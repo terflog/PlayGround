@@ -43,6 +43,10 @@ const state = {
     rescuedMrFuji: false, // EVENT_RESCUED_MR_FUJI (scripts/PokemonTower7F.asm)
     wokeRoute12Snorlax: false, // EVENT_FIGHT_ROUTE12_SNORLAX (scripts/Route12.asm)
     wokeRoute16Snorlax: false, // EVENT_FIGHT_ROUTE16_SNORLAX (scripts/Route16.asm)
+    gotBikeVoucher: false, // EVENT_GOT_BIKE_VOUCHER (scripts/PokemonFanClub.asm)
+    gotBicycle: false, // EVENT_GOT_BICYCLE (scripts/BikeShop.asm)
+    gotMtMoonFossil: false, // EVENT_GOT_DOME_FOSSIL / EVENT_GOT_HELIX_FOSSIL (scripts/MtMoonB2F.asm)
+    calmedMarowak: false, // EVENT_BEAT_GHOST_MAROWAK (scripts/PokemonTower6F.asm)
   },
   party: [],
   bag: [], // Player starts with 0 items; items and HMs are acquired in-game!
@@ -216,6 +220,14 @@ const ITEM_CATALOG = {
   TOWN_MAP: { id: "TOWN_MAP", name: "TOWN MAP", qty: 1, kind: "map" },
   OAKS_PARCEL: { id: "OAKS_PARCEL", name: "OAK's PARCEL", qty: 1, kind: "key" },
   SS_TICKET: { id: "SS_TICKET", name: "S.S. TICKET", qty: 1, kind: "key" },
+  BIKE_VOUCHER: { id: "BIKE_VOUCHER", name: "BIKE VOUCHER", qty: 1, kind: "key" },
+  BICYCLE: { id: "BICYCLE", name: "BICYCLE", qty: 1, kind: "bike" },
+  SILPH_SCOPE: { id: "SILPH_SCOPE", name: "SILPH SCOPE", qty: 1, kind: "key" },
+  LIFT_KEY: { id: "LIFT_KEY", name: "LIFT KEY", qty: 1, kind: "key" },
+  GOLD_TEETH: { id: "GOLD_TEETH", name: "GOLD TEETH", qty: 1, kind: "key" },
+  SECRET_KEY: { id: "SECRET_KEY", name: "SECRET KEY", qty: 1, kind: "key" },
+  HELIX_FOSSIL: { id: "HELIX_FOSSIL", name: "HELIX FOSSIL", qty: 1, kind: "key" },
+  DOME_FOSSIL: { id: "DOME_FOSSIL", name: "DOME FOSSIL", qty: 1, kind: "key" },
 };
 
 export function giveBagItem(itemKey, count = 1) {
@@ -1661,6 +1673,29 @@ function checkInGameGiftOrEvent(npc, zone) {
     return giveGiftMon("HITMONCHAN", 30); // scripts/FightingDojo.asm:278
   }
   // 3. Canonical Hidden Machine (HM01–HM05), Key Item & Ground Item Ball scripts:
+  if (zone.constName === "POKEMON_FAN_CLUB" && upName.includes("CHAIRMAN")) {
+    if (!state.events.gotBikeVoucher && !state.events.gotBicycle) {
+      state.events.gotBikeVoucher = true;
+      giveBagItem("BIKE_VOUCHER", 1);
+      return `\n\nCHAIRMAN: Thank you for listening to my story about RAPIDASH! Take this BIKE VOUCHER to the CERULEAN BIKE SHOP!\n\nRED received a BIKE VOUCHER!`;
+    }
+  }
+  if (zone.constName === "BIKE_SHOP" && upName.includes("CLERK")) {
+    if (state.bag.some((it) => it.id === "BIKE_VOUCHER")) {
+      state.events.gotBicycle = true;
+      state.bag = state.bag.filter((it) => it.id !== "BIKE_VOUCHER");
+      giveBagItem("BICYCLE", 1);
+      return `\n\nCLERK: Oh, that's a BIKE VOUCHER! Here you go!\n\nRED exchanged the BIKE VOUCHER for a BICYCLE!`;
+    }
+  }
+  if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
+    if (state.bag.some((it) => it.id === "DOME_FOSSIL")) {
+      state.bag = state.bag.filter((it) => it.id !== "DOME_FOSSIL");
+      return giveGiftMon("KABUTO", 30);
+    }
+    state.bag = state.bag.filter((it) => it.id !== "HELIX_FOSSIL");
+    return giveGiftMon("OMANYTE", 30);
+  }
   if (zone.constName === "SS_ANNE_CAPTAINS_ROOM" && upName.includes("CAPTAIN")) {
     giveBagItem("HM01_CUT", 1);
     return `\n\nRED received HM01 (CUT) from the CAPTAIN!`;
@@ -1734,9 +1769,24 @@ function checkInGameGiftOrEvent(npc, zone) {
     }
     return `\n\nPicked up POKé BALLs & POTIONs at the POKéMON MART!`;
   }
+  if (npc.kind === "item" && npc.sprite === "SPRITE_FOSSIL") {
+    const isDome = upName.includes("DOME");
+    state.events.gotMtMoonFossil = true;
+    state.npcs.forEach((n) => {
+      if (n.sprite === "SPRITE_FOSSIL") n.collected = true;
+    });
+    const added = giveBagItem(isDome ? "DOME_FOSSIL" : "HELIX_FOSSIL", 1);
+    if (added) {
+      return `\n\nRED got the ${added.name}! SUPER NERD took the other fossil!`;
+    }
+  }
   if (npc.kind === "item" && npc.sprite === "SPRITE_POKE_BALL") {
     let foundKey = "POTION";
-    if (upName.includes("MOON_STONE")) foundKey = "MOON_STONE";
+    if (upName.includes("GOLD_TEETH")) foundKey = "GOLD_TEETH";
+    else if (upName.includes("SECRET_KEY")) foundKey = "SECRET_KEY";
+    else if (upName.includes("SILPH_SCOPE")) foundKey = "SILPH_SCOPE";
+    else if (upName.includes("LIFT_KEY")) foundKey = "LIFT_KEY";
+    else if (upName.includes("MOON_STONE")) foundKey = "MOON_STONE";
     else if (upName.includes("FIRE_STONE")) foundKey = "FIRE_STONE";
     else if (upName.includes("WATER_STONE")) foundKey = "WATER_STONE";
     else if (upName.includes("LEAF_STONE")) foundKey = "LEAF_STONE";
@@ -2963,6 +3013,12 @@ function handleEnemyFainted(b, msgs) {
         if (b.trainerKey.startsWith("GAME_CORNER:GAMECORNER_ROCKET")) {
           const rNpc = state.npcs.find((n) => n.name === "GAMECORNER_ROCKET");
           if (rNpc) rNpc.collected = true;
+        }
+        // Defeating Giovanni in Rocket Hideout B4F drops the Silph Scope & Lift Key
+        if (b.trainerKey.startsWith("ROCKET_HIDEOUT_B4F:ROCKETHIDEOUTB4F_GIOVANNI")) {
+          giveBagItem("SILPH_SCOPE", 1);
+          giveBagItem("LIFT_KEY", 1);
+          msgs.push(`GIOVANNI dropped the\nSILPH SCOPE & LIFT KEY!`);
         }
       }
       b.showTrainerSprite = Boolean(b.trainerSprite);
@@ -4443,6 +4499,39 @@ function useBagItemInStartMenu(itemIndex) {
     useFieldMove(item.moveId);
     return;
   }
+  if (item.kind === "bike") {
+    if (state.currentZone && state.currentZone.romId >= 0x25 && state.currentZone.category === "indoor") {
+      audio.playSfx("bump");
+      return;
+    }
+    sm.open = false;
+    sm.subView = null;
+    renderStartMenu();
+    state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
+    if (state.player.mode === "walk") {
+      state.pikachu.spawnDelayed = false;
+      state.pikachu.x = state.player.x;
+      state.pikachu.y = state.player.y;
+      state.pikachu.renderX = state.player.x;
+      state.pikachu.renderY = state.player.y;
+    }
+    syncPikachuOverworldState();
+    audio.playSfx("warp");
+    openDialogue(
+      "BICYCLE",
+      state.player.mode === "bike"
+        ? "RED got on the BICYCLE!"
+        : "RED got off the BICYCLE."
+    );
+    renderAllCanvases(true);
+    return;
+  }
+  if (item.kind === "map") {
+    audio.playSfx("blip");
+    sm.subView = "TOWN_MAP";
+    renderStartMenu();
+    return;
+  }
   if (item.kind === "flute") {
     sm.open = false;
     sm.subView = null;
@@ -4723,10 +4812,49 @@ export function handleStartMenuInput(input) {
     return;
   }
 
+  if (sm.subView === "OPTION") {
+    if (input === "UP") {
+      sm.subCursor = (sm.subCursor + 3) % 4;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "DOWN") {
+      sm.subCursor = (sm.subCursor + 1) % 4;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      sm.subView = null;
+      renderStartMenu();
+    } else if (input === "A" || input === "LEFT" || input === "RIGHT") {
+      if (sm.subCursor === 0) {
+        const modes = ["reference", "sgb", "cgb", "dmg"];
+        const delta = input === "LEFT" ? 3 : 1;
+        engine.paletteMode = modes[(modes.indexOf(engine.paletteMode) + delta) % modes.length];
+        audio.playSfx("blip");
+        saveProgress();
+        renderAllCanvases(true);
+        renderStartMenu();
+      } else if (sm.subCursor === 1) {
+        audio.toggle();
+        renderStartMenu();
+      } else if (sm.subCursor === 2) {
+        state.wildEncountersEnabled = !state.wildEncountersEnabled;
+        audio.playSfx("blip");
+        saveProgress();
+        renderStartMenu();
+      } else {
+        audio.playSfx("blip");
+        sm.subView = null;
+        renderStartMenu();
+      }
+    }
+    return;
+  }
+
   if (sm.subView) {
     if (input === "B" || input === "START" || input === "A") {
       audio.playSfx("blip");
-      sm.subView = null;
+      sm.subView = sm.subView === "TOWN_MAP" ? "ITEM" : null;
       renderStartMenu();
     }
     return;
@@ -5271,6 +5399,52 @@ export function renderStartMenu() {
         );
       }
     });
+  } else if (sm.subView === "TOWN_MAP") {
+    const curZ = state.currentZone;
+    const wrap = document.createElement("div");
+    wrap.className = "gb-pokedex-data";
+    wrap.innerHTML = `
+      <div style="display:flex;justify-content:space-between;padding:4px 8px;border-bottom:2px solid #111827;font-size:10px;font-weight:900">
+        <span>${curZ.regionName || curZ.displayName.toUpperCase()}</span>
+        <span>TOWN MAP</span>
+      </div>
+      <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#fcfaff;overflow:hidden">
+        <canvas id="start-town-map-canvas" width="160" height="104" style="width:100%;height:100%;display:block"></canvas>
+      </div>
+      <div class="gb-poke-box" style="padding:4px 8px;font-size:9px;font-weight:900;min-height:32px;display:flex;align-items:center;justify-content:space-between">
+        <span>CURRENT: ${curZ.displayName}</span>
+        <span class="gb-prompt-arrow">▼</span>
+      </div>
+    `;
+    wrap.onclick = () => {
+      audio.playSfx("blip");
+      sm.subView = "ITEM";
+      renderStartMenu();
+    };
+    subBody.appendChild(wrap);
+    const tmCanvas = document.getElementById("start-town-map-canvas");
+    if (tmCanvas) {
+      const ctx = tmCanvas.getContext("2d");
+      const W = tmCanvas.width;
+      const H = tmCanvas.height;
+      const cellW = W / 16;
+      const cellH = H / 16;
+      ctx.fillStyle = "#fcfaff";
+      ctx.fillRect(0, 0, W, H);
+      for (const z of engine.canonicalZones) {
+        const px = z.townMapX * cellW;
+        const py = z.townMapY * cellH;
+        ctx.fillStyle = z.category === "town" ? "#64748b" : "#cbd5e1";
+        ctx.fillRect(px + 2, py + 2, cellW - 4, cellH - 4);
+      }
+      const cx = curZ.townMapX * cellW;
+      const cy = curZ.townMapY * cellH;
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(cx + 1.5, cy + 1.5, cellW - 3, cellH - 3);
+    }
   } else if (sm.subView === "SAVE") {
     if (subTitle) subTitle.textContent = `SAVE GAME (sMainData)`;
     saveProgress();
@@ -5295,46 +5469,51 @@ export function renderStartMenu() {
     optWrap.style.padding = "8px 10px";
     optWrap.style.display = "flex";
     optWrap.style.flexDirection = "column";
-    optWrap.style.gap = "5px";
-    const palRow = document.createElement("button");
-    palRow.type = "button";
-    palRow.className = "sub-list-row";
-    palRow.innerHTML = `<span>PALETTE MODE</span><span>${engine.paletteMode.toUpperCase()}</span>`;
-    palRow.onclick = () => {
-      const modes = ["reference", "sgb", "cgb", "dmg"];
-      const next = modes[(modes.indexOf(engine.paletteMode) + 1) % modes.length];
-      engine.paletteMode = next;
-      const sel = document.getElementById("palette-select");
-      if (sel) sel.value = next;
-      audio.playSfx("blip");
-      renderAllCanvases();
-      renderStartMenu();
-    };
-    const bgmRow = document.createElement("button");
-    bgmRow.type = "button";
-    bgmRow.className = "sub-list-row";
-    bgmRow.innerHTML = `<span>SOUND / BGM</span><span>${audio.enabled ? "ON" : "OFF"}</span>`;
-    bgmRow.onclick = () => {
-      const on = audio.toggle();
-      const btn = document.getElementById("btn-audio-toggle");
-      if (btn) {
-        btn.textContent = on ? "🔊 BGM: ON" : "🔇 BGM: OFF";
-        btn.classList.toggle("active", on);
-      }
-      renderStartMenu();
-    };
-    const wildRow = document.createElement("button");
-    wildRow.type = "button";
-    wildRow.className = "sub-list-row";
-    wildRow.innerHTML = `<span>WILD ENCOUNTERS</span><span>${state.wildEncountersEnabled ? "ON" : "OFF"}</span>`;
-    wildRow.onclick = () => {
-      state.wildEncountersEnabled = !state.wildEncountersEnabled;
-      audio.playSfx("blip");
-      renderStartMenu();
-    };
-    optWrap.appendChild(palRow);
-    optWrap.appendChild(bgmRow);
-    optWrap.appendChild(wildRow);
+    optWrap.style.gap = "6px";
+    const rows = [
+      {
+        label: "PALETTE",
+        val: engine.paletteMode.toUpperCase(),
+        act: () => {
+          sm.subCursor = 0;
+          handleStartMenuInput("A");
+        },
+      },
+      {
+        label: "SOUND",
+        val: audio.enabled ? "ON" : "OFF",
+        act: () => {
+          sm.subCursor = 1;
+          handleStartMenuInput("A");
+        },
+      },
+      {
+        label: "ENC.RATE",
+        val: state.wildEncountersEnabled ? "NORMAL" : "OFF",
+        act: () => {
+          sm.subCursor = 2;
+          handleStartMenuInput("A");
+        },
+      },
+      {
+        label: "CANCEL",
+        val: "",
+        act: () => {
+          sm.subCursor = 3;
+          handleStartMenuInput("A");
+        },
+      },
+    ];
+    rows.forEach((r, rIdx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "bbag-row";
+      btn.innerHTML = `<span class="bbag-left"><span class="bcursor">${
+        sm.subCursor === rIdx ? "▶" : " "
+      }</span><span>${r.label}</span></span><span>${r.val}</span>`;
+      btn.onclick = r.act;
+      optWrap.appendChild(btn);
+    });
     subBody.appendChild(optWrap);
   }
 }
