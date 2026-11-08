@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Kanto Region Overworld Map — Crystal Story Events &amp; Joypad Explorer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- Live Kanto Overworld Canvas -->
+    <canvas id="world-canvas" aria-label="Kanto Region Overworld Map"></canvas>
+
+    <!-- ===================================================================== -->
+    <!-- STARTUP TITLE SEQUENCE OVERLAY                                        -->
+    <!-- ===================================================================== -->
+    <section id="title-screen" role="dialog" aria-label="Kanto Region Title Sequence">
+      <canvas id="title-canvas"></canvas>
+
+      <div class="title-sequence-card">
+        <div class="title-top-bar">
+          <span class="title-studio-tag">★ GAME FREAK / KANTO &amp; CRYSTAL TRIBUTE ★</span>
+          <span id="title-stage-indicator" class="title-stage-pill">
+            STAGE 1 • SUICUNE CRYSTAL STARBURST
+          </span>
+        </div>
+
+        <div class="title-logo-block">
+          <div class="pokeball-crest" aria-hidden="true">
+            <div class="pokeball-crest-inner"></div>
+          </div>
+          <p class="title-overline">POCKET MONSTERS WORLD ATLAS</p>
+          <h1 class="title-main-heading">KANTO REGION</h1>
+          <div class="title-version-ribbon">
+            FIRERED • LEAFGREEN • CRYSTAL STORY EVENTS EDITION
+          </div>
+        </div>
+
+        <!-- Animated Kanto & Crystal Showcase -->
+        <div class="title-starters-row" aria-label="Kanto and Crystal Showcase">
+          <div class="starter-chip starter-crystal">
+            <span class="starter-icon">💎</span>
+            <div>
+              <strong>Suicune</strong>
+              <small>#245 Aurora</small>
+            </div>
+          </div>
+          <div class="starter-chip starter-fire">
+            <span class="starter-icon">🔥</span>
+            <div>
+              <strong>Charizard</strong>
+              <small>#006 Flame</small>
+            </div>
+          </div>
+          <div class="starter-chip starter-grass">
+            <span class="starter-icon">🌿</span>
+            <div>
+              <strong>Celebi</strong>
+              <small>#251 Time</small>
+            </div>
+          </div>
+          <div class="starter-chip starter-electric">
+            <span class="starter-icon">⚡</span>
+            <div>
+              <strong>Pikachu</strong>
+              <small>#025 Mouse</small>
+            </div>
+          </div>
+        </div>
+
+        <p class="title-synopsis">
+          Explore all <strong>11 Kanto Cities &amp; Towns</strong>, <strong>25 Canonical Routes</strong>,
+          and <strong>5 Pokémon Crystal-Exclusive Scripted Story Events</strong> (Suicune &amp; Eusine,
+          GS Ball Celebi Shrine, Clear Bell &amp; Power Plant Crisis) using the
+          <strong>Interactive Joypad</strong>!
+        </p>
+
+        <button id="start-game-btn" type="button" class="title-start-btn" aria-label="Start Game">
+          START GAME
+        </button>
+
+        <div class="title-controls-hint">
+          <span>🕹️ Drag Thumbstick or Tap D-Pad to Move</span>
+          <span>•</span>
+          <span>💎 5 Scripted Crystal Cutscenes</span>
+          <span>•</span>
+          <span>🚲 Bicycle &amp; 🌊 Lapras Surf</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TOP HUD BAR                                                           -->
+    <!-- ===================================================================== -->
+    <header id="hud-top-bar">
+      <div class="hud-location-box">
+        <div class="hud-pokeball-dot"></div>
+        <div>
+          <div class="hud-location-row">
+            <span id="hud-location-name">Pallet Town</span>
+            <span id="hud-coords" class="hud-coords-pill">X:42 Y:95</span>
+          </div>
+          <div id="hud-location-sub" class="hud-location-sub">
+            Shades of your journey await!
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-stats-row">
+        <div class="hud-stat-pill" title="Current Movement Mode">
+          <span id="hud-mode-badge">👟 WALK</span>
+        </div>
+        <div class="hud-stat-pill hud-stat-crystal" title="Completed Pokémon Crystal Scripted Story Events">
+          <span>💎 Crystal:</span>
+          <strong id="hud-crystal-count">0 / 5</strong>
+        </div>
+        <div class="hud-stat-pill" title="Collected Kanto Gym Badges">
+          <span>🏅 Badges:</span>
+          <strong id="hud-badges-count">0 / 8</strong>
+        </div>
+        <div class="hud-stat-pill" title="Wild Kanto Pokémon Sighted">
+          <span>📖 Pokédex:</span>
+          <strong id="hud-dex-count">1</strong>
+        </div>
+      </div>
+
+      <div class="hud-actions-row">
+        <button id="btn-crystal-quests" type="button" class="hud-btn hud-btn-crystal">
+          💎 Crystal Events
+        </button>
+        <button id="btn-open-map-hud" type="button" class="hud-btn hud-btn-primary">
+          🗺️ Kanto Map
+        </button>
+        <button id="btn-joypad-style" type="button" class="hud-btn" title="Switch Joypad Mode">
+          🕹️ ANALOG
+        </button>
+        <button id="btn-zoom" type="button" class="hud-btn" title="Adjust Camera Zoom">
+          🔍 100%
+        </button>
+        <button id="btn-sound" type="button" class="hud-btn" title="Toggle Retro Audio">
+          🔊 SFX ON
+        </button>
+        <button id="btn-replay-title" type="button" class="hud-btn" title="View Title Sequence">
+          🎬 Title
+        </button>
+        <a
+          href="./index.html"
+          class="hud-btn"
+          style="text-decoration: none; display: inline-flex; align-items: center"
+          title="Switch to Team Rocket Grunt Mode"
+        >
+          🚀 Rocket Mode
+        </a>
+      </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- TOP-RIGHT LIVE KANTO MINI-MAP & WAYPOINT COMPASS                      -->
+    <!-- ===================================================================== -->
+    <aside id="minimap-card" title="Click to open Full Kanto Town Map & Fast Travel">
+      <div class="minimap-header">
+        <span>KANTO RADAR</span>
+        <span class="minimap-expand-tag">TAP TO EXPAND</span>
+      </div>
+      <canvas id="minimap-canvas" width="160" height="136"></canvas>
+      <div id="waypoint-label" class="minimap-waypoint">🧭 Viridian Forest GS Ball Shrine</div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- GBA-STYLE REGION ENTRY BANNER & DISCOVERY TOAST                       -->
+    <!-- ===================================================================== -->
+    <div id="region-banner" aria-live="polite">
+      <div class="banner-tag">KANTO REGION</div>
+      <div id="banner-title" class="banner-title">Pallet Town</div>
+      <div id="banner-subtitle" class="banner-subtitle">Shades of your journey await!</div>
+    </div>
+
+    <div id="discovery-toast" aria-live="polite"></div>
+
+    <!-- ===================================================================== -->
+    <!-- CLASSIC DIALOGUE / SCRIPTED CRYSTAL STORY CUTSCENE BOX                -->
+    <!-- ===================================================================== -->
+    <div id="dialog-box" class="hidden" role="dialog" aria-modal="false">
+      <div class="dialog-header">
+        <div class="dialog-title-group">
+          <span id="dialog-step-badge" class="dialog-step-badge hidden">CRYSTAL EVENT</span>
+          <span id="dialog-title">Prof. Oak</span>
+        </div>
+        <button id="btn-dialog-ok" type="button" class="dialog-close-btn">A • CONTINUE ▾</button>
+      </div>
+      <p id="dialog-text"></p>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- BOTTOM ERGONOMIC JOYPAD & ACTION CONTROLS DECK                        -->
+    <!-- ===================================================================== -->
+    <footer id="controls-deck">
+      <!-- Bottom-Left Virtual Joypad (Analog Thumbstick + 4-Way D-Pad Ring) -->
+      <div id="joypad-container" aria-label="Character Movement Joypad">
+        <div class="joypad-header-tag">
+          <span>JOYPAD</span>
+          <strong id="joypad-readout">IDLE</strong>
+        </div>
+
+        <div id="joypad-base" role="group" aria-label="Directional Joypad">
+          <button
+            type="button"
+            class="dpad-sector dpad-up"
+            data-dpad-btn
+            data-dir="up"
+            aria-label="Move Up"
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            class="dpad-sector dpad-right"
+            data-dpad-btn
+            data-dir="right"
+            aria-label="Move Right"
+          >
+            ▶
+          </button>
+          <button
+            type="button"
+            class="dpad-sector dpad-down"
+            data-dpad-btn
+            data-dir="down"
+            aria-label="Move Down"
+          >
+            ▼
+          </button>
+          <button
+            type="button"
+            class="dpad-sector dpad-left"
+            data-dpad-btn
+            data-dir="left"
+            aria-label="Move Left"
+          >
+            ◀
+          </button>
+
+          <div id="joypad-stick" aria-hidden="true">
+            <div class="joypad-stick-grip"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom-Right Handheld Action Buttons (A, B, Bike, Map) -->
+      <div id="action-pad" aria-label="Action Controls">
+        <div class="aux-buttons-row">
+          <button id="btn-bike" type="button" class="aux-pill-btn" aria-label="Toggle Bicycle">
+            🚲 BIKE
+          </button>
+          <button id="btn-map" type="button" class="aux-pill-btn" aria-label="Toggle Town Map">
+            🗺️ MAP
+          </button>
+        </div>
+
+        <div class="ab-buttons-row">
+          <div class="ab-btn-wrap">
+            <button id="btn-b" type="button" class="ab-circle-btn btn-b-color" aria-label="B Button Run">
+              B
+            </button>
+            <span class="ab-caption">RUN / DASH</span>
+          </div>
+          <div class="ab-btn-wrap">
+            <button
+              id="btn-a"
+              type="button"
+              class="ab-circle-btn btn-a-color"
+              aria-label="A Button Interact"
+            >
+              A
+            </button>
+            <span class="ab-caption">TALK / SIGN</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- POKÉMON CRYSTAL-EXCLUSIVE SCRIPTED STORY EVENTS MODAL                 -->
+    <!-- ===================================================================== -->
+    <div id="crystal-modal" class="hidden" role="dialog" aria-label="Pokémon Crystal Scripted Story Events">
+      <div class="town-map-window crystal-window">
+        <div class="town-map-topbar crystal-topbar">
+          <div>
+            <h2>💎 POKÉMON CRYSTAL — EXCLUSIVE SCRIPTED STORY EVENTS</h2>
+            <p>
+              Walk to any Crystal beacon with the Joypad or click “Trigger Scene” below to experience
+              live scripted Suicune, Eusine, Celebi &amp; Kanto Power Plant cutscenes!
+            </p>
+          </div>
+          <button id="btn-close-crystal" type="button" class="town-map-close">✕ CLOSE</button>
+        </div>
+        <div id="crystal-events-list" class="crystal-events-grid"></div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- FULL INTERACTIVE KANTO TOWN MAP MODAL (FLY & WAYPOINT GUIDE)          -->
+    <!-- ===================================================================== -->
+    <div id="town-map-modal" class="hidden" role="dialog" aria-label="Kanto Region Town Map">
+      <div class="town-map-window">
+        <div class="town-map-topbar">
+          <div>
+            <h2>POKÉGEAR • KANTO REGION TOWN MAP</h2>
+            <p>Click any City on the map or choose a destination below to set a Compass Guide or Fly!</p>
+          </div>
+          <button id="btn-close-map" type="button" class="town-map-close">✕ CLOSE</button>
+        </div>
+
+        <div class="town-map-body">
+          <div class="town-map-canvas-wrap">
+            <canvas id="full-kanto-map-canvas" width="480" height="408"></canvas>
+            <div class="town-map-legend">
+              <span><i class="dot-red"></i> Player Position</span>
+              <span><i class="dot-cyan"></i> Crystal Events</span>
+              <span><i class="dot-gold"></i> Roads &amp; Bridges</span>
+            </div>
+          </div>
+
+          <div id="town-map-list" class="town-map-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

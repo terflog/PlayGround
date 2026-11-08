@@ -36,6 +36,7 @@ export const TILE = {
   SHIP_DECK: 27,
   HEAL_PAD: 28,
   ICE_FLOOR: 29,
+  CRYSTAL_SHRINE: 30,
 };
 
 export const SOLID_TILES = new Set([
@@ -52,6 +53,7 @@ export const SOLID_TILES = new Set([
   TILE.ROOF_PURPLE,
   TILE.ROOF_GREEN,
   TILE.FOUNTAIN,
+  TILE.CRYSTAL_SHRINE,
 ]);
 
 export const CITIES = [
@@ -581,3 +583,172 @@ export const SIGNS = [
   { x: 41, y: 123, title: 'CINNABAR ISLAND SIGN', text: 'CINNABAR ISLAND — “The Fiery Town of Burning Desire.” Home of Cinnabar Lab, Pokémon Mansion, and Blaine’s Gym.' },
   { x: 21, y: 20, title: 'INDIGO PLATEAU — POKÉMON LEAGUE', text: 'INDIGO PLATEAU — The ultimate stage for Kanto Pokémon Trainers! Challenge the Elite Four and Champion!' },
 ];
+
+export const CRYSTAL_EVENTS = [
+  {
+    id: 'suicune-vermilion',
+    chapter: 'Chapter I • Crystal Exclusive',
+    title: 'Suicune at Vermilion Harbor & Eusine’s Pursuit',
+    locationName: 'Vermilion Harbor Pier',
+    x: 104,
+    y: 89,
+    triggerRadius: 2.3,
+    color: '#38bdf8',
+    rewardItem: 'Mystic Water Aura',
+    pokemonUnlocked: 'Suicune (Sighted)',
+    summary:
+      'Approach Vermilion Pier where Suicune stands atop the harbor waves. Watch it leap across the sea as MysticMan Eusine rushes in!',
+    actors: [
+      { type: 'suicune', x: 104, y: 90, leapTo: { x: 112, y: 90 } },
+      { type: 'eusine', x: 102, y: 88, walkTo: { x: 103, y: 89 } },
+    ],
+    effectType: 'aurora',
+    steps: [
+      {
+        speaker: '💎 SUICUNE — THE AURORA POKÉMON',
+        text: '“Krrr-shaaah!!” ❄️\nStanding atop the shimmering waves of Vermilion Harbor, Suicune’s diamond crest gleams with an icy northern aurora as it locks eyes with you!',
+      },
+      {
+        speaker: '💨 SCRIPTED OVERWORLD LEAP',
+        text: 'With three impossible bounds across the surface of the ocean, Suicune streaks eastward toward the coastal cliffs of Route 14!',
+      },
+      {
+        speaker: '🎩 MYSTICMAN EUSINE',
+        text: '“Awesome!! Did you see that?! I have chased Suicune for ten years, yet it paused to gaze directly at YOU! I’m Eusine—let’s track Suicune to Route 14!”',
+      },
+    ],
+  },
+  {
+    id: 'suicune-route14',
+    chapter: 'Chapter II • Crystal Exclusive',
+    title: 'Coastal Wind on Route 14 & Eusine’s Challenge',
+    locationName: 'Route 14 Seaside Overlook',
+    x: 132,
+    y: 95,
+    triggerRadius: 2.3,
+    color: '#06b6d4',
+    rewardItem: 'Clear Bell',
+    pokemonUnlocked: 'Raikou',
+    summary:
+      'Corner Suicune along Kanto’s eastern coastal boardwalk on Route 14 and prove your worth in a scripted duel with Eusine to earn the Clear Bell!',
+    actors: [
+      { type: 'suicune', x: 133, y: 95, leapTo: { x: 133, y: 87 } },
+      { type: 'eusine', x: 130, y: 95, walkTo: { x: 131, y: 95 } },
+    ],
+    effectType: 'crystal-wind',
+    steps: [
+      {
+        speaker: '💎 SUICUNE ON KANTO ROUTE 14',
+        text: 'Perched where the ocean spray meets Route 14’s emerald cliffs, Suicune circles you once in a vortex of purifying mist before leaping north toward Cerulean Cape!',
+      },
+      {
+        speaker: '🎩 MYSTICMAN EUSINE — SCRIPTED DUEL',
+        text: '“I knew you would follow Suicune here! To earn Suicune’s recognition, I must test your bond with my Electrode, Haunter, and Hypno—en garde!”',
+      },
+      {
+        speaker: '🔔 RECEIVED THE CLEAR BELL!',
+        text: 'Eusine: “Amazing... I lost! Now I see why Suicune trusts your heart. Take this treasured CLEAR BELL—its chime will summon Suicune at Cerulean Cape!”',
+      },
+    ],
+  },
+  {
+    id: 'clear-bell-suicune',
+    chapter: 'Chapter III • Crystal Exclusive',
+    title: 'Chime of the Clear Bell: The Three Beasts & Suicune’s Pact',
+    locationName: 'Cerulean Cape Crystal Sanctuary (Route 25)',
+    x: 116,
+    y: 12,
+    triggerRadius: 2.3,
+    color: '#a855f7',
+    rewardItem: 'Crystal Emblem',
+    pokemonUnlocked: 'Suicune',
+    summary:
+      'Resonate the Clear Bell at Cerulean Cape! Witness Raikou, Entei, and Suicune awaken in unison as Suicune descends to challenge you.',
+    actors: [
+      { type: 'suicune', x: 116, y: 11, leapTo: { x: 116, y: 12 } },
+      { type: 'raikou', x: 114, y: 10, leapTo: { x: 106, y: 10 } },
+      { type: 'entei', x: 118, y: 10, leapTo: { x: 124, y: 10 } },
+      { type: 'eusine', x: 114, y: 13, walkTo: { x: 115, y: 13 } },
+    ],
+    effectType: 'trinity-awakening',
+    steps: [
+      {
+        speaker: '🔔 THE CLEAR BELL RESONATES',
+        text: 'Din-don-din... The Clear Bell chimes across Cerulean Cape! The northern sky shimmers with the translucent crystalline aura of Pokémon Crystal!',
+      },
+      {
+        speaker: '⚡🔥❄️ RAIKOU, ENTEI & SUICUNE AWAKEN',
+        text: 'In a flash of golden thunder and volcanic flame, Raikou and Entei streak across the Kanto horizon—while Suicune steps calmly down a bridge of diamond ice!',
+      },
+      {
+        speaker: '💎 SUICUNE JOINS YOUR DISCOVERY LOG!',
+        text: 'Suicune bows its crystal crest in recognition of your journey! Eusine tips his hat in awe: “Magnificent! Legends will tell of this Crystal encounter forever!”',
+      },
+    ],
+  },
+  {
+    id: 'gs-ball-celebi',
+    chapter: 'Chapter IV • Crystal Exclusive',
+    title: 'Secret of the GS Ball: Celebi’s Forest Shrine',
+    locationName: 'Viridian Forest Ancient Shrine',
+    x: 42,
+    y: 47,
+    triggerRadius: 2.2,
+    color: '#22c55e',
+    rewardItem: 'GS Ball & Miracle Seed',
+    pokemonUnlocked: 'Celebi',
+    summary:
+      'Place the golden GS Ball into the mossy wooden Forest Shrine in the heart of Viridian Forest to trigger Celebi’s time-travel arrival!',
+    actors: [
+      { type: 'celebi', x: 42, y: 46, leapTo: { x: 42, y: 47 } },
+    ],
+    effectType: 'celebi-time',
+    steps: [
+      {
+        speaker: '🟡 THE GOLDEN GS BALL',
+        text: 'You placed Kurt’s mysterious golden GS BALL into the hollow of the ancient wooden Forest Shrine. Suddenly, every sound in Viridian Forest falls silent...',
+      },
+      {
+        speaker: '🌿✨ TIME RIPPLES THROUGH THE CANOPY',
+        text: 'Blinding emerald rings spiral outward from the shrine! Golden leaves float upward as time itself ripples across the forest floor!',
+      },
+      {
+        speaker: '🧚‍♀️ MYTHICAL CELEBI APPEARS!',
+        text: '“Bi-biii!!” Travelling across time, the Voice of the Forest CELEBI swoops down in a shower of radiant green stardust and blesses your Kanto adventure!',
+      },
+    ],
+  },
+  {
+    id: 'power-plant-rocket',
+    chapter: 'Chapter V • Crystal Kanto Arc',
+    title: 'Nugget Bridge Saboteur & Kanto Power Plant Restoration',
+    locationName: 'Nugget Bridge (Route 24)',
+    x: 104,
+    y: 17,
+    triggerRadius: 2.2,
+    color: '#eab308',
+    rewardItem: 'Machine Part & EXPN Card',
+    pokemonUnlocked: 'Entei',
+    summary:
+      'Intercept the Team Rocket Grunt on Nugget Bridge to recover the stolen Machine Part, restore the Kanto Power Plant, and power up the Saffron Magnet Train!',
+    actors: [
+      { type: 'rocket', x: 104, y: 16, leapTo: { x: 104, y: 11 } },
+    ],
+    effectType: 'electric-surge',
+    steps: [
+      {
+        speaker: '🚀 TEAM ROCKET SABOTEUR CORNERED!',
+        text: 'Grunt on Nugget Bridge: “Hey! You followed me from Cerulean Gym?! Fine—I hid the stolen MACHINE PART right here! Team Rocket is blasting off again!”',
+      },
+      {
+        speaker: '⚙️⚡ KANTO POWER PLANT & MAGNET TRAIN RESTORED',
+        text: 'You returned the Machine Part to the Kanto Power Plant! High-voltage electricity surges through Route 10, restoring Saffron City’s Magnet Train!',
+      },
+      {
+        speaker: '📻 POKÉGEAR EXPN RADIO CARD UNLOCKED!',
+        text: 'Lavender Radio Director: “You saved Kanto’s power grid! Take this EXPN CARD—your PokéGear now plays the Poké Flute melody to wake Snorlax on Route 12!”',
+      },
+    ],
+  },
+];
+
