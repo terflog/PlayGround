@@ -21,20 +21,45 @@ export function unpackBytes(b64) {
   return out;
 }
 
+function createLazy2BitMap(sourceDict) {
+  const cache = {};
+  const src = sourceDict || {};
+  return new Proxy(cache, {
+    get(target, prop) {
+      if (typeof prop !== "string") return target[prop];
+      if (prop in target) return target[prop];
+      const raw = src[prop];
+      if (!raw) return undefined;
+      const unpacked = {
+        width: raw.width,
+        height: raw.height,
+        pixels: unpack2Bit(raw.data, raw.width, raw.height),
+      };
+      target[prop] = unpacked;
+      return unpacked;
+    },
+    has(target, prop) {
+      return prop in target || prop in src;
+    },
+    ownKeys() {
+      return Reflect.ownKeys(src);
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      if (prop in src) {
+        return { enumerable: true, configurable: true };
+      }
+      return undefined;
+    },
+  });
+}
+
 export class PokeYellowEngine {
   constructor(data) {
     this.data = data;
     this.palettes = data.palettes;
 
-    // Unpack tilesets & blocksets
-    this.gfxSheets = {};
-    for (const [k, v] of Object.entries(data.tilesets.gfx)) {
-      this.gfxSheets[k] = {
-        width: v.width,
-        height: v.height,
-        pixels: unpack2Bit(v.data, v.width, v.height),
-      };
-    }
+    // Lazily unpack tilesets & blocksets on first access to avoid startup memory spike
+    this.gfxSheets = createLazy2BitMap(data.tilesets.gfx);
 
     this.bstData = {};
     for (const [k, v] of Object.entries(data.tilesets.bst)) {
@@ -53,58 +78,30 @@ export class PokeYellowEngine {
       this.tilesetsByConst[ts.constName] = ts;
     }
 
-    // Unpack sprites
-    this.spriteSheets = {};
-    for (const [k, v] of Object.entries(data.sprites.sheets)) {
-      this.spriteSheets[k] = {
-        width: v.width,
-        height: v.height,
-        pixels: unpack2Bit(v.data, v.width, v.height),
-      };
-    }
+    // Lazily unpack overworld, portrait, emote, Pokémon & trainer sprites on demand
+    this.spriteSheets = createLazy2BitMap(data.sprites.sheets);
     this.spriteConstToKey = data.sprites.constToKey;
+    this.pikachuFaces = createLazy2BitMap(data.sprites.pikachuFaces);
+    this.emotes = createLazy2BitMap(data.sprites.emotes);
+    this.pokemonSprites = createLazy2BitMap(data.sprites.pokemon);
+    this.trainerSprites = createLazy2BitMap(data.sprites.trainers || {});
 
-    this.pikachuFaces = {};
-    for (const [k, v] of Object.entries(data.sprites.pikachuFaces)) {
-      this.pikachuFaces[k] = {
-        width: v.width,
-        height: v.height,
-        pixels: unpack2Bit(v.data, v.width, v.height),
-      };
-    }
-
-    this.emotes = {};
-    for (const [k, v] of Object.entries(data.sprites.emotes)) {
-      this.emotes[k] = {
-        width: v.width,
-        height: v.height,
-        pixels: unpack2Bit(v.data, v.width, v.height),
-      };
-    }
-
-    this.pokemonSprites = {};
-    for (const [k, v] of Object.entries(data.sprites.pokemon)) {
-      this.pokemonSprites[k] = {
-        width: v.width,
-        height: v.height,
-        pixels: unpack2Bit(v.data, v.width, v.height),
-      };
-    }
-
-    this.trainerSprites = {};
-    for (const [k, v] of Object.entries(data.sprites.trainers || {})) {
-      this.trainerSprites[k] = {
-        width: v.width,
-        height: v.height,
-        pixels: unpack2Bit(v.data, v.width, v.height),
-      };
-    }
-
-    // Index all zones
-    this.allZones = data.zones.map((z) => ({
-      ...z,
-      blockBytes: unpackBytes(z.blocks),
-    }));
+    // Index all zones with lazy blockBytes decoding
+    this.allZones = data.zones.map((z) => {
+      let decodedBlocks = null;
+      const copy = { ...z };
+      Object.defineProperty(copy, "blockBytes", {
+        enumerable: true,
+        configurable: true,
+        get() {
+          if (!decodedBlocks) {
+            decodedBlocks = unpackBytes(z.blocks);
+          }
+          return decodedBlocks;
+        },
+      });
+      return copy;
+    });
     this.canonicalZones = this.allZones.filter((z) => z.isCanonical220);
     this.zonesByConst = {};
     this.zonesByNumber = {};
@@ -119,6 +116,19 @@ export class PokeYellowEngine {
     this.animCounter = 0; // 0..7
     this.animateTiles = true;
     this.paletteMode = "reference"; // "reference" | "sgb" | "cgb" | "dmg"
+  }
+
+  getOrCreateImageData(canvas, ctx, w, h) {
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    if (
+      !canvas._cachedImgData ||
+      canvas._cachedImgData.width !== w ||
+      canvas._cachedImgData.height !== h
+    ) {
+      canvas._cachedImgData = ctx.createImageData(w, h);
+    }
+    return canvas._cachedImgData;
   }
 
   getPaletteColors(palName, mode = this.paletteMode) {
@@ -524,13 +534,9 @@ export class PokeYellowEngine {
     const pxW = totalBlocksW * 32;
     const pxH = totalBlocksH * 32;
 
-    if (canvas.width !== pxW || canvas.height !== pxH) {
-      canvas.width = pxW;
-      canvas.height = pxH;
-    }
-
     const ctx = canvas.getContext("2d");
-    const imgData = ctx.createImageData(pxW, pxH);
+    if (!ctx) return;
+    const imgData = this.getOrCreateImageData(canvas, ctx, pxW, pxH);
     const buf = imgData.data;
 
     const ts = this.tilesetsByConst[zone.tileset];
@@ -736,12 +742,9 @@ export class PokeYellowEngine {
   ) {
     const W = 160;
     const H = 144;
-    if (canvas.width !== W || canvas.height !== H) {
-      canvas.width = W;
-      canvas.height = H;
-    }
     const ctx = canvas.getContext("2d");
-    const imgData = ctx.createImageData(W, H);
+    if (!ctx) return;
+    const imgData = this.getOrCreateImageData(canvas, ctx, W, H);
     const buf = imgData.data;
 
     const ts = this.tilesetsByConst[zone.tileset];
@@ -901,11 +904,14 @@ export class PokeYellowEngine {
 
   render2BitGraphicToCanvas(canvas, spriteObj, palName = "PAL_YELLOWMON") {
     if (!canvas || !spriteObj) return;
-    canvas.width = spriteObj.width;
-    canvas.height = spriteObj.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const imgData = ctx.createImageData(spriteObj.width, spriteObj.height);
+    const imgData = this.getOrCreateImageData(
+      canvas,
+      ctx,
+      spriteObj.width,
+      spriteObj.height
+    );
     const pal = this.getPaletteColors(palName);
     this.drawRaw2BitSprite(
       imgData.data,

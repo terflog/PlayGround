@@ -1695,22 +1695,23 @@ function performMoveAttack(attacker, defender, move, isEnemyTurn = false) {
   }
 
   // Status-only moves
+  const effect = String(move.effect || "");
   if (move.power === 0) {
-    if (move.effect.includes("PARALYZE") || move.id === "THUNDER_WAVE" || move.id === "STUN_SPORE" || move.id === "GLARE") {
+    if (effect.includes("PARALYZE") || move.id === "THUNDER_WAVE" || move.id === "STUN_SPORE" || move.id === "GLARE") {
       if (defender.status === "OK") {
         defender.status = "PAR";
         msgs.push(`${defender.nickname} was\nparalyzed! It may not attack!`);
       } else {
         msgs.push(`But it failed!`);
       }
-    } else if (move.effect.includes("SLEEP") || move.id === "SLEEP_POWDER" || move.id === "SING" || move.id === "HYPNOSIS" || move.id === "SPORE") {
+    } else if (effect.includes("SLEEP") || move.id === "SLEEP_POWDER" || move.id === "SING" || move.id === "HYPNOSIS" || move.id === "SPORE") {
       if (defender.status === "OK") {
         defender.status = "SLP";
         msgs.push(`${defender.nickname}\nfell asleep!`);
       } else {
         msgs.push(`But it failed!`);
       }
-    } else if (move.effect.includes("POISON") || move.id === "POISONPOWDER" || move.id === "TOXIC") {
+    } else if (effect.includes("POISON") || move.id === "POISONPOWDER" || move.id === "TOXIC") {
       if (defender.status === "OK") {
         defender.status = "PSN";
         msgs.push(`${defender.nickname}\nwas poisoned!`);
@@ -1720,10 +1721,10 @@ function performMoveAttack(attacker, defender, move, isEnemyTurn = false) {
     } else if (move.id === "RECOVER" || move.id === "SOFTBOILED" || move.id === "REST") {
       attacker.hp = attacker.maxHp;
       msgs.push(`${prefix}\nregained health!`);
-    } else if (move.effect.includes("DEFENSE_DOWN")) {
+    } else if (effect.includes("DEFENSE_DOWN")) {
       defender.def = Math.max(5, Math.floor(defender.def * 0.8));
       msgs.push(`${defender.nickname}'s\nDEFENSE fell!`);
-    } else if (move.effect.includes("ATTACK_DOWN")) {
+    } else if (effect.includes("ATTACK_DOWN")) {
       defender.atk = Math.max(5, Math.floor(defender.atk * 0.8));
       msgs.push(`${defender.nickname}'s\nATTACK fell!`);
     } else {
@@ -1752,26 +1753,30 @@ function performMoveAttack(attacker, defender, move, isEnemyTurn = false) {
 
   // Secondary status effects
   if (defender.hp > 0 && defender.status === "OK") {
-    if (move.effect.includes("PARALYZE_SIDE_EFFECT") && Math.random() < 0.2) {
+    if (effect.includes("PARALYZE_SIDE_EFFECT") && Math.random() < 0.2) {
       defender.status = "PAR";
       msgs.push(`${defender.nickname} was\nparalyzed!`);
-    } else if (move.effect.includes("BURN_SIDE_EFFECT") && Math.random() < 0.2) {
+    } else if (effect.includes("BURN_SIDE_EFFECT") && Math.random() < 0.2) {
       defender.status = "BRN";
       msgs.push(`${defender.nickname} was\nburned!`);
-    } else if (move.effect.includes("POISON_SIDE_EFFECT") && Math.random() < 0.25) {
+    } else if (effect.includes("POISON_SIDE_EFFECT") && Math.random() < 0.25) {
       defender.status = "PSN";
       msgs.push(`${defender.nickname} was\npoisoned!`);
-    } else if (move.effect.includes("FREEZE_SIDE_EFFECT") && Math.random() < 0.1) {
+    } else if (effect.includes("FREEZE_SIDE_EFFECT") && Math.random() < 0.1) {
       defender.status = "FRZ";
       msgs.push(`${defender.nickname} was\nfrozen solid!`);
     }
   }
 
   // Drain moves
-  if (move.effect === "DRAIN_HP_EFFECT" && damage > 0) {
+  if (effect === "DRAIN_HP_EFFECT" && damage > 0) {
     const healed = Math.max(1, Math.floor(damage / 2));
     attacker.hp = Math.min(attacker.maxHp, attacker.hp + healed);
     msgs.push(`Sucked health from\n${defender.nickname}!`);
+  } else if (effect === "RECOIL_EFFECT" && damage > 0) {
+    const recoil = Math.max(1, Math.floor(damage / 4));
+    attacker.hp = Math.max(0, attacker.hp - recoil);
+    msgs.push(`${prefix}'s hit\nwith recoil!`);
   }
 
   return msgs;
@@ -2572,16 +2577,26 @@ function renderBattleModal() {
 
   const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
   const pMon = state.party[b.activePlayerIdx] || state.party[0];
+  if (!foe || !pMon) {
+    state.battle = null;
+    modal.classList.add("hidden");
+    return;
+  }
 
   // 1. Enemy HUD (DrawEnemyHUDAndHPBar & SetupEnemyPartyPokeballs)
-  document.getElementById("battle-foe-name").textContent = foe.nickname;
-  document.getElementById("battle-foe-lv").textContent =
-    foe.status !== "OK" ? foe.status : `:L${foe.level}`;
-  const foePct = Math.max(0, Math.round((foe.hp / foe.maxHp) * 100));
+  const foeNameEl = document.getElementById("battle-foe-name");
+  if (foeNameEl) foeNameEl.textContent = foe.nickname;
+  const foeLvEl = document.getElementById("battle-foe-lv");
+  if (foeLvEl) {
+    foeLvEl.textContent = foe.status !== "OK" ? foe.status : `:L${foe.level}`;
+  }
+  const foePct = Math.max(0, Math.round((foe.hp / Math.max(1, foe.maxHp)) * 100));
   const foeBar = document.getElementById("battle-foe-hp-fill");
-  foeBar.style.width = `${foePct}%`;
-  foeBar.style.background =
-    foePct > 50 ? "#22c55e" : foePct > 20 ? "#eab308" : "#ef4444";
+  if (foeBar) {
+    foeBar.style.width = `${foePct}%`;
+    foeBar.style.background =
+      foePct > 50 ? "#22c55e" : foePct > 20 ? "#eab308" : "#ef4444";
+  }
 
   const ballsBox = document.getElementById("battle-foe-balls");
   if (ballsBox) {
@@ -3116,7 +3131,9 @@ function updateUIForCurrentZone() {
   }
 
   updateCoordinatesUI();
-  renderKantoTownMap();
+  if (state.viewMode !== "gb") {
+    renderKantoTownMap();
+  }
 
   // Highlight active row in zone list
   document.querySelectorAll(".zone-item").forEach((el) => {
@@ -3228,7 +3245,32 @@ function updateUIForCurrentZone() {
   }
 }
 
-function renderAllCanvases() {
+let lastRenderSig = "";
+
+function computeRenderSignature() {
+  const z = state.currentZone;
+  const p = state.player;
+  const pk = state.pikachu;
+  let sig = `${z?.constName}|${state.viewMode}|${engine.paletteMode}|${engine.animCounter}|${state.showBorder}|${state.showEntitiesOnZoneMap}|${state.showWarpsOnZoneMap}|${state.showGridOnZoneMap}|${state.showHiddenObjects}|${state.activeEmote}|${p.renderX.toFixed(2)},${p.renderY.toFixed(2)},${p.dir},${p.walking},${p.stepParity},${p.mode},${p.surfSprite}|${pk.visible},${pk.renderX.toFixed(2)},${pk.renderY.toFixed(2)},${pk.dir},${pk.walking},${pk.stepParity}`;
+  for (let i = 0; i < state.npcs.length; i++) {
+    const n = state.npcs[i];
+    if (!n.defaultVisible && !state.showHiddenObjects) continue;
+    if (n.collected) continue;
+    sig += `|${n.renderX.toFixed(2)},${n.renderY.toFixed(2)},${n.facing},${n.isWalking},${n.stepParity}`;
+  }
+  return sig;
+}
+
+function renderAllCanvases(force = true) {
+  if (!force) {
+    if (state.battle) return; // Battle screen covers the entire LCD viewport
+    const sig = computeRenderSignature();
+    if (sig === lastRenderSig) return;
+    lastRenderSig = sig;
+  } else {
+    lastRenderSig = computeRenderSignature();
+  }
+
   const fullCanvas = document.getElementById("full-zone-canvas");
   const gbCanvas = document.getElementById("gb-screen-canvas");
 
@@ -3578,8 +3620,12 @@ function openVisualAtlasModal() {
   renderAtlasGrid();
 }
 
+let atlasThumbCanvas = null;
+let atlasObserver = null;
+
 function renderAtlasGrid() {
   const grid = document.getElementById("atlas-grid");
+  if (!grid) return;
   const q = (document.getElementById("atlas-search-input")?.value || "")
     .trim()
     .toLowerCase();
@@ -3605,22 +3651,57 @@ function renderAtlasGrid() {
     );
   });
 
-  document.getElementById("atlas-count-label").textContent = `Showing ${zones.length} Loadable Zone Segments`;
+  const countLbl = document.getElementById("atlas-count-label");
+  if (countLbl) {
+    countLbl.textContent = `Showing ${zones.length} Loadable Zone Segments`;
+  }
+  if (atlasObserver) {
+    atlasObserver.disconnect();
+    atlasObserver = null;
+  }
   grid.innerHTML = "";
 
+  if (!atlasThumbCanvas) {
+    atlasThumbCanvas = document.createElement("canvas");
+  }
+
+  if (typeof IntersectionObserver !== "undefined") {
+    atlasObserver = new IntersectionObserver(
+      (entries, obs) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const img = entry.target;
+          obs.unobserve(img);
+          const zConst = img.dataset.zoneConst;
+          const zObj = engine.zonesByConst[zConst];
+          if (zObj) {
+            engine.renderFullZone(atlasThumbCanvas, zObj, {
+              showBorder: false,
+              showEntities: false,
+              showWarps: false,
+              showGrid: false,
+            });
+            img.src = atlasThumbCanvas.toDataURL("image/png");
+          }
+        }
+      },
+      { root: grid, rootMargin: "200px" }
+    );
+  }
+
+  const frag = document.createDocumentFragment();
   zones.forEach((z) => {
     const card = document.createElement("div");
     card.className = `atlas-card ${
       z.constName === state.currentZone.constName ? "active" : ""
     }`;
-    const thumbCanvas = document.createElement("canvas");
-    thumbCanvas.className = "atlas-thumb-canvas";
-    engine.renderFullZone(thumbCanvas, z, {
-      showBorder: false,
-      showEntities: false,
-      showWarps: false,
-      showGrid: false,
-    });
+    const thumbImg = document.createElement("img");
+    thumbImg.className = "atlas-thumb-canvas";
+    thumbImg.alt = z.displayName;
+    thumbImg.dataset.zoneConst = z.constName;
+    if (atlasObserver) {
+      atlasObserver.observe(thumbImg);
+    }
 
     const info = document.createElement("div");
     info.className = "atlas-card-info";
@@ -3633,177 +3714,218 @@ function renderAtlasGrid() {
       <div class="atlas-card-sub">${z.constName} • ${z.width}×${z.height} blk</div>
     `;
 
-    card.appendChild(thumbCanvas);
+    card.appendChild(thumbImg);
     card.appendChild(info);
     card.onclick = () => {
-      document.getElementById("atlas-modal").classList.add("hidden");
+      document.getElementById("atlas-modal")?.classList.add("hidden");
       loadZone(z, { resetParent: true });
     };
-    grid.appendChild(card);
+    frag.appendChild(card);
   });
+  grid.appendChild(frag);
 }
 
-// Main 60fps loop
+// Main 60fps loop with error boundary & dirty-state throttling
 let lastAnimTick = 0;
-let lastNpcTick = 0;
+let lastEvoSpriteKey = "";
 const heldDirs = new Set();
 
 function gameLoop(now) {
-  // 1. Update water & flower tile animation counter every 280ms (matching ~20 Game Boy frames)
-  if (now - lastAnimTick > 280) {
-    lastAnimTick = now;
-    engine.animCounter = (engine.animCounter + 1) & 7;
-    if (state.dialogue && state.dialogue.pikachuMood) {
-      renderDialogueModal();
-    }
-  }
-
-  // 1b. Update active EvolveMon animation (engine/movie/evolution.asm:49-65)
-  if (state.battle && state.battle.menuState === "EVOLVING" && state.battle.evolution) {
-    const evo = state.battle.evolution;
-    if (now - evo.startTime >= evo.duration) {
-      completeEvolutionAnimation();
-    } else {
-      renderBattleModal();
-    }
-  }
-
-  // 2. Update Player smooth step interpolation
-  if (state.player.moveAnim) {
-    const anim = state.player.moveAnim;
-    const t = Math.min(1, (now - anim.startTime) / anim.duration);
-    state.player.renderX = anim.fromX + (anim.toX - anim.fromX) * t;
-    let jumpArc = 0;
-    if (anim.isLedgeJump) {
-      jumpArc = -Math.sin(t * Math.PI) * 0.75;
-    }
-    state.player.renderY = anim.fromY + (anim.toY - anim.fromY) * t + jumpArc;
-
-    if (state.pikachu.moveAnim) {
-      const pa = state.pikachu.moveAnim;
-      state.pikachu.renderX = pa.fromX + (pa.toX - pa.fromX) * t;
-      state.pikachu.renderY = pa.fromY + (pa.toY - pa.fromY) * t;
+  try {
+    if (document.hidden) {
+      requestAnimationFrame(gameLoop);
+      return;
     }
 
-    if (t >= 1) {
-      state.player.x = anim.toX;
-      state.player.y = anim.toY;
-      state.player.renderX = anim.toX;
-      state.player.renderY = anim.toY;
-      state.player.walking = false;
-      state.player.moveAnim = null;
-
-      if (state.pikachu.moveAnim) {
-        state.pikachu.x = state.pikachu.moveAnim.toX;
-        state.pikachu.y = state.pikachu.moveAnim.toY;
-        state.pikachu.renderX = state.pikachu.x;
-        state.pikachu.renderY = state.pikachu.y;
-        state.pikachu.walking = false;
-        state.pikachu.moveAnim = null;
-      }
-
-      onPlayerStepCompleted();
-    }
-  } else if (heldDirs.size > 0 && !state.dialogue && !state.battle) {
-    const lastDir = Array.from(heldDirs).pop();
-    attemptStep(lastDir);
-  }
-
-  // 3. Fluid 60fps NPC movement & idle turning (matches engine/overworld/movement.asm UpdateNPCSprite)
-  const zone = state.currentZone;
-  const ts = engine.tilesetsByConst[zone.tileset];
-  for (const npc of state.npcs) {
-    if (!npc.defaultVisible && !state.showHiddenObjects) continue;
-    if (npc.collected) continue;
-
-    // 3a. Interpolate active 16-frame step animation (UpdateSpriteInWalkingAnimation)
-    if (npc.moveAnim) {
-      const na = npc.moveAnim;
-      const nt = Math.min(1, (now - na.startTime) / na.duration);
-      npc.renderX = na.fromX + (na.toX - na.fromX) * nt;
-      npc.renderY = na.fromY + (na.toY - na.fromY) * nt;
-      npc.isWalking = nt > 0.12 && nt < 0.88;
-      if (nt >= 1) {
-        npc.renderX = npc.x;
-        npc.renderY = npc.y;
-        npc.isWalking = false;
-        npc.moveAnim = null;
-      }
-      continue;
-    }
-
-    // 3b. Per-NPC random movement delay timer (SPRITESTATEDATA2_MOVEMENTDELAY)
-    if (state.dialogue || state.battle) continue;
-    if (now < (npc.nextMoveTime || 0)) continue;
-    npc.nextMoveTime = now + 650 + Math.random() * 1450;
-
-    if (npc.movement === "WALK") {
-      const dirs =
-        npc.dir === "UP_DOWN"
-          ? ["UP", "DOWN"]
-          : npc.dir === "LEFT_RIGHT"
-          ? ["LEFT", "RIGHT"]
-          : ["DOWN", "UP", "LEFT", "RIGHT"];
-      const d = dirs[Math.floor(Math.random() * dirs.length)];
-      npc.facing = d;
-      const dx = d === "LEFT" ? -1 : d === "RIGHT" ? 1 : 0;
-      const dy = d === "UP" ? -1 : d === "DOWN" ? 1 : 0;
-      const nx = npc.x + dx;
-      const ny = npc.y + dy;
-
-      if (
-        Math.abs(nx - npc.originX) <= 2 &&
-        Math.abs(ny - npc.originY) <= 2 &&
-        nx >= 0 &&
-        nx < zone.width * 2 &&
-        ny >= 0 &&
-        ny < zone.height * 2 &&
-        !(nx === state.player.x && ny === state.player.y) &&
-        !(state.pikachu.visible && nx === state.pikachu.x && ny === state.pikachu.y) &&
-        !state.npcs.some(
-          (other) =>
-            other !== npc &&
-            !other.collected &&
-            (other.defaultVisible || state.showHiddenObjects) &&
-            other.x === nx &&
-            other.y === ny
-        ) &&
-        engine.isStepPassable(zone, npc.x, npc.y, nx, ny)
-      ) {
-        const destTile = engine.getCollisionTileAtStep(zone, nx, ny);
-        if (!ts.doorSet.has(destTile) && !ts.warpSet.has(destTile)) {
-          const fromX = npc.x;
-          const fromY = npc.y;
-          npc.x = nx;
-          npc.y = ny;
-          npc.stepParity = !npc.stepParity;
-          npc.isWalking = true;
-          npc.moveAnim = {
-            fromX,
-            fromY,
-            toX: nx,
-            toY: ny,
-            startTime: now,
-            duration: 265, // 16 Game Boy frames at 60fps
-          };
+    // 1. Update water & flower tile animation counter every 280ms (matching ~20 Game Boy frames)
+    if (now - lastAnimTick > 280) {
+      lastAnimTick = now;
+      engine.animCounter = (engine.animCounter + 1) & 7;
+      if (state.dialogue && state.dialogue.pikachuMood) {
+        const faceCanvas = document.getElementById("dialogue-pika-canvas");
+        const frames = state.dialogue.pikachuMood.frames;
+        if (faceCanvas && Array.isArray(frames) && frames.length > 0) {
+          const frameKey = frames[Math.floor(now / 320) % frames.length];
+          engine.render2BitGraphicToCanvas(
+            faceCanvas,
+            engine.pikachuFaces[frameKey],
+            "PAL_PIKACHU_PORTRAIT"
+          );
         }
       }
-    } else if (
-      npc.movement === "STAY" &&
-      (npc.dir === "ANY_DIR" || npc.dir === "UP_DOWN" || npc.dir === "LEFT_RIGHT")
-    ) {
-      // ChangeFacingDirection in engine/overworld/movement.asm:144, 245
-      const dirs =
-        npc.dir === "UP_DOWN"
-          ? ["UP", "DOWN"]
-          : npc.dir === "LEFT_RIGHT"
-          ? ["LEFT", "RIGHT"]
-          : ["DOWN", "UP", "LEFT", "RIGHT"];
-      npc.facing = dirs[Math.floor(Math.random() * dirs.length)];
     }
-  }
 
-  renderAllCanvases();
+    // 1b. Update active EvolveMon animation without full DOM rebuilds every frame
+    if (state.battle && state.battle.menuState === "EVOLVING" && state.battle.evolution) {
+      const evo = state.battle.evolution;
+      const elapsed = now - evo.startTime;
+      if (elapsed >= evo.duration) {
+        lastEvoSpriteKey = "";
+        completeEvolutionAnimation();
+      } else {
+        const t = Math.min(1, elapsed / evo.duration);
+        const periodMs = Math.max(70, 260 - t * 180);
+        const showNew = t > 0.15 && Math.floor(elapsed / periodMs) % 2 === 1;
+        const sprKey = showNew ? evo.newSpecies : evo.oldSpecies;
+        const evoStage = document.getElementById("battle-evo-stage");
+        if (evoStage) {
+          evoStage.classList.toggle("evo-flash-silhouette", t > 0.15 && t < 0.92);
+        }
+        if (sprKey !== lastEvoSpriteKey) {
+          lastEvoSpriteKey = sprKey;
+          const evoCanvas = document.getElementById("battle-evo-canvas");
+          const spr = engine.pokemonSprites[sprKey] || engine.pokemonSprites.PIKACHU;
+          engine.render2BitGraphicToCanvas(evoCanvas, spr, "PAL_YELLOWMON");
+        }
+      }
+    }
+
+    // 2. Update Player smooth step interpolation
+    if (state.player.moveAnim) {
+      const anim = state.player.moveAnim;
+      const t = Math.min(1, (now - anim.startTime) / anim.duration);
+      state.player.renderX = anim.fromX + (anim.toX - anim.fromX) * t;
+      let jumpArc = 0;
+      if (anim.isLedgeJump) {
+        jumpArc = -Math.sin(t * Math.PI) * 0.75;
+      }
+      state.player.renderY = anim.fromY + (anim.toY - anim.fromY) * t + jumpArc;
+
+      if (state.pikachu.moveAnim) {
+        const pa = state.pikachu.moveAnim;
+        state.pikachu.renderX = pa.fromX + (pa.toX - pa.fromX) * t;
+        state.pikachu.renderY = pa.fromY + (pa.toY - pa.fromY) * t;
+      }
+
+      if (t >= 1) {
+        state.player.x = anim.toX;
+        state.player.y = anim.toY;
+        state.player.renderX = anim.toX;
+        state.player.renderY = anim.toY;
+        state.player.walking = false;
+        state.player.moveAnim = null;
+
+        if (state.pikachu.moveAnim) {
+          state.pikachu.x = state.pikachu.moveAnim.toX;
+          state.pikachu.y = state.pikachu.moveAnim.toY;
+          state.pikachu.renderX = state.pikachu.x;
+          state.pikachu.renderY = state.pikachu.y;
+          state.pikachu.walking = false;
+          state.pikachu.moveAnim = null;
+        }
+
+        onPlayerStepCompleted();
+      }
+    } else if (
+      heldDirs.size > 0 &&
+      !state.dialogue &&
+      !state.battle &&
+      !state.startMenu.open
+    ) {
+      const lastDir = Array.from(heldDirs).pop();
+      attemptStep(lastDir);
+    }
+
+    // 3. Fluid 60fps NPC movement & idle turning (skip while in battle)
+    if (!state.battle && state.currentZone) {
+      const zone = state.currentZone;
+      const ts = engine.tilesetsByConst[zone.tileset];
+      for (const npc of state.npcs) {
+        if (!npc.defaultVisible && !state.showHiddenObjects) continue;
+        if (npc.collected) continue;
+
+        // 3a. Interpolate active 16-frame step animation (UpdateSpriteInWalkingAnimation)
+        if (npc.moveAnim) {
+          const na = npc.moveAnim;
+          const nt = Math.min(1, (now - na.startTime) / na.duration);
+          npc.renderX = na.fromX + (na.toX - na.fromX) * nt;
+          npc.renderY = na.fromY + (na.toY - na.fromY) * nt;
+          npc.isWalking = nt > 0.12 && nt < 0.88;
+          if (nt >= 1) {
+            npc.renderX = npc.x;
+            npc.renderY = npc.y;
+            npc.isWalking = false;
+            npc.moveAnim = null;
+          }
+          continue;
+        }
+
+        // 3b. Per-NPC random movement delay timer (SPRITESTATEDATA2_MOVEMENTDELAY)
+        if (state.dialogue || state.startMenu.open) continue;
+        if (now < (npc.nextMoveTime || 0)) continue;
+        npc.nextMoveTime = now + 650 + Math.random() * 1450;
+
+        if (npc.movement === "WALK") {
+          const dirs =
+            npc.dir === "UP_DOWN"
+              ? ["UP", "DOWN"]
+              : npc.dir === "LEFT_RIGHT"
+              ? ["LEFT", "RIGHT"]
+              : ["DOWN", "UP", "LEFT", "RIGHT"];
+          const d = dirs[Math.floor(Math.random() * dirs.length)];
+          npc.facing = d;
+          const dx = d === "LEFT" ? -1 : d === "RIGHT" ? 1 : 0;
+          const dy = d === "UP" ? -1 : d === "DOWN" ? 1 : 0;
+          const nx = npc.x + dx;
+          const ny = npc.y + dy;
+
+          if (
+            Math.abs(nx - npc.originX) <= 2 &&
+            Math.abs(ny - npc.originY) <= 2 &&
+            nx >= 0 &&
+            nx < zone.width * 2 &&
+            ny >= 0 &&
+            ny < zone.height * 2 &&
+            !(nx === state.player.x && ny === state.player.y) &&
+            !(state.pikachu.visible && nx === state.pikachu.x && ny === state.pikachu.y) &&
+            !state.npcs.some(
+              (other) =>
+                other !== npc &&
+                !other.collected &&
+                (other.defaultVisible || state.showHiddenObjects) &&
+                other.x === nx &&
+                other.y === ny
+            ) &&
+            engine.isStepPassable(zone, npc.x, npc.y, nx, ny)
+          ) {
+            const destTile = engine.getCollisionTileAtStep(zone, nx, ny);
+            if (ts && !ts.doorSet.has(destTile) && !ts.warpSet.has(destTile)) {
+              const fromX = npc.x;
+              const fromY = npc.y;
+              npc.x = nx;
+              npc.y = ny;
+              npc.stepParity = !npc.stepParity;
+              npc.isWalking = true;
+              npc.moveAnim = {
+                fromX,
+                fromY,
+                toX: nx,
+                toY: ny,
+                startTime: now,
+                duration: 265, // 16 Game Boy frames at 60fps
+              };
+            }
+          }
+        } else if (
+          npc.movement === "STAY" &&
+          (npc.dir === "ANY_DIR" || npc.dir === "UP_DOWN" || npc.dir === "LEFT_RIGHT")
+        ) {
+          // ChangeFacingDirection in engine/overworld/movement.asm:144, 245
+          const dirs =
+            npc.dir === "UP_DOWN"
+              ? ["UP", "DOWN"]
+              : npc.dir === "LEFT_RIGHT"
+              ? ["LEFT", "RIGHT"]
+              : ["DOWN", "UP", "LEFT", "RIGHT"];
+          npc.facing = dirs[Math.floor(Math.random() * dirs.length)];
+        }
+      }
+    }
+
+    renderAllCanvases(false);
+  } catch (err) {
+    console.error("GameLoop recovered from error:", err);
+  }
   requestAnimationFrame(gameLoop);
 }
 
@@ -4065,7 +4187,11 @@ function setupControlsAndEvents() {
       const workspace = document.getElementById("workspace");
       if (stage) stage.dataset.viewMode = state.viewMode;
       if (workspace) workspace.dataset.viewMode = state.viewMode;
-      renderAllCanvases();
+      if (state.viewMode !== "gb") {
+        renderZoneList();
+        renderKantoTownMap();
+      }
+      renderAllCanvases(true);
     });
   });
 
@@ -4307,7 +4433,9 @@ window.POKEYELLOW = {
 window.addEventListener("DOMContentLoaded", () => {
   loadProgress();
   setupControlsAndEvents();
-  renderZoneList();
+  if (state.viewMode !== "gb") {
+    renderZoneList();
+  }
   loadZone("PALLET_TOWN");
   requestAnimationFrame(gameLoop);
 });

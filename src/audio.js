@@ -80,35 +80,34 @@ export class GameBoyAudio {
     }
   }
 
-  scheduleChannelLoop(ch, tickMs) {
+  scheduleChannelLoop(ch, tickMs, noteIdx = 0) {
     if (!this.enabled || !this.ctx) return;
-    let offsetMs = 0;
+    const notes = ch?.notes;
+    if (!Array.isArray(notes) || notes.length === 0) return;
+    const idx = noteIdx % notes.length;
+    const [midi, ticks] = notes[idx];
+    const durMs = Math.max(20, (ticks || 1) * tickMs);
     const waveType = ch.ch === 3 ? "triangle" : "square";
     const chVol = ch.ch === 2 ? 0.35 : ch.ch === 1 ? 0.22 : 0.28;
 
-    for (const [midi, ticks] of ch.notes) {
-      const durMs = Math.max(20, ticks * tickMs);
-      if (midi > 0) {
-        const timer = setTimeout(() => {
-          if (!this.enabled || !this.ctx) return;
-          this.playNote(this.midiToFreq(midi), durMs * 0.9, waveType, chVol);
-        }, offsetMs);
-        this.timers.push(timer);
-      }
-      offsetMs += durMs;
+    if (midi > 0) {
+      this.playNote(this.midiToFreq(midi), durMs * 0.9, waveType, chVol);
     }
 
-    if (offsetMs > 100) {
-      const loopTimer = setTimeout(() => {
-        if (this.enabled) this.scheduleChannelLoop(ch, tickMs);
-      }, offsetMs);
-      this.timers.push(loopTimer);
-    }
+    const timer = setTimeout(() => {
+      const pos = this.timers.indexOf(timer);
+      if (pos !== -1) this.timers.splice(pos, 1);
+      if (this.enabled && this.ctx) {
+        this.scheduleChannelLoop(ch, tickMs, (idx + 1) % notes.length);
+      }
+    }, durMs);
+    this.timers.push(timer);
   }
 
   playNote(freq, durMs, type = "square", volume = 0.25) {
     if (!this.ctx || !this.masterGain) return;
     if (!Number.isFinite(freq) || freq <= 0) return;
+    if (this.activeOscillators.size >= 16) return;
     try {
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
