@@ -9,7 +9,7 @@ const audio = new GameBoyAudio(POKEYELLOW_DATA.music);
 const state = {
   currentZone: engine.zonesByConst.PALLET_TOWN,
   lastOutdoorMap: { mapConst: "PALLET_TOWN", warpIndex: 0 },
-  viewMode: "split", // "split" | "zone" | "gb"
+  viewMode: "gb", // Default to "gb" so LIVE PLAYABLE OVERWORLD (160x144 NATIVE GB) is the only visible screen when playing!
   showBorder: false,
   showEntitiesOnZoneMap: false, // Default false so the Full Zone Map matches the clean Pallet Town reference image 1:1 on load!
   showWarpsOnZoneMap: false,
@@ -79,6 +79,13 @@ const state = {
   npcs: [],
   dialogue: null, // { title, pages: [], pageIndex: 0, pikachuMood: null, elevatorOptions: null }
   battle: null, // { species, level, hp, maxHp, playerHp, playerMaxHp, log, caught, finished }
+  startMenu: {
+    open: false,
+    cursor: 0, // Saved menu item index (wBattleAndStartSavedMenuItem: 0..6)
+    subView: null, // null | "POKEDEX" | "POKEMON" | "ITEM" | "RED" | "SAVE" | "OPTION"
+    subCursor: 0,
+    selectedDexSpecies: null,
+  },
   selectedElevatorDest: {},
 };
 
@@ -3041,6 +3048,318 @@ function renderAllCanvases() {
   }
 }
 
+// Authentic Generation I In-Game START Menu (home/start_menu.asm & engine/menus/draw_start_menu.asm)
+const START_MENU_SECTIONS = [
+  "POKEDEX",
+  "POKEMON",
+  "ITEM",
+  "RED",
+  "SAVE",
+  "OPTION",
+  "EXIT",
+];
+
+export function toggleStartMenu() {
+  if (state.battle || state.dialogue) return;
+  state.startMenu.open = !state.startMenu.open;
+  state.startMenu.subView = null;
+  state.startMenu.selectedDexSpecies = null;
+  audio.playSfx("blip");
+  renderStartMenu();
+}
+
+export function handleStartMenuInput(input) {
+  const sm = state.startMenu;
+  if (!sm.open) return;
+
+  if (sm.subView) {
+    if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      if (sm.selectedDexSpecies) {
+        sm.selectedDexSpecies = null;
+      } else {
+        sm.subView = null;
+      }
+      renderStartMenu();
+    }
+    return;
+  }
+
+  // Top-level DrawStartMenu (home/start_menu.asm:14-85)
+  if (input === "UP") {
+    // Wrap around from top (0) to bottom (6) (home/start_menu.asm:18-34)
+    sm.cursor = (sm.cursor + 6) % 7;
+    audio.playSfx("blip");
+    renderStartMenu();
+  } else if (input === "DOWN") {
+    // Wrap around from bottom (6) to top (0) (home/start_menu.asm:35-51)
+    sm.cursor = (sm.cursor + 1) % 7;
+    audio.playSfx("blip");
+    renderStartMenu();
+  } else if (input === "B" || input === "START") {
+    // CloseStartMenu (home/start_menu.asm:57-58)
+    audio.playSfx("blip");
+    sm.open = false;
+    renderStartMenu();
+  } else if (input === "A") {
+    audio.playSfx("blip");
+    const chosen = START_MENU_SECTIONS[sm.cursor];
+    if (chosen === "EXIT") {
+      sm.open = false;
+      renderStartMenu();
+    } else {
+      sm.subView = chosen;
+      sm.subCursor = 0;
+      sm.selectedDexSpecies = null;
+      renderStartMenu();
+    }
+  }
+}
+
+export function renderStartMenu() {
+  const overlay = document.getElementById("start-menu-overlay");
+  if (!overlay) return;
+  const sm = state.startMenu;
+  if (!sm.open) {
+    overlay.classList.add("hidden");
+    return;
+  }
+  overlay.classList.remove("hidden");
+
+  const menuBox = document.getElementById("start-menu-box");
+  menuBox.querySelectorAll("[data-smenu-item]").forEach((btn) => {
+    const idx = Number(btn.dataset.smenuItem);
+    const curEl = btn.querySelector(".bcursor");
+    if (curEl) {
+      curEl.textContent = idx === sm.cursor ? (sm.subView ? "▷" : "▶") : " ";
+    }
+  });
+
+  const subPanel = document.getElementById("start-sub-panel");
+  const subTitle = document.getElementById("start-sub-title");
+  const subBody = document.getElementById("start-sub-body");
+  if (!sm.subView) {
+    subPanel.classList.add("hidden");
+    return;
+  }
+  subPanel.classList.remove("hidden");
+  subBody.innerHTML = "";
+
+  if (sm.subView === "POKEDEX") {
+    subTitle.textContent = `POKéDEX — OWN: ${state.caughtPokemon.size}/151`;
+    const allStats = Object.values(POKEYELLOW_DATA.battle?.pokemonStats || {});
+    if (sm.selectedDexSpecies) {
+      const sp = sm.selectedDexSpecies;
+      const base = POKEYELLOW_DATA.battle.pokemonStats[sp];
+      const evoStr =
+        (base.evolutions || [])
+          .map((e) =>
+            e.method === "LEVEL"
+              ? `LV.${e.level} → ${e.target}`
+              : e.method === "ITEM"
+              ? `${e.item.replace("_STONE", "")} → ${e.target}`
+              : `TRADE → ${e.target}`
+          )
+          .join(", ") || "None";
+      subBody.innerHTML = `
+        <div class="stats-top-grid">
+          <canvas id="start-dex-canvas" width="40" height="40" style="width:52px;height:52px"></canvas>
+          <div>
+            <div><strong>${sp.replace(/_/g, " ")}</strong></div>
+            <div>TYPE: ${base.types.join(" / ")}</div>
+            <div>BASE HP:${base.hp} ATK:${base.atk} DEF:${base.def} SPD:${base.spd} SPC:${base.spc}</div>
+          </div>
+        </div>
+        <div><strong>EVOLUTIONS:</strong> ${evoStr}</div>
+        <div><strong>BASE MOVES:</strong> ${(base.baseMoves || []).join(", ")}</div>
+      `;
+      const c = document.getElementById("start-dex-canvas");
+      const spr = engine.pokemonSprites[sp] || engine.pokemonSprites.PIKACHU;
+      engine.render2BitGraphicToCanvas(c, spr, "PAL_YELLOWMON");
+      return;
+    }
+
+    allStats.forEach((st, idx) => {
+      const owned = state.caughtPokemon.has(st.species);
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "sub-list-row";
+      row.innerHTML = `<span>#${String(idx + 1).padStart(3, "0")} ${
+        owned ? "◓" : " "
+      } ${st.species.replace(/_/g, " ")}</span><span>${st.types.join("/")}</span>`;
+      row.onclick = () => {
+        audio.playSfx("blip");
+        sm.selectedDexSpecies = st.species;
+        renderStartMenu();
+      };
+      subBody.appendChild(row);
+    });
+  } else if (sm.subView === "POKEMON") {
+    initDefaultParty();
+    subTitle.textContent = `PARTY POKéMON (${state.party.length}/6)`;
+    state.party.forEach((mon, idx) => {
+      const base = POKEYELLOW_DATA.battle?.pokemonStats?.[mon.species];
+      const evoStr =
+        (base?.evolutions || [])
+          .map((e) =>
+            e.method === "LEVEL"
+              ? `Lv.${e.level}→${e.target}`
+              : `${e.item?.replace("_STONE", "") || "TRADE"}→${e.target}`
+          )
+          .join(", ") || "Final";
+      const row = document.createElement("div");
+      row.className = "sub-list-row";
+      row.style.flexDirection = "column";
+      row.style.alignItems = "stretch";
+      row.style.gap = "2px";
+      row.innerHTML = `
+        <div style="display:flex;justify-content:space-between">
+          <strong>${idx === 0 ? "★ " : ""}${mon.nickname} :L${mon.level}</strong>
+          <span>HP ${mon.hp}/${mon.maxHp} (${mon.status})</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:#334155">
+          <span>Moves: ${mon.moves.map((m) => m.name).join(", ")}</span>
+          <span>Evo: ${evoStr}</span>
+        </div>
+      `;
+      row.onclick = () => {
+        if (idx > 0) {
+          // Swap party lead (SwitchPartyMon)
+          audio.playSfx("blip");
+          const tmp = state.party[0];
+          state.party[0] = state.party[idx];
+          state.party[idx] = tmp;
+          renderStartMenu();
+        }
+      };
+      subBody.appendChild(row);
+    });
+  } else if (sm.subView === "ITEM") {
+    subTitle.textContent = `ITEM BAG`;
+    state.bag.forEach((item) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "sub-list-row";
+      row.innerHTML = `<span>${item.name}</span><span>×${item.qty}</span>`;
+      row.onclick = () => {
+        initDefaultParty();
+        const lead = state.party[0];
+        if (item.kind === "heal") {
+          item.qty = Math.max(1, item.qty - 1);
+          lead.hp = Math.min(lead.maxHp, lead.hp + item.hp);
+          if (item.cure) lead.status = "OK";
+          modifyPikachuHappiness("USEDITEM");
+          audio.playSfx("warp");
+          subTitle.textContent = `Healed ${lead.nickname}!`;
+          renderStartMenu();
+        } else if (item.kind === "candy") {
+          item.qty = Math.max(1, item.qty - 1);
+          const msgs = [];
+          levelUpPokemon(lead, msgs);
+          audio.playSfx("warp");
+          subTitle.textContent = msgs[msgs.length - 1]?.replace(/\n/g, " ") || `${lead.nickname} Lv.${lead.level}!`;
+        } else if (item.kind === "stone") {
+          if (lead.species === "PIKACHU" && item.id === "THUNDER_STONE") {
+            audio.playSfx("pika");
+            subTitle.textContent = `PIKACHU refused to evolve!`;
+          } else {
+            const base = POKEYELLOW_DATA.battle?.pokemonStats?.[lead.species];
+            const matchEvo = (base?.evolutions || []).find(
+              (ev) => ev.method === "ITEM" && ev.item === item.id
+            );
+            if (matchEvo) {
+              item.qty = Math.max(1, item.qty - 1);
+              evolvePokemon(lead, matchEvo.target, []);
+              audio.playSfx("warp");
+              subTitle.textContent = `Evolved into ${lead.nickname}!`;
+            } else {
+              audio.playSfx("bump");
+              subTitle.textContent = `No effect on ${lead.nickname}!`;
+            }
+          }
+        } else {
+          audio.playSfx("blip");
+          subTitle.textContent = `${item.name}: Ready for battle/field use!`;
+        }
+      };
+      subBody.appendChild(row);
+    });
+  } else if (sm.subView === "RED") {
+    subTitle.textContent = `TRAINER CARD — RED`;
+    subBody.innerHTML = `
+      <div class="stats-top-grid">
+        <canvas id="start-red-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
+        <div>
+          <div><strong>NAME/</strong> RED</div>
+          <div><strong>MONEY/</strong> ¥${3000 + state.defeatedTrainers.size * 350}</div>
+          <div><strong>PIKACHU FRIENDSHIP/</strong> ${state.pikachu.friendship} / 255</div>
+        </div>
+      </div>
+      <div><strong>KANTO ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
+      <div><strong>POKéDEX OWNED:</strong> ${state.caughtPokemon.size} / 151</div>
+      <div><strong>TRAINERS DEFEATED:</strong> ${state.defeatedTrainers.size}</div>
+      <div><strong>BADGES:</strong> ● BOULDER ● CASCADE ● THUNDER ● RAINBOW</div>
+    `;
+    const rc = document.getElementById("start-red-canvas");
+    const spr = engine.trainerSprites.BROCK || engine.pokemonSprites.PIKACHU;
+    engine.render2BitGraphicToCanvas(rc, spr, "PAL_REDMON");
+  } else if (sm.subView === "SAVE") {
+    subTitle.textContent = `SAVE GAME (sMainData)`;
+    saveProgress();
+    subBody.innerHTML = `
+      <div><strong>PLAYER:</strong> RED</div>
+      <div><strong>CURRENT ZONE:</strong> ${state.currentZone.displayName}</div>
+      <div><strong>POKéDEX:</strong> ${state.caughtPokemon.size} Caught</div>
+      <div><strong>ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
+      <div style="margin-top:6px;padding:6px;border:2px solid #111827;background:#fef08a">
+        Saving... Don't turn off the power!<br/>
+        <strong>RED saved the game!</strong>
+      </div>
+    `;
+  } else if (sm.subView === "OPTION") {
+    subTitle.textContent = `OPTION`;
+    const palRow = document.createElement("button");
+    palRow.type = "button";
+    palRow.className = "sub-list-row";
+    palRow.innerHTML = `<span>PALETTE MODE</span><span>${engine.paletteMode.toUpperCase()}</span>`;
+    palRow.onclick = () => {
+      const modes = ["reference", "sgb", "cgb", "dmg"];
+      const next = modes[(modes.indexOf(engine.paletteMode) + 1) % modes.length];
+      engine.paletteMode = next;
+      const sel = document.getElementById("palette-select");
+      if (sel) sel.value = next;
+      audio.playSfx("blip");
+      renderAllCanvases();
+      renderStartMenu();
+    };
+    const bgmRow = document.createElement("button");
+    bgmRow.type = "button";
+    bgmRow.className = "sub-list-row";
+    bgmRow.innerHTML = `<span>SOUND / BGM</span><span>${audio.enabled ? "ON" : "OFF"}</span>`;
+    bgmRow.onclick = () => {
+      const on = audio.toggle();
+      const btn = document.getElementById("btn-audio-toggle");
+      if (btn) {
+        btn.textContent = on ? "🔊 BGM: ON" : "🔇 BGM: OFF";
+        btn.classList.toggle("active", on);
+      }
+      renderStartMenu();
+    };
+    const wildRow = document.createElement("button");
+    wildRow.type = "button";
+    wildRow.className = "sub-list-row";
+    wildRow.innerHTML = `<span>WILD ENCOUNTERS</span><span>${state.wildEncountersEnabled ? "ON" : "OFF"}</span>`;
+    wildRow.onclick = () => {
+      state.wildEncountersEnabled = !state.wildEncountersEnabled;
+      audio.playSfx("blip");
+      renderStartMenu();
+    };
+    subBody.appendChild(palRow);
+    subBody.appendChild(bgmRow);
+    subBody.appendChild(wildRow);
+  }
+}
+
 // 220-Zone Visual Atlas Modal
 function openVisualAtlasModal() {
   const modal = document.getElementById("atlas-modal");
@@ -3323,6 +3642,26 @@ function setupControlsAndEvents() {
       return;
     }
 
+    if (state.startMenu.open) {
+      if (keyToDir[e.code]) {
+        e.preventDefault();
+        handleStartMenuInput(keyToDir[e.code]);
+      } else if (
+        e.code === "Space" ||
+        e.code === "KeyZ"
+      ) {
+        e.preventDefault();
+        handleStartMenuInput("A");
+      } else if (e.code === "KeyX" || e.code === "Backspace" || e.code === "Escape") {
+        e.preventDefault();
+        handleStartMenuInput("B");
+      } else if (e.code === "Enter" || e.code === "KeyM") {
+        e.preventDefault();
+        handleStartMenuInput("START");
+      }
+      return;
+    }
+
     if (keyToDir[e.code]) {
       e.preventDefault();
       const dir = keyToDir[e.code];
@@ -3335,6 +3674,9 @@ function setupControlsAndEvents() {
     ) {
       e.preventDefault();
       interactInFront();
+    } else if (e.code === "KeyM") {
+      e.preventDefault();
+      toggleStartMenu();
     } else if (e.code === "KeyX" || e.code === "Escape") {
       if (state.dialogue) {
         state.dialogue = null;
@@ -3364,6 +3706,10 @@ function setupControlsAndEvents() {
         handleBattleInput(dir);
         return;
       }
+      if (state.startMenu.open) {
+        handleStartMenuInput(dir);
+        return;
+      }
       heldDirs.add(dir);
       attemptStep(dir);
     };
@@ -3378,6 +3724,8 @@ function setupControlsAndEvents() {
   document.getElementById("btn-gb-a")?.addEventListener("click", () => {
     if (state.battle) {
       handleBattleInput("A");
+    } else if (state.startMenu.open) {
+      handleStartMenuInput("A");
     } else {
       interactInFront();
     }
@@ -3388,6 +3736,8 @@ function setupControlsAndEvents() {
       renderDialogueModal();
     } else if (state.battle) {
       handleBattleInput("B");
+    } else if (state.startMenu.open) {
+      handleStartMenuInput("B");
     } else {
       state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
       if (state.player.mode === "walk") {
@@ -3401,7 +3751,11 @@ function setupControlsAndEvents() {
     }
   });
   document.getElementById("btn-gb-start")?.addEventListener("click", () => {
-    openVisualAtlasModal();
+    if (state.startMenu.open) {
+      handleStartMenuInput("START");
+    } else {
+      toggleStartMenu();
+    }
   });
   document.getElementById("btn-gb-select")?.addEventListener("click", () => {
     if (state.battle) {
@@ -3486,7 +3840,9 @@ function setupControlsAndEvents() {
         b.classList.toggle("active", b.dataset.viewMode === state.viewMode);
       });
       const stage = document.getElementById("main-stage");
-      stage.dataset.viewMode = state.viewMode;
+      const workspace = document.getElementById("workspace");
+      if (stage) stage.dataset.viewMode = state.viewMode;
+      if (workspace) workspace.dataset.viewMode = state.viewMode;
       renderAllCanvases();
     });
   });
@@ -3657,6 +4013,28 @@ function setupControlsAndEvents() {
     cancelEvolutionAnimation();
   });
 
+  // In-game START Menu item click listeners
+  document.querySelectorAll("[data-smenu-item]").forEach((btn) => {
+    const idx = Number(btn.dataset.smenuItem);
+    btn.addEventListener("mouseenter", () => {
+      if (state.startMenu.open && !state.startMenu.subView) {
+        state.startMenu.cursor = idx;
+        renderStartMenu();
+      }
+    });
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.startMenu.cursor = idx;
+      state.startMenu.subView = null;
+      handleStartMenuInput("A");
+    });
+  });
+
+  document.getElementById("start-sub-back-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handleStartMenuInput("B");
+  });
+
   // Visual Atlas modal
   document.getElementById("btn-open-atlas")?.addEventListener("click", () => {
     openVisualAtlasModal();
@@ -3699,6 +4077,8 @@ window.POKEYELLOW = {
   completeEvolutionAnimation,
   modifyPikachuHappiness,
   triggerNpcDialogue,
+  toggleStartMenu,
+  handleStartMenuInput,
   healParty,
 };
 

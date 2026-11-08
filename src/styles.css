@@ -311,6 +311,14 @@ canvas {
   overflow: hidden;
 }
 
+.workspace[data-view-mode="gb"] {
+  grid-template-columns: 1fr;
+}
+
+.workspace[data-view-mode="gb"] .sidebar {
+  display: none !important;
+}
+
 .main-stage {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(350px, 0.92fr);
@@ -324,14 +332,25 @@ canvas {
   grid-template-columns: 1fr;
 }
 .main-stage[data-view-mode="zone"] .gb-viewport-card {
-  display: none;
+  display: none !important;
 }
 
 .main-stage[data-view-mode="gb"] {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 680px);
+  justify-content: center;
 }
 .main-stage[data-view-mode="gb"] .zone-map-card {
-  display: none;
+  display: none !important;
+}
+.main-stage[data-view-mode="gb"] .inspector-grid {
+  display: none !important;
+}
+.main-stage[data-view-mode="gb"] .gb-lcd-wrap {
+  width: 340px;
+  height: 306px;
+}
+.main-stage[data-view-mode="gb"] .gb-controls-bar {
+  max-width: 340px;
 }
 
 .viewport-card {
@@ -1075,6 +1094,103 @@ canvas {
 
 .evo-cancel-btn:hover {
   background: #dc2626;
+}
+
+/* Authentic Generation I In-Game START Menu (home/start_menu.asm & engine/menus/draw_start_menu.asm) */
+.start-menu-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 26;
+  pointer-events: none;
+}
+
+/* DrawStartMenu: hlcoord 10, 0 / lb bc, 14, 8 -> Right half (50% width), top 88% height */
+.start-menu-box {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 88%;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: auto;
+  font-family: var(--font-mono);
+}
+
+.smenu-item {
+  background: transparent;
+  border: none;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: left;
+  padding: 2px 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0.03em;
+}
+
+.smenu-item:hover {
+  background: rgba(250, 204, 21, 0.35);
+}
+
+.start-sub-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.start-sub-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #111827;
+  padding-bottom: 4px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.start-sub-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.sub-list-row {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 3px 5px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sub-list-row:hover {
+  background: rgba(250, 204, 21, 0.32);
+  border-color: #111827;
 }
 
 /* DisplayPartyMenu (0,0..19,17): Full-Screen Party Menu */
