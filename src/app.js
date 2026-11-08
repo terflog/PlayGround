@@ -214,8 +214,16 @@ const ITEM_CATALOG = {
   MOON_STONE: { id: "MOON_STONE", name: "MOON STONE", qty: 1, kind: "stone" },
   POKE_FLUTE: { id: "POKE_FLUTE", name: "POKé FLUTE", qty: 1, kind: "flute" },
   TOWN_MAP: { id: "TOWN_MAP", name: "TOWN MAP", qty: 1, kind: "map" },
+  BICYCLE: { id: "BICYCLE", name: "BICYCLE", qty: 1, kind: "bike" },
+  BIKE_VOUCHER: { id: "BIKE_VOUCHER", name: "BIKE VOUCHER", qty: 1, kind: "key" },
   OAKS_PARCEL: { id: "OAKS_PARCEL", name: "OAK's PARCEL", qty: 1, kind: "key" },
   SS_TICKET: { id: "SS_TICKET", name: "S.S. TICKET", qty: 1, kind: "key" },
+  HELIX_FOSSIL: { id: "HELIX_FOSSIL", name: "HELIX FOSSIL", qty: 1, kind: "key" },
+  DOME_FOSSIL: { id: "DOME_FOSSIL", name: "DOME FOSSIL", qty: 1, kind: "key" },
+  SILPH_SCOPE: { id: "SILPH_SCOPE", name: "SILPH SCOPE", qty: 1, kind: "key" },
+  LIFT_KEY: { id: "LIFT_KEY", name: "LIFT KEY", qty: 1, kind: "key" },
+  GOLD_TEETH: { id: "GOLD_TEETH", name: "GOLD TEETH", qty: 1, kind: "key" },
+  SECRET_KEY: { id: "SECRET_KEY", name: "SECRET KEY", qty: 1, kind: "key" },
 };
 
 export function giveBagItem(itemKey, count = 1) {
@@ -1690,6 +1698,35 @@ function checkInGameGiftOrEvent(npc, zone) {
     const partyNames = state.party.map((m) => `${m.nickname} (:L${m.level})`).join(", ");
     return `\n\nOAK: Heartfelt congratulations, RED! You and ${partyNames} are now officially recorded in the POKéMON LEAGUE HALL OF FAME!`;
   }
+  if (zone.constName === "POKEMON_FAN_CLUB" && upName.includes("CHAIRMAN")) {
+    if (!state.bag.some((it) => it.id === "BICYCLE")) {
+      giveBagItem("BIKE_VOUCHER", 1);
+      return `\n\nRED received a BIKE VOUCHER from the CHAIRMAN! Exchange it at the CERULEAN BIKE SHOP!`;
+    }
+  }
+  if (zone.constName === "BIKE_SHOP" && upName.includes("CLERK")) {
+    if (state.bag.some((it) => it.id === "BIKE_VOUCHER")) {
+      state.bag = state.bag.filter((it) => it.id !== "BIKE_VOUCHER");
+      giveBagItem("BICYCLE", 1);
+      return `\n\nOh, that's a BIKE VOUCHER! OK! Here you go!\n\nRED exchanged the BIKE VOUCHER for a BICYCLE!`;
+    }
+  }
+  if (zone.constName === "MT_MOON_B2F" && npc.sprite === "SPRITE_FOSSIL") {
+    const isDome = upName.includes("DOME");
+    giveBagItem(isDome ? "DOME_FOSSIL" : "HELIX_FOSSIL", 1);
+    state.npcs.forEach((n) => {
+      if (n.sprite === "SPRITE_FOSSIL") n.collected = true;
+    });
+    return `\n\nRED got the ${isDome ? "DOME FOSSIL" : "HELIX FOSSIL"}!`;
+  }
+  if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
+    if (state.bag.some((it) => it.id === "DOME_FOSSIL")) {
+      state.bag = state.bag.filter((it) => it.id !== "DOME_FOSSIL");
+      return giveGiftMon("KABUTO", 30);
+    }
+    state.bag = state.bag.filter((it) => it.id !== "HELIX_FOSSIL");
+    return giveGiftMon("OMANYTE", 30);
+  }
   if (zone.constName === "MR_FUJIS_HOUSE" && upName.includes("MR_FUJI")) {
     giveBagItem("POKE_FLUTE", 1);
     return `\n\nRED received a POKé FLUTE from MR. FUJI!`;
@@ -1736,7 +1773,11 @@ function checkInGameGiftOrEvent(npc, zone) {
   }
   if (npc.kind === "item" && npc.sprite === "SPRITE_POKE_BALL") {
     let foundKey = "POTION";
-    if (upName.includes("MOON_STONE")) foundKey = "MOON_STONE";
+    if (upName.includes("GOLD_TEETH")) foundKey = "GOLD_TEETH";
+    else if (upName.includes("SECRET_KEY")) foundKey = "SECRET_KEY";
+    else if (upName.includes("SILPH_SCOPE")) foundKey = "SILPH_SCOPE";
+    else if (upName.includes("LIFT_KEY")) foundKey = "LIFT_KEY";
+    else if (upName.includes("MOON_STONE")) foundKey = "MOON_STONE";
     else if (upName.includes("FIRE_STONE")) foundKey = "FIRE_STONE";
     else if (upName.includes("WATER_STONE")) foundKey = "WATER_STONE";
     else if (upName.includes("LEAF_STONE")) foundKey = "LEAF_STONE";
@@ -2963,6 +3004,12 @@ function handleEnemyFainted(b, msgs) {
         if (b.trainerKey.startsWith("GAME_CORNER:GAMECORNER_ROCKET")) {
           const rNpc = state.npcs.find((n) => n.name === "GAMECORNER_ROCKET");
           if (rNpc) rNpc.collected = true;
+        }
+        // If Rocket Hideout B4F Giovanni is defeated, award SILPH SCOPE & LIFT KEY
+        if (b.trainerKey.startsWith("ROCKET_HIDEOUT_B4F:ROCKETHIDEOUTB4F_GIOVANNI")) {
+          giveBagItem("SILPH_SCOPE", 1);
+          giveBagItem("LIFT_KEY", 1);
+          msgs.push(`GIOVANNI dropped the\nSILPH SCOPE & LIFT KEY!`);
         }
       }
       b.showTrainerSprite = Boolean(b.trainerSprite);
@@ -4443,6 +4490,40 @@ function useBagItemInStartMenu(itemIndex) {
     useFieldMove(item.moveId);
     return;
   }
+  if (item.kind === "bike") {
+    sm.open = false;
+    sm.subView = null;
+    renderStartMenu();
+    if (state.currentZone.romId >= 0x25) {
+      audio.playSfx("bump");
+      openDialogue("BICYCLE", "OAK's words echoed... RED! There's a time and place for everything! But not indoors!");
+      return;
+    }
+    state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
+    if (state.player.mode === "walk") {
+      state.pikachu.spawnDelayed = false;
+      state.pikachu.x = state.player.x;
+      state.pikachu.y = state.player.y;
+      state.pikachu.renderX = state.player.x;
+      state.pikachu.renderY = state.player.y;
+    }
+    syncPikachuOverworldState();
+    audio.playSfx("warp");
+    openDialogue(
+      "BICYCLE",
+      state.player.mode === "bike"
+        ? "RED got on the BICYCLE!"
+        : "RED got off the BICYCLE."
+    );
+    renderAllCanvases(true);
+    return;
+  }
+  if (item.kind === "map") {
+    audio.playSfx("blip");
+    sm.subView = "TOWN_MAP";
+    renderStartMenu();
+    return;
+  }
   if (item.kind === "flute") {
     sm.open = false;
     sm.subView = null;
@@ -4723,10 +4804,46 @@ export function handleStartMenuInput(input) {
     return;
   }
 
+  if (sm.subView === "OPTION") {
+    if (input === "UP") {
+      sm.subCursor = (sm.subCursor + 2) % 3;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "DOWN") {
+      sm.subCursor = (sm.subCursor + 1) % 3;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "A" || input === "LEFT" || input === "RIGHT") {
+      if (sm.subCursor === 0) {
+        const modes = ["reference", "sgb", "cgb", "dmg"];
+        const dirDelta = input === "LEFT" ? 3 : 1;
+        engine.paletteMode =
+          modes[(modes.indexOf(engine.paletteMode) + dirDelta) % modes.length];
+        audio.playSfx("blip");
+        saveProgress();
+        renderAllCanvases(true);
+        renderStartMenu();
+      } else if (sm.subCursor === 1) {
+        audio.toggle();
+        renderStartMenu();
+      } else if (sm.subCursor === 2) {
+        state.wildEncountersEnabled = !state.wildEncountersEnabled;
+        audio.playSfx("blip");
+        saveProgress();
+        renderStartMenu();
+      }
+    } else if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      sm.subView = null;
+      renderStartMenu();
+    }
+    return;
+  }
+
   if (sm.subView) {
     if (input === "B" || input === "START" || input === "A") {
       audio.playSfx("blip");
-      sm.subView = null;
+      sm.subView = sm.subView === "TOWN_MAP" ? "ITEM" : null;
       renderStartMenu();
     }
     return;
@@ -5289,6 +5406,53 @@ export function renderStartMenu() {
       </div>
     `;
     subBody.appendChild(saveWrap);
+  } else if (sm.subView === "TOWN_MAP") {
+    // Authentic In-Game Kanto Town Map (DisplayTownMap in engine/items/town_map.asm)
+    const cur = state.currentZone;
+    const wrap = document.createElement("div");
+    wrap.className = "gb-pokedex-data";
+    wrap.innerHTML = `
+      <div style="display:flex;justify-content:space-between;padding:4px 8px;border-bottom:2px solid #111827;font-size:10px;font-weight:900">
+        <span>${cur.regionName || cur.displayName.toUpperCase()}</span>
+        <span>TOWN MAP</span>
+      </div>
+      <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#fcfaff;overflow:hidden">
+        <canvas id="start-town-map-canvas" width="160" height="104" style="width:100%;height:100%;display:block"></canvas>
+      </div>
+      <div class="gb-poke-box" style="padding:4px 8px;font-size:9px;font-weight:900;min-height:32px;display:flex;align-items:center;justify-content:space-between">
+        <span>RED's POSITION: ${cur.displayName}</span>
+        <span class="gb-prompt-arrow">▼</span>
+      </div>
+    `;
+    wrap.onclick = () => {
+      audio.playSfx("blip");
+      sm.subView = "ITEM";
+      renderStartMenu();
+    };
+    subBody.appendChild(wrap);
+    const tmCanvas = document.getElementById("start-town-map-canvas");
+    if (tmCanvas) {
+      const ctx = tmCanvas.getContext("2d");
+      const W = tmCanvas.width;
+      const H = tmCanvas.height;
+      const cellW = W / 16;
+      const cellH = H / 16;
+      ctx.fillStyle = "#fcfaff";
+      ctx.fillRect(0, 0, W, H);
+      for (const z of engine.canonicalZones) {
+        const px = z.townMapX * cellW;
+        const py = z.townMapY * cellH;
+        ctx.fillStyle = z.category === "town" ? "#64748b" : "#cbd5e1";
+        ctx.fillRect(px + 2, py + 2, cellW - 4, cellH - 4);
+      }
+      const cx = cur.townMapX * cellW;
+      const cy = cur.townMapY * cellH;
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(cx + 0.5, cy + 0.5, cellW - 1, cellH - 1);
+    }
   } else if (sm.subView === "OPTION") {
     if (subTitle) subTitle.textContent = `OPTION`;
     const optWrap = document.createElement("div");
@@ -5299,38 +5463,26 @@ export function renderStartMenu() {
     const palRow = document.createElement("button");
     palRow.type = "button";
     palRow.className = "sub-list-row";
-    palRow.innerHTML = `<span>PALETTE MODE</span><span>${engine.paletteMode.toUpperCase()}</span>`;
+    palRow.innerHTML = `<span><span class="bcursor">${sm.subCursor === 0 ? "▶" : " "}</span>PALETTE MODE</span><span>${engine.paletteMode.toUpperCase()}</span>`;
     palRow.onclick = () => {
-      const modes = ["reference", "sgb", "cgb", "dmg"];
-      const next = modes[(modes.indexOf(engine.paletteMode) + 1) % modes.length];
-      engine.paletteMode = next;
-      const sel = document.getElementById("palette-select");
-      if (sel) sel.value = next;
-      audio.playSfx("blip");
-      renderAllCanvases();
-      renderStartMenu();
+      sm.subCursor = 0;
+      handleStartMenuInput("A");
     };
     const bgmRow = document.createElement("button");
     bgmRow.type = "button";
     bgmRow.className = "sub-list-row";
-    bgmRow.innerHTML = `<span>SOUND / BGM</span><span>${audio.enabled ? "ON" : "OFF"}</span>`;
+    bgmRow.innerHTML = `<span><span class="bcursor">${sm.subCursor === 1 ? "▶" : " "}</span>SOUND / BGM</span><span>${audio.enabled ? "ON" : "OFF"}</span>`;
     bgmRow.onclick = () => {
-      const on = audio.toggle();
-      const btn = document.getElementById("btn-audio-toggle");
-      if (btn) {
-        btn.textContent = on ? "🔊 BGM: ON" : "🔇 BGM: OFF";
-        btn.classList.toggle("active", on);
-      }
-      renderStartMenu();
+      sm.subCursor = 1;
+      handleStartMenuInput("A");
     };
     const wildRow = document.createElement("button");
     wildRow.type = "button";
     wildRow.className = "sub-list-row";
-    wildRow.innerHTML = `<span>WILD ENCOUNTERS</span><span>${state.wildEncountersEnabled ? "ON" : "OFF"}</span>`;
+    wildRow.innerHTML = `<span><span class="bcursor">${sm.subCursor === 2 ? "▶" : " "}</span>WILD ENCOUNTERS</span><span>${state.wildEncountersEnabled ? "ON" : "OFF"}</span>`;
     wildRow.onclick = () => {
-      state.wildEncountersEnabled = !state.wildEncountersEnabled;
-      audio.playSfx("blip");
-      renderStartMenu();
+      sm.subCursor = 2;
+      handleStartMenuInput("A");
     };
     optWrap.appendChild(palRow);
     optWrap.appendChild(bgmRow);
