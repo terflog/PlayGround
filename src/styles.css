@@ -291,6 +291,17 @@ canvas {
   color: #fde047;
 }
 
+.hud-pill.clickable-pill {
+  cursor: pointer;
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #fca5a5;
+}
+
+.hud-pill.clickable-pill:hover {
+  border-color: var(--pika-yellow);
+  color: var(--pika-yellow);
+}
+
 /* Main Workspace */
 .workspace {
   flex: 1;
@@ -417,22 +428,25 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 12px;
-  gap: 10px;
+  padding: 6px 10px;
+  gap: 8px;
   background: radial-gradient(circle at center, #1f2b46 0%, #111827 100%);
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .gb-screen-bezel {
   background: #262936;
   border: 3px solid #facc15;
-  border-radius: 12px 12px 22px 12px;
-  padding: 8px 12px 10px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.65);
+  border-radius: 12px 12px 20px 12px;
+  padding: 6px 10px 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65);
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 1;
+  min-height: 0;
 }
 
 .gb-bezel-top {
@@ -443,7 +457,7 @@ canvas {
   font-size: 9px;
   font-weight: 800;
   color: #94a3b8;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   letter-spacing: 0.05em;
 }
 
@@ -453,8 +467,8 @@ canvas {
 
 .gb-lcd-wrap {
   position: relative;
-  width: 320px;
-  height: 288px;
+  width: 280px;
+  height: 252px;
   border: 2px solid #0f172a;
   background: #f8f4ff;
   overflow: hidden;
@@ -563,6 +577,7 @@ canvas {
 .gb-textbox-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
   margin-top: 5px;
 }
 
@@ -576,6 +591,11 @@ canvas {
   padding: 3px 8px;
   border-radius: 3px;
   cursor: pointer;
+}
+
+.gb-next-btn.battle-challenge-btn {
+  background: #dc2626;
+  color: #ffffff;
 }
 
 /* Wild Battle Modal */
@@ -699,14 +719,15 @@ canvas {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 340px;
-  gap: 10px;
+  max-width: 300px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .dpad-grid {
   display: grid;
-  grid-template-columns: repeat(3, 26px);
-  grid-template-rows: repeat(3, 24px);
+  grid-template-columns: repeat(3, 24px);
+  grid-template-rows: repeat(3, 22px);
   gap: 2px;
 }
 
@@ -778,11 +799,12 @@ canvas {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   background: #0e1525;
   border-top: 1px solid var(--border-subtle);
-  max-height: 145px;
+  max-height: 122px;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .inspector-heading {

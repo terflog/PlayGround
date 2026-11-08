@@ -23,6 +23,8 @@ const state = {
   searchQuery: "",
   townMapFilterCoords: null,
   visitedZones: new Set(["PALLET_TOWN"]),
+  caughtPokemon: new Set(["PIKACHU"]),
+  defeatedTrainers: new Set(),
   player: {
     x: 5,
     y: 6,
@@ -114,6 +116,80 @@ const ELEVATOR_FLOORS = {
     { label: "11F — President's Office", destConst: "SILPH_CO_11F", warpIndex: 1 },
   ],
 };
+
+const STORAGE_KEY = "pokeyellow_220_save_v1";
+
+function saveProgress() {
+  try {
+    const payload = {
+      visitedZones: Array.from(state.visitedZones),
+      caughtPokemon: Array.from(state.caughtPokemon),
+      defeatedTrainers: Array.from(state.defeatedTrainers),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore storage quota / privacy mode errors
+  }
+}
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.visitedZones)) {
+      data.visitedZones.forEach((z) => state.visitedZones.add(z));
+    }
+    if (Array.isArray(data.caughtPokemon)) {
+      data.caughtPokemon.forEach((p) => state.caughtPokemon.add(p));
+    }
+    if (Array.isArray(data.defeatedTrainers)) {
+      data.defeatedTrainers.forEach((t) => state.defeatedTrainers.add(t));
+    }
+  } catch {
+    // Ignore malformed saved state
+  }
+}
+
+function getTrainerBattleEntry(npc, zone) {
+  if (!npc || npc.kind === "item") return null;
+  const key = `${zone.constName}:${npc.name}:${npc.id}`;
+  const label = `${npc.name} ${npc.sprite} ${zone.constName}`.toUpperCase();
+
+  if (label.includes("BROCK")) return { trainerName: "LEADER BROCK", species: "ONIX", level: 12, key };
+  if (label.includes("MISTY")) return { trainerName: "LEADER MISTY", species: "STARMIE", level: 21, key };
+  if (label.includes("SURGE")) return { trainerName: "LT. SURGE", species: "RAICHU", level: 28, key };
+  if (label.includes("ERIKA")) return { trainerName: "LEADER ERIKA", species: "GLOOM", level: 32, key };
+  if (label.includes("KOGA")) return { trainerName: "LEADER KOGA", species: "VENOMOTH", level: 50, key };
+  if (label.includes("SABRINA")) return { trainerName: "LEADER SABRINA", species: "ALAKAZAM", level: 50, key };
+  if (label.includes("BLAINE")) return { trainerName: "LEADER BLAINE", species: "ARCANINE", level: 54, key };
+  if (label.includes("GIOVANNI")) return { trainerName: "BOSS GIOVANNI", species: "PERSIAN", level: 53, key };
+  if (label.includes("LORELEI")) return { trainerName: "ELITE LORELEI", species: "LAPRAS", level: 56, key };
+  if (label.includes("BRUNO")) return { trainerName: "ELITE BRUNO", species: "MACHAMP", level: 58, key };
+  if (label.includes("AGATHA")) return { trainerName: "ELITE AGATHA", species: "GENGAR", level: 60, key };
+  if (label.includes("LANCE")) return { trainerName: "ELITE LANCE", species: "DRAGONITE", level: 62, key };
+  if (label.includes("BLUE") || label.includes("RIVAL")) return { trainerName: "RIVAL BLUE", species: "EEVEE", level: 25, key };
+  if (label.includes("JESSIE") || label.includes("JAMES") || label.includes("ROCKET")) {
+    return { trainerName: "TEAM ROCKET", species: "MEOWTH", level: 24, key };
+  }
+  if (label.includes("MEWTWO")) return { trainerName: null, species: "MEWTWO", level: 70, key };
+  if (label.includes("ZAPDOS")) return { trainerName: null, species: "ZAPDOS", level: 50, key };
+  if (label.includes("ARTICUNO")) return { trainerName: null, species: "ARTICUNO", level: 50, key };
+  if (label.includes("MOLTRES")) return { trainerName: null, species: "MOLTRES", level: 50, key };
+  if (label.includes("SNORLAX")) return { trainerName: null, species: "SNORLAX", level: 30, key };
+
+  if (npc.kind === "trainer") {
+    const pool = ["RATTATA", "PIDGEOTTO", "SANDSHREW", "NIDORINO", "KADABRA", "MACHOKE"];
+    const pick = pool[(npc.id + zone.zoneNumber) % pool.length];
+    return {
+      trainerName: npc.name.replace(/_/g, " "),
+      species: pick,
+      level: Math.min(55, 10 + Math.floor(zone.zoneNumber / 5)),
+      key,
+    };
+  }
+  return null;
+}
 
 function findDefaultSpawn(zone, spawnWarpIndex = null) {
   if (spawnWarpIndex !== null && zone.warps[spawnWarpIndex]) {
@@ -227,6 +303,7 @@ export function loadZone(target, options = {}) {
 
   state.currentZone = zone;
   state.visitedZones.add(zone.constName);
+  saveProgress();
   state.npcs = initZoneNpcs(zone);
   state.dialogue = null;
 
@@ -647,7 +724,10 @@ export function interactInFront() {
           npc.collected = true;
         }
         audio.playSfx("blip");
-        openDialogue(npc.name.replace(/_/g, " "), npc.text);
+        const trainerEntry = getTrainerBattleEntry(npc, zone);
+        openDialogue(npc.name.replace(/_/g, " "), npc.text, {
+          trainerBattle: trainerEntry,
+        });
         return;
       }
     }
@@ -704,7 +784,7 @@ function advanceDialogue() {
   }
 }
 
-export function triggerWildEncounter(poolOrEntry) {
+export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
   let level = 5;
   let species = "PIDGEY";
   if (Array.isArray(poolOrEntry) && Array.isArray(poolOrEntry[0])) {
@@ -717,6 +797,7 @@ export function triggerWildEncounter(poolOrEntry) {
     species = poolOrEntry[1];
   }
   const maxHp = 14 + level * 3;
+  const trainerName = trainerMeta?.trainerName || null;
   state.battle = {
     species,
     level,
@@ -724,7 +805,11 @@ export function triggerWildEncounter(poolOrEntry) {
     maxHp,
     playerHp: 68,
     playerMaxHp: 68,
-    log: `Wild ${species.replace(/_/g, " ")} (Lv.${level}) appeared in ${state.currentZone.displayName}!`,
+    trainerName,
+    trainerKey: trainerMeta?.key || null,
+    log: trainerName
+      ? `${trainerName} wants to battle! ${trainerName} sent out ${species.replace(/_/g, " ")} (Lv.${level})!`
+      : `Wild ${species.replace(/_/g, " ")} (Lv.${level}) appeared in ${state.currentZone.displayName}!`,
     finished: false,
   };
   audio.playSfx("thunder");
@@ -781,6 +866,24 @@ function renderDialogueModal() {
   } else {
     elevBox.classList.add("hidden");
   }
+
+  const battleBtn = document.getElementById("dialogue-battle-btn");
+  if (battleBtn) {
+    if (state.dialogue.trainerBattle) {
+      const tb = state.dialogue.trainerBattle;
+      battleBtn.classList.remove("hidden");
+      battleBtn.textContent = tb.trainerName
+        ? `⚔️ BATTLE ${tb.trainerName}`
+        : `⚔️ BATTLE ${tb.species}`;
+      battleBtn.onclick = () => {
+        state.dialogue = null;
+        renderDialogueModal();
+        triggerWildEncounter([tb.level, tb.species], tb);
+      };
+    } else {
+      battleBtn.classList.add("hidden");
+    }
+  }
 }
 
 function renderBattleModal() {
@@ -829,10 +932,19 @@ function executeBattleAction(action) {
     return;
   }
   if (action === "ball") {
+    if (b.trainerName) {
+      audio.playSfx("bump");
+      b.log = `${b.trainerName} blocked the POKé BALL! Don't be a thief!`;
+      renderBattleModal();
+      return;
+    }
     audio.playSfx("warp");
     b.hp = 0;
     b.finished = true;
-    b.log = `RED threw a POKé BALL! Gotcha! Wild ${b.species.replace(/_/g, " ")} was caught! (Click RUN/CLOSE to continue)`;
+    state.caughtPokemon.add(b.species);
+    saveProgress();
+    updateUIForCurrentZone();
+    b.log = `RED threw a POKé BALL! Gotcha! ${b.species.replace(/_/g, " ")} was caught! (${state.caughtPokemon.size} species in Pokédex)`;
     renderBattleModal();
     return;
   }
@@ -846,7 +958,14 @@ function executeBattleAction(action) {
     action === "thunderbolt" ? "THUNDERBOLT" : "QUICK ATTACK";
   if (b.hp === 0) {
     b.finished = true;
-    b.log = `PIKACHU used ${moveLabel}! Wild ${b.species.replace(/_/g, " ")} fainted! PIKACHU gained ${b.level * 18} EXP!`;
+    if (b.trainerKey) {
+      state.defeatedTrainers.add(b.trainerKey);
+      saveProgress();
+    }
+    const foeTitle = b.trainerName
+      ? `${b.trainerName}'s ${b.species.replace(/_/g, " ")}`
+      : `Wild ${b.species.replace(/_/g, " ")}`;
+    b.log = `PIKACHU used ${moveLabel}! ${foeTitle} fainted! PIKACHU gained ${b.level * 18} EXP!`;
   } else {
     const counterDmg = Math.max(1, Math.floor(b.level * 0.4));
     b.playerHp = Math.max(1, b.playerHp - counterDmg);
@@ -1016,6 +1135,10 @@ function updateUIForCurrentZone() {
   document.getElementById("active-zone-subtitle").textContent = `${z.constName} (ROM ${z.romHex}) • ${z.regionName} • ${z.width}×${z.height} Blocks (${z.width * 32}×${z.height * 32} px) • Tileset: ${z.tileset}`;
 
   document.getElementById("visited-counter").textContent = `${state.visitedZones.size} / 220 Visited`;
+  const caughtEl = document.getElementById("caught-counter");
+  if (caughtEl) {
+    caughtEl.textContent = `🔴 ${state.caughtPokemon.size} Caught`;
+  }
 
   updateCoordinatesUI();
   renderKantoTownMap();
@@ -1093,12 +1216,15 @@ function updateUIForCurrentZone() {
   state.npcs.forEach((npc) => {
     const btn = document.createElement("button");
     btn.className = "entity-chip npc-chip";
-    btn.textContent = `${npc.name.replace(/_/g, " ")} (${npc.x},${npc.y})${
+    const trainerEntry = getTrainerBattleEntry(npc, z);
+    btn.textContent = `${trainerEntry ? "⚔️ " : ""}${npc.name.replace(/_/g, " ")} (${npc.x},${npc.y})${
       !npc.defaultVisible ? " [Event]" : ""
     }`;
     btn.onclick = () => {
       audio.playSfx("blip");
-      openDialogue(npc.name.replace(/_/g, " "), npc.text);
+      openDialogue(npc.name.replace(/_/g, " "), npc.text, {
+        trainerBattle: trainerEntry,
+      });
     };
     npcBox.appendChild(btn);
   });
@@ -1530,6 +1656,16 @@ function setupControlsAndEvents() {
   document.getElementById("btn-check-pikachu")?.addEventListener("click", () => {
     openPikachuInteraction();
   });
+  document.getElementById("caught-counter")?.addEventListener("click", () => {
+    audio.playSfx("blip");
+    const caughtList = Array.from(state.caughtPokemon)
+      .map((s) => s.replace(/_/g, " "))
+      .join(", ");
+    openDialogue(
+      "RED'S POKéDEX & JOURNEY LOG",
+      `POKéDEX CAUGHT (${state.caughtPokemon.size}): ${caughtList}\n\nKANTO ZONES VISITED: ${state.visitedZones.size} / 220 • TRAINERS DEFEATED: ${state.defeatedTrainers.size}`
+    );
+  });
   document.getElementById("btn-audio-toggle")?.addEventListener("click", (e) => {
     const on = audio.toggle();
     e.currentTarget.textContent = on ? "🔊 BGM: ON" : "🔇 BGM: OFF";
@@ -1604,6 +1740,7 @@ window.POKEYELLOW = {
 };
 
 window.addEventListener("DOMContentLoaded", () => {
+  loadProgress();
   setupControlsAndEvents();
   renderZoneList();
   loadZone("PALLET_TOWN");

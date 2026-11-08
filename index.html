@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pokémon Yellow Version — All 220 Loadable Zone Segments</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23facc15'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-size='40'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E"
+    />
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
@@ -71,6 +75,7 @@
 
         <div class="zone-banner-right">
           <span id="hud-player-pos" class="hud-pill">Step (5, 6) • Block (2, 3) • Tile $00</span>
+          <button type="button" id="caught-counter" class="hud-pill clickable-pill" title="View Caught Pokémon">🔴 1 Caught</button>
           <span id="visited-counter" class="hud-pill gold-pill">1 / 220 Visited</span>
         </div>
       </section>
@@ -149,6 +154,9 @@
                       </div>
                       <div id="dialogue-elevator-options" class="gb-elevator-list hidden"></div>
                       <div class="gb-textbox-footer">
+                        <button type="button" id="dialogue-battle-btn" class="gb-next-btn battle-challenge-btn hidden">
+                          ⚔️ BATTLE TRAINER
+                        </button>
                         <button type="button" id="dialogue-next-btn" class="gb-next-btn">
                           CONTINUE ▼ (SPACE / A)
                         </button>
