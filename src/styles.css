@@ -513,37 +513,37 @@ button {
   display: block;
 }
 
-/* Authentic Game Boy Overlays (Dialogue & Battle) */
+/* Authentic Game Boy Overlays (home/textbox.asm MESSAGE_BOX at 0,12..19,17) */
 .gb-overlay {
   position: absolute;
   inset: 0;
   display: flex;
-   flex-direction: column;
+  flex-direction: column;
   justify-content: flex-end;
-  background: rgba(15, 23, 42, 0.28);
-  padding: 6px;
+  background: transparent;
+  padding: 0;
+  z-index: 18;
 }
 
 .gb-textbox {
-  background: #fcfcfc;
+  position: relative;
+  width: 100%;
+  min-height: 33.33%;
+  background: #fcfaff;
   color: #111827;
   border: 3px double #111827;
-  border-radius: 4px;
-  padding: 7px 9px;
+  box-shadow: inset 0 0 0 1px #111827;
+  border-radius: 0;
+  padding: 7px 10px 8px 10px;
   font-family: var(--font-mono);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
 }
 
 .gb-textbox-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10px;
-  font-weight: 800;
-  color: #1e293b;
-  border-bottom: 1px solid #cbd5e1;
-  padding-bottom: 3px;
-  margin-bottom: 5px;
+  display: none !important;
 }
 
 .gb-mini-close {
@@ -556,62 +556,79 @@ button {
 }
 
 .gb-textbox-body {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
-  min-height: 46px;
+  flex: 1;
 }
 
+/* Centered Pikachu Mood Portrait Box (engine/pikachu/pikachu_pic_animation.asm hlcoord 6, 4) */
 .dialogue-pika-box {
-  flex-shrink: 0;
-  border: 2px solid #111827;
-  background: #ffffff;
-  padding: 2px;
+  position: absolute;
+  top: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px;
+  background: #fcfaff;
+  z-index: 19;
 }
 
 #dialogue-pika-canvas {
-  width: 48px;
-  height: 48px;
+  width: 68px;
+  height: 68px;
   display: block;
 }
 
 .gb-dialogue-text {
   font-size: 11px;
-  line-height: 1.4;
-  font-weight: 700;
+  line-height: 1.48;
+  font-weight: 800;
   color: #0f172a;
   white-space: pre-line;
+  padding-right: 12px;
 }
 
+/* Upper List Box for Elevator / Fly Destinations (engine/menus/text_box.asm) */
 .gb-elevator-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-  max-height: 76px;
+  position: absolute;
+  top: 6px;
+  right: 0;
+  width: 72%;
+  max-height: 58%;
   overflow-y: auto;
+  padding: 5px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 19;
 }
 
 .gb-floor-btn {
-  background: #e2e8f0;
-  border: 1px solid #1e293b;
+  background: transparent;
+  border: none;
   color: #0f172a;
   font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 6px;
+  font-size: 9.5px;
+  font-weight: 900;
+  text-align: left;
+  padding: 2px 4px;
   cursor: pointer;
 }
 
+.gb-floor-btn::before {
+  content: "▶ ";
+}
+
 .gb-floor-btn:hover {
-  background: #facc15;
+  background: rgba(250, 204, 21, 0.35);
 }
 
 .gb-textbox-footer {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
-  margin-top: 5px;
 }
 
 .gb-next-btn {

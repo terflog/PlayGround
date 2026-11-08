@@ -5450,6 +5450,10 @@ function setupControlsAndEvents() {
   });
 
   // Dialogue & Authentic Gen I Battle Menu buttons
+  document.getElementById("dialogue-textbox")?.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    advanceDialogue();
+  });
   document.getElementById("dialogue-next-btn")?.addEventListener("click", () => {
     advanceDialogue();
   });
