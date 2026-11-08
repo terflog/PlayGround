@@ -16,7 +16,8 @@ const state = {
   showGridOnZoneMap: false,
   showHiddenObjects: false,
   noClip: false,
-  autoSurf: true,
+  autoSurf: false, // Surfing requires explicitly using HM03 SURF (or a party Pokémon's SURF move)
+  strengthActive: false, // Enabled in the current zone by using HM04 STRENGTH
   wildEncountersEnabled: true,
   zoneZoom: "fit", // "fit" | 1 | 2 | 3
   categoryFilter: "canonical220", // "canonical220" | "town" | "route" | "indoor" | "dungeon" | "all224"
@@ -32,6 +33,11 @@ const state = {
   },
   party: [],
   bag: [
+    { id: "HM01_CUT", name: "HM01 CUT", qty: 1, kind: "hm", moveId: "CUT" },
+    { id: "HM02_FLY", name: "HM02 FLY", qty: 1, kind: "hm", moveId: "FLY" },
+    { id: "HM03_SURF", name: "HM03 SURF", qty: 1, kind: "hm", moveId: "SURF" },
+    { id: "HM04_STRENGTH", name: "HM04 STRENGTH", qty: 1, kind: "hm", moveId: "STRENGTH" },
+    { id: "HM05_FLASH", name: "HM05 FLASH", qty: 1, kind: "hm", moveId: "FLASH" },
     { id: "POKE_BALL", name: "POKé BALL", qty: 10, kind: "ball", mult: 1.0 },
     { id: "GREAT_BALL", name: "GREAT BALL", qty: 5, kind: "ball", mult: 1.5 },
     { id: "ULTRA_BALL", name: "ULTRA BALL", qty: 3, kind: "ball", mult: 2.0 },
@@ -686,6 +692,13 @@ export function loadZone(target, options = {}) {
 
   heldDirs.clear();
   state.currentZone = zone;
+  state.strengthActive = false;
+  if (
+    zone.constName !== "ROCK_TUNNEL_1F" &&
+    zone.constName !== "ROCK_TUNNEL_B1F"
+  ) {
+    engine.flashIlluminated = false;
+  }
   state.visitedZones.add(zone.constName);
   saveProgress();
   state.npcs = initZoneNpcs(zone);
@@ -821,6 +834,202 @@ function isWaterTile(zone, tileId) {
   );
 }
 
+function isCuttableTreeTile(zone, tileId) {
+  if (!zone) return false;
+  return (
+    (zone.tileset === "OVERWORLD" && tileId === 0x3d) ||
+    (zone.tileset === "GYM" && tileId === 0x50)
+  );
+}
+
+const KANTO_FLY_DESTINATIONS = [
+  { label: "PALLET TOWN", destConst: "PALLET_TOWN", warpIndex: 0 },
+  { label: "VIRIDIAN CITY", destConst: "VIRIDIAN_CITY", warpIndex: 0 },
+  { label: "PEWTER CITY", destConst: "PEWTER_CITY", warpIndex: 2 },
+  { label: "CERULEAN CITY", destConst: "CERULEAN_CITY", warpIndex: 2 },
+  { label: "VERMILION CITY", destConst: "VERMILION_CITY", warpIndex: 0 },
+  { label: "LAVENDER TOWN", destConst: "LAVENDER_TOWN", warpIndex: 0 },
+  { label: "CELADON CITY", destConst: "CELADON_CITY", warpIndex: 3 },
+  { label: "FUCHSIA CITY", destConst: "FUCHSIA_CITY", warpIndex: 1 },
+  { label: "SAFFRON CITY", destConst: "SAFFRON_CITY", warpIndex: 3 },
+  { label: "CINNABAR ISLAND", destConst: "CINNABAR_ISLAND", warpIndex: 3 },
+  { label: "INDIGO PLATEAU", destConst: "INDIGO_PLATEAU", warpIndex: 0 },
+];
+
+export function teachHmMove(moveId, targetMon = null) {
+  initDefaultParty();
+  const cleanId = String(moveId || "").toUpperCase();
+  const existing = state.party.find(
+    (m) => Array.isArray(m.moves) && m.moves.some((mv) => mv.id === cleanId)
+  );
+  if (existing && !targetMon) return existing;
+
+  const mon = targetMon || state.party[0];
+  if (!mon) return null;
+  if (!Array.isArray(mon.moves)) mon.moves = [];
+  if (!mon.moves.some((mv) => mv.id === cleanId)) {
+    const moveObj = getMoveObj(cleanId);
+    if (mon.moves.length < 4) {
+      mon.moves.push(moveObj);
+    } else {
+      mon.moves[3] = moveObj;
+    }
+    modifyPikachuHappiness("USEDTMHM");
+    syncPikachuOverworldState();
+    saveProgress();
+  }
+  return mon;
+}
+
+export function useFieldMove(moveId, options = {}) {
+  initDefaultParty();
+  const cleanId = String(moveId || "").toUpperCase();
+  const autoTeach = options.teachIfMissing !== false;
+  let userMon = state.party.find(
+    (m) => Array.isArray(m.moves) && m.moves.some((mv) => mv.id === cleanId)
+  );
+  if (!userMon && autoTeach) {
+    userMon = teachHmMove(cleanId);
+  }
+  if (!userMon) {
+    audio.playSfx("bump");
+    openDialogue(
+      `HM — ${cleanId}`,
+      `No POKéMON in RED's party knows ${cleanId} yet! Teach it using the HM in your ITEM bag.`
+    );
+    return false;
+  }
+
+  if (state.startMenu.open) {
+    state.startMenu.open = false;
+    state.startMenu.subView = null;
+    state.startMenu.selectedDexSpecies = null;
+    renderStartMenu();
+  }
+
+  const zone = state.currentZone;
+  const dx =
+    state.player.dir === "LEFT" ? -1 : state.player.dir === "RIGHT" ? 1 : 0;
+  const dy =
+    state.player.dir === "UP" ? -1 : state.player.dir === "DOWN" ? 1 : 0;
+  const fx = state.player.x + dx;
+  const fy = state.player.y + dy;
+  const inBounds =
+    fx >= 0 && fx < zone.width * 2 && fy >= 0 && fy < zone.height * 2;
+  const frontTile = inBounds
+    ? engine.getCollisionTileAtStep(zone, fx, fy)
+    : -1;
+
+  if (cleanId === "SURF") {
+    if (state.player.mode === "surf") {
+      audio.playSfx("blip");
+      openDialogue(
+        "HM03 SURF",
+        `${userMon.nickname} is already surfing across the water!`
+      );
+      return true;
+    }
+    const blockedByNpc = state.npcs.some(
+      (n) =>
+        !n.collected &&
+        (n.defaultVisible || state.showHiddenObjects) &&
+        n.x === fx &&
+        n.y === fy
+    );
+    if (!inBounds || blockedByNpc || !isWaterTile(zone, frontTile)) {
+      audio.playSfx("bump");
+      openDialogue(
+        "HM03 SURF",
+        `Can't SURF here!\n\nFace the water's edge and use HM03 SURF.`
+      );
+      return false;
+    }
+    // Activate SURF and step onto the water tile
+    audio.playSfx("warp");
+    state.player.mode = "surf";
+    state.pikachu.spawnDelayed = false;
+    syncPikachuOverworldState();
+    startPlayerMove(fx, fy, state.player.dir, 165, false);
+    openDialogue(
+      "HM03 SURF",
+      `${userMon.nickname} used SURF!\n\nRED got on ${userMon.nickname}!`
+    );
+    renderAllCanvases(true);
+    return true;
+  }
+
+  if (cleanId === "CUT") {
+    const ts = engine.tilesetsByConst[zone.tileset];
+    if (inBounds && isCuttableTreeTile(zone, frontTile)) {
+      engine.cutTrees.add(`${zone.constName}:${fx},${fy}`);
+      audio.playSfx("ledge");
+      renderAllCanvases(true);
+      openDialogue(
+        "HM01 CUT",
+        `${userMon.nickname} hacked away with CUT!\n\nThe small tree was cut down!`
+      );
+      return true;
+    }
+    if (inBounds && ts && frontTile === ts.grassTile) {
+      engine.cutTrees.add(`${zone.constName}:${fx},${fy}`);
+      audio.playSfx("ledge");
+      renderAllCanvases(true);
+      openDialogue(
+        "HM01 CUT",
+        `${userMon.nickname} cleared the tall grass with CUT!`
+      );
+      return true;
+    }
+    audio.playSfx("bump");
+    openDialogue(
+      "HM01 CUT",
+      `There isn't anything to CUT here!\n\nStand facing a small tree or tall grass and use HM01 CUT.`
+    );
+    return false;
+  }
+
+  if (cleanId === "FLY") {
+    if (zone.romId >= 0x25 && zone.category !== "town" && zone.category !== "route") {
+      audio.playSfx("bump");
+      openDialogue("HM02 FLY", `Can't use FLY inside a building or dungeon!`);
+      return false;
+    }
+    audio.playSfx("blip");
+    state.dialogue = {
+      title: `HM02 FLY — ${userMon.nickname}`,
+      pages: ["Where would you like to FLY to?"],
+      pageIndex: 0,
+      elevatorConst: "HM02_FLY",
+      elevatorOptions: KANTO_FLY_DESTINATIONS,
+    };
+    renderDialogueModal();
+    return true;
+  }
+
+  if (cleanId === "STRENGTH") {
+    state.strengthActive = true;
+    audio.playSfx("thunder");
+    openDialogue(
+      "HM04 STRENGTH",
+      `${userMon.nickname} used STRENGTH!\n\n${userMon.nickname}'s saving energy makes it possible to move boulders around!`
+    );
+    return true;
+  }
+
+  if (cleanId === "FLASH") {
+    engine.flashIlluminated = true;
+    audio.playSfx("thunder");
+    renderAllCanvases(true);
+    openDialogue(
+      "HM05 FLASH",
+      `${userMon.nickname} used FLASH!\n\nA blinding FLASH illuminates the area!`
+    );
+    return true;
+  }
+
+  return false;
+}
+
 function attemptStep(dir) {
   if (state.dialogue || state.battle || state.startMenu.open) return;
   if (state.player.moveAnim) return;
@@ -939,12 +1148,54 @@ function attemptStep(dir) {
     }
   }
 
-  // 4. Check NPC collision
+  // 4. Check NPC collision (and HM04 STRENGTH boulder pushing!)
   if (!state.noClip) {
     for (const npc of state.npcs) {
       if (!npc.defaultVisible && !state.showHiddenObjects) continue;
       if (npc.collected) continue;
       if (npc.x === targetX && npc.y === targetY) {
+        if (npc.sprite === "SPRITE_BOULDER" && state.strengthActive && !npc.moveAnim) {
+          const bx = targetX + dx;
+          const by = targetY + dy;
+          const ts = engine.tilesetsByConst[zone.tileset];
+          const destTile =
+            bx >= 0 && bx < zone.width * 2 && by >= 0 && by < zone.height * 2
+              ? engine.getCollisionTileAtStep(zone, bx, by)
+              : -1;
+          const canPush =
+            bx >= 0 &&
+            bx < zone.width * 2 &&
+            by >= 0 &&
+            by < zone.height * 2 &&
+            engine.isStepPassable(zone, targetX, targetY, bx, by) &&
+            !(ts && (ts.doorSet.has(destTile) || ts.warpSet.has(destTile))) &&
+            !(state.pikachu.visible && state.pikachu.x === bx && state.pikachu.y === by) &&
+            !state.npcs.some(
+              (other) =>
+                other !== npc &&
+                !other.collected &&
+                (other.defaultVisible || state.showHiddenObjects) &&
+                other.x === bx &&
+                other.y === by
+            );
+          if (canPush) {
+            const fromX = npc.x;
+            const fromY = npc.y;
+            npc.x = bx;
+            npc.y = by;
+            npc.moveAnim = {
+              fromX,
+              fromY,
+              toX: bx,
+              toY: by,
+              startTime: performance.now(),
+              duration: 210,
+            };
+            audio.playSfx("ledge");
+            renderAllCanvases(true);
+            return;
+          }
+        }
         audio.playSfx("bump");
         return;
       }
@@ -1218,9 +1469,62 @@ export function interactInFront() {
       if (!npc.defaultVisible && !state.showHiddenObjects) continue;
       if (npc.collected) continue;
       if (npc.x === cx && npc.y === cy) {
+        if (npc.sprite === "SPRITE_BOULDER") {
+          audio.playSfx("blip");
+          if (state.strengthActive) {
+            openDialogue(
+              "BOULDER",
+              "STRENGTH made it possible to move boulders around! Walk into the boulder to push it."
+            );
+          } else {
+            openDialogue(
+              "BOULDER",
+              "It's a big boulder, but a POKéMON may be able to move it with HM04 STRENGTH.",
+              {
+                fieldMoveAction: {
+                  label: "🪨 USE HM04 STRENGTH",
+                  moveId: "STRENGTH",
+                },
+              }
+            );
+          }
+          return;
+        }
         triggerNpcDialogue(npc, zone);
         return;
       }
+    }
+  }
+
+  // 5. Check HM overworld obstacles in front of Red (Cuttable Tree or Water Shoreline)
+  if (fx >= 0 && fx < zone.width * 2 && fy >= 0 && fy < zone.height * 2) {
+    if (isCuttableTreeTile(zone, frontTile)) {
+      audio.playSfx("blip");
+      openDialogue(
+        "SMALL TREE",
+        "This tree can be CUT! Use HM01 CUT to chop it down.",
+        {
+          fieldMoveAction: {
+            label: "🌳 USE HM01 CUT",
+            moveId: "CUT",
+          },
+        }
+      );
+      return;
+    }
+    if (isWaterTile(zone, frontTile) && state.player.mode !== "surf") {
+      audio.playSfx("blip");
+      openDialogue(
+        "WATER'S EDGE",
+        "The water is calm and dyed a deep blue. Use HM03 SURF to ride across the water!",
+        {
+          fieldMoveAction: {
+            label: "🌊 USE HM03 SURF",
+            moveId: "SURF",
+          },
+        }
+      );
+      return;
     }
   }
 }
@@ -2551,6 +2855,15 @@ function renderDialogueModal() {
         renderDialogueModal();
         triggerWildEncounter([tb.level, tb.species], tb);
       };
+    } else if (state.dialogue.fieldMoveAction) {
+      const fma = state.dialogue.fieldMoveAction;
+      battleBtn.classList.remove("hidden");
+      battleBtn.textContent = fma.label;
+      battleBtn.onclick = () => {
+        state.dialogue = null;
+        renderDialogueModal();
+        useFieldMove(fma.moveId);
+      };
     } else {
       battleBtn.classList.add("hidden");
     }
@@ -3244,7 +3557,7 @@ function computeRenderSignature() {
   const z = state.currentZone;
   const p = state.player;
   const pk = state.pikachu;
-  let sig = `${z?.constName}|${state.viewMode}|${engine.paletteMode}|${engine.animCounter}|${state.showBorder}|${state.showEntitiesOnZoneMap}|${state.showWarpsOnZoneMap}|${state.showGridOnZoneMap}|${state.showHiddenObjects}|${state.activeEmote}|${p.renderX.toFixed(2)},${p.renderY.toFixed(2)},${p.dir},${p.walking},${p.stepParity},${p.mode},${p.surfSprite}|${pk.visible},${pk.renderX.toFixed(2)},${pk.renderY.toFixed(2)},${pk.dir},${pk.walking},${pk.stepParity}`;
+  let sig = `${z?.constName}|${state.viewMode}|${engine.paletteMode}|${engine.animCounter}|${engine.cutTrees.size}|${engine.flashIlluminated}|${state.showBorder}|${state.showEntitiesOnZoneMap}|${state.showWarpsOnZoneMap}|${state.showGridOnZoneMap}|${state.showHiddenObjects}|${state.activeEmote}|${p.renderX.toFixed(2)},${p.renderY.toFixed(2)},${p.dir},${p.walking},${p.stepParity},${p.mode},${p.surfSprite}|${pk.visible},${pk.renderX.toFixed(2)},${pk.renderY.toFixed(2)},${pk.dir},${pk.walking},${pk.stepParity}`;
   for (let i = 0; i < state.npcs.length; i++) {
     const n = state.npcs[i];
     if (!n.defaultVisible && !state.showHiddenObjects) continue;
@@ -3443,6 +3756,7 @@ export function renderStartMenu() {
   } else if (sm.subView === "POKEMON") {
     initDefaultParty();
     subTitle.textContent = `PARTY POKéMON (${state.party.length}/6)`;
+    const hmSet = new Set(["CUT", "FLY", "SURF", "STRENGTH", "FLASH"]);
     state.party.forEach((mon, idx) => {
       const base = POKEYELLOW_DATA.battle?.pokemonStats?.[mon.species];
       const evoStr =
@@ -3457,7 +3771,7 @@ export function renderStartMenu() {
       row.className = "sub-list-row";
       row.style.flexDirection = "column";
       row.style.alignItems = "stretch";
-      row.style.gap = "2px";
+      row.style.gap = "3px";
       row.innerHTML = `
         <div style="display:flex;justify-content:space-between">
           <strong>${idx === 0 ? "★ " : ""}${mon.nickname} :L${mon.level}</strong>
@@ -3468,6 +3782,25 @@ export function renderStartMenu() {
           <span>Evo: ${evoStr}</span>
         </div>
       `;
+      const fieldMoves = (mon.moves || []).filter((m) => hmSet.has(m.id));
+      if (fieldMoves.length > 0) {
+        const fmWrap = document.createElement("div");
+        fmWrap.style.display = "flex";
+        fmWrap.style.gap = "4px";
+        fmWrap.style.marginTop = "2px";
+        fieldMoves.forEach((fm) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "gb-floor-btn";
+          btn.textContent = `USE ${fm.name}`;
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            useFieldMove(fm.id, { teachIfMissing: false });
+          };
+          fmWrap.appendChild(btn);
+        });
+        row.appendChild(fmWrap);
+      }
       row.onclick = () => {
         if (idx > 0) {
           // Swap party lead (SwitchPartyMon)
@@ -3486,10 +3819,17 @@ export function renderStartMenu() {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "sub-list-row";
-      row.innerHTML = `<span>${item.name}</span><span>×${item.qty}</span>`;
+      row.innerHTML = `<span>${item.name}</span><span>${
+        item.kind === "hm" ? "HM" : `×${item.qty}`
+      }</span>`;
       row.onclick = () => {
         initDefaultParty();
         const lead = state.party[0];
+        if (item.kind === "hm" && item.moveId) {
+          teachHmMove(item.moveId, lead);
+          useFieldMove(item.moveId);
+          return;
+        }
         if (item.kind === "heal") {
           item.qty = Math.max(1, item.qty - 1);
           lead.hp = Math.min(lead.maxHp, lead.hp + item.hp);
@@ -4136,9 +4476,23 @@ function setupControlsAndEvents() {
         return;
       }
     }
-    // Otherwise move Red + Pikachu there and sync water/land surfing state
+    // Otherwise move Red + Pikachu there (respecting HM03 SURF for water tiles)
     const clickTile = engine.getCollisionTileAtStep(z, stepX, stepY);
     const clickWater = isWaterTile(z, clickTile);
+    if (clickWater && state.player.mode !== "surf" && !state.autoSurf) {
+      audio.playSfx("bump");
+      openDialogue(
+        "WATER'S EDGE",
+        "The water is deep! Stand at the shoreline and use HM03 SURF to cross.",
+        {
+          fieldMoveAction: {
+            label: "🌊 USE HM03 SURF",
+            moveId: "SURF",
+          },
+        }
+      );
+      return;
+    }
     state.player.mode = clickWater ? "surf" : "walk";
     state.player.x = stepX;
     state.player.y = stepY;
@@ -4421,6 +4775,8 @@ window.POKEYELLOW = {
   toggleStartMenu,
   handleStartMenuInput,
   healParty,
+  useFieldMove,
+  teachHmMove,
 };
 
 window.addEventListener("DOMContentLoaded", () => {
