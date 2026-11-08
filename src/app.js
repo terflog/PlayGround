@@ -48,6 +48,7 @@ const state = {
     gotDomeFossil: false, // EVENT_GOT_DOME_FOSSIL (scripts/MtMoonB2F.asm)
     gotHelixFossil: false, // EVENT_GOT_HELIX_FOSSIL (scripts/MtMoonB2F.asm)
     mtMoonNerdLeft: false, // Super Nerd leaves Mt. Moon B2F without taking the other fossil
+    gotDojoHitmons: false, // Fighting Dojo Karate Master awards both Hitmonlee & Hitmonchan
     calmedMarowak: false, // EVENT_BEAT_GHOST_MAROWAK (scripts/PokemonTower6F.asm)
   },
   party: [],
@@ -836,6 +837,14 @@ function initZoneNpcs(zone) {
       } else if (o.name === "MTMOONB2F_DOME_FOSSIL" && state.events.gotDomeFossil) {
         collected = true;
       } else if (o.name === "MTMOONB2F_HELIX_FOSSIL" && state.events.gotHelixFossil) {
+        collected = true;
+      }
+    } else if (zone.constName === "FIGHTING_DOJO") {
+      if (
+        (o.name === "FIGHTINGDOJO_HITMONLEE_POKE_BALL" ||
+          o.name === "FIGHTINGDOJO_HITMONCHAN_POKE_BALL") &&
+        state.events.gotDojoHitmons
+      ) {
         collected = true;
       }
     }
@@ -1677,11 +1686,42 @@ function checkInGameGiftOrEvent(npc, zone) {
   if (zone.constName === "CELADON_MANSION_ROOF_HOUSE" && upName.includes("EEVEE")) {
     return giveGiftMon("EEVEE", 25); // scripts/CeladonMansionRoofHouse.asm:16
   }
-  if (zone.constName === "FIGHTING_DOJO" && upName.includes("HITMONLEE")) {
-    return giveGiftMon("HITMONLEE", 30); // scripts/FightingDojo.asm:244
-  }
-  if (zone.constName === "FIGHTING_DOJO" && upName.includes("HITMONCHAN")) {
-    return giveGiftMon("HITMONCHAN", 30); // scripts/FightingDojo.asm:278
+  if (
+    zone.constName === "FIGHTING_DOJO" &&
+    (upName.includes("KARATE_MASTER") ||
+      upName.includes("HITMONLEE") ||
+      upName.includes("HITMONCHAN"))
+  ) {
+    const masterDefeated = state.defeatedTrainers.has(
+      "FIGHTING_DOJO:FIGHTINGDOJO_KARATE_MASTER:1"
+    );
+    if (
+      !masterDefeated &&
+      (upName.includes("HITMONLEE") || upName.includes("HITMONCHAN"))
+    ) {
+      return `\n\nKARATE MASTER: Hey! Don't be greedy! Defeat me in battle first!`;
+    }
+    if (
+      masterDefeated ||
+      upName.includes("HITMONLEE") ||
+      upName.includes("HITMONCHAN")
+    ) {
+      if (!state.events.gotDojoHitmons) {
+        state.events.gotDojoHitmons = true;
+        state.npcs.forEach((n) => {
+          if (
+            n.name === "FIGHTINGDOJO_HITMONLEE_POKE_BALL" ||
+            n.name === "FIGHTINGDOJO_HITMONCHAN_POKE_BALL"
+          ) {
+            n.collected = true;
+          }
+        });
+        const m1 = giveGiftMon("HITMONLEE", 30).trim();
+        const m2 = giveGiftMon("HITMONCHAN", 30).trim();
+        renderAllCanvases(true);
+        return `\n\nKARATE MASTER: Hwa! You have proven your fighting spirit! Take BOTH of our prized fighting POKéMON!\n\n${m1}\n\n${m2}`;
+      }
+    }
   }
   // 3. Canonical Hidden Machine (HM01–HM05), Key Item & Ground Item Ball scripts:
   if (zone.constName === "POKEMON_FAN_CLUB" && upName.includes("CHAIRMAN")) {
@@ -2008,7 +2048,9 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
   if (
     npc.kind === "item" &&
     npc.sprite === "SPRITE_POKE_BALL" &&
-    npc.name !== "OAKSLAB_EEVEE_POKE_BALL"
+    npc.name !== "OAKSLAB_EEVEE_POKE_BALL" &&
+    npc.name !== "FIGHTINGDOJO_HITMONLEE_POKE_BALL" &&
+    npc.name !== "FIGHTINGDOJO_HITMONCHAN_POKE_BALL"
   ) {
     npc.collected = true;
   }
@@ -3074,6 +3116,40 @@ function handleEnemyFainted(b, msgs) {
           giveBagItem("SILPH_SCOPE", 1);
           giveBagItem("LIFT_KEY", 1);
           msgs.push(`GIOVANNI dropped the\nSILPH SCOPE & LIFT KEY!`);
+        }
+        // Defeating the Karate Master in Fighting Dojo awards BOTH Hitmonlee & Hitmonchan!
+        if (b.trainerKey.startsWith("FIGHTING_DOJO:FIGHTINGDOJO_KARATE_MASTER")) {
+          b.endBattleText = "KARATE MASTER: Hwa!\nArrgh! Beaten!";
+          b.onComplete = () => {
+            if (!state.events.gotDojoHitmons) {
+              state.events.gotDojoHitmons = true;
+              state.seenPokemon.add("HITMONLEE");
+              state.caughtPokemon.add("HITMONLEE");
+              if (!state.party.some((m) => m.species === "HITMONLEE") && state.party.length < 6) {
+                state.party.push(buildMonInstance("HITMONLEE", 30));
+              }
+              state.seenPokemon.add("HITMONCHAN");
+              state.caughtPokemon.add("HITMONCHAN");
+              if (!state.party.some((m) => m.species === "HITMONCHAN") && state.party.length < 6) {
+                state.party.push(buildMonInstance("HITMONCHAN", 30));
+              }
+              state.npcs.forEach((n) => {
+                if (
+                  n.name === "FIGHTINGDOJO_HITMONLEE_POKE_BALL" ||
+                  n.name === "FIGHTINGDOJO_HITMONCHAN_POKE_BALL"
+                ) {
+                  n.collected = true;
+                }
+              });
+              saveProgress();
+              updateUIForCurrentZone();
+              renderAllCanvases(true);
+              openDialogue(
+                "KARATE MASTER",
+                "KARATE MASTER: Indeed, I have lost!\n\nYou are worthy of our Dojo's highest honor — take BOTH of our prized fighting POKéMON!\n\nRED received HITMONLEE (:L30) and HITMONCHAN (:L30)!"
+              );
+            }
+          };
         }
       }
       b.showTrainerSprite = Boolean(b.trainerSprite);
