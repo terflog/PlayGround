@@ -139,27 +139,25 @@
                 <div class="gb-lcd-wrap">
                   <canvas id="gb-screen-canvas" width="160" height="144"></canvas>
 
-                  <!-- Authentic Game Boy Dialogue / Pikachu Mood Overlay -->
-                  <div id="dialogue-overlay" class="gb-overlay hidden">
-                    <div class="gb-textbox">
-                      <div class="gb-textbox-header">
+                  <!-- Authentic Game Boy Dialogue / Pikachu Mood Overlay (home/text.asm TextBoxBorder at 0,12..19,17) -->
+                  <div id="dialogue-overlay" class="gb-overlay dialogue-modal hidden">
+                    <div id="dialogue-pika-box" class="gb-poke-box dialogue-pika-box hidden">
+                      <canvas id="dialogue-pika-canvas" width="40" height="40"></canvas>
+                    </div>
+                    <div id="dialogue-elevator-options" class="gb-poke-box gb-elevator-list hidden"></div>
+                    <div class="gb-textbox gb-poke-box" id="dialogue-textbox">
+                      <div class="gb-textbox-header hidden" aria-hidden="true">
                         <span id="dialogue-title">PALLET TOWN</span>
                         <button type="button" id="dialogue-close-btn" class="gb-mini-close">✕</button>
                       </div>
                       <div class="gb-textbox-body">
-                        <div id="dialogue-pika-box" class="dialogue-pika-box hidden">
-                          <canvas id="dialogue-pika-canvas" width="40" height="40"></canvas>
-                        </div>
                         <p id="dialogue-text" class="gb-dialogue-text"></p>
                       </div>
-                      <div id="dialogue-elevator-options" class="gb-elevator-list hidden"></div>
                       <div class="gb-textbox-footer">
                         <button type="button" id="dialogue-battle-btn" class="gb-next-btn battle-challenge-btn hidden">
-                          ⚔️ BATTLE TRAINER
+                          ▶ ACTION
                         </button>
-                        <button type="button" id="dialogue-next-btn" class="gb-next-btn">
-                          CONTINUE ▼ (SPACE / A)
-                        </button>
+                        <button type="button" id="dialogue-next-btn" class="gb-prompt-arrow" aria-label="Continue">▼</button>
                       </div>
                     </div>
                   </div>
