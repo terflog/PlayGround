@@ -200,7 +200,7 @@
                         <div id="battle-player-hud" class="battle-hud player-hud">
                           <div class="battle-hud-line">
                             <strong id="battle-player-name">PIKACHU</strong>
-                            <span id="battle-player-lv">:L25</span>
+                            <span id="battle-player-lv">:L5</span>
                           </div>
                           <div class="hp-bar-Row">
                             <span class="hp-tag">HP:</span>
@@ -208,7 +208,7 @@
                               <div id="battle-player-hp-fill" class="hp-fill" style="width: 100%"></div>
                             </div>
                           </div>
-                          <div id="battle-player-hp-nums" class="hp-nums">68/ 68</div>
+                          <div id="battle-player-hp-nums" class="hp-nums">20/ 20</div>
                           <div class="hud-lbracket player-bracket"><span class="bracket-tri">◣</span></div>
                         </div>
                       </div>
@@ -251,6 +251,12 @@
                       <!-- LIST_MENU_BOX (4,2..19,12): Bag Item Menu (DisplayBagMenu) -->
                       <div id="battle-bag-box" class="gb-poke-box battle-bag-box hidden" role="menu" aria-label="Item Bag Menu">
                         <div id="battle-bag-list" class="battle-bag-list"></div>
+                      </div>
+
+                      <!-- EvolveMon (0,0..19,11): Centered Evolution Animation Stage (engine/movie/evolution.asm) -->
+                      <div id="battle-evo-stage" class="battle-evo-stage hidden">
+                        <canvas id="battle-evo-canvas" width="56" height="56"></canvas>
+                        <button type="button" id="battle-evo-cancel-btn" class="evo-cancel-btn" title="Cancel Evolution (Press B / X)">STOP EVOLUTION (B)</button>
                       </div>
 
                       <!-- DisplayPartyMenu (0,0..19,17): Full-Screen Party Menu + SWITCH/STATS/CANCEL -->

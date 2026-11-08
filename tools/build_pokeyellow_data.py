@@ -479,12 +479,13 @@ def parse_battle_database():
         mult = 2.0 if eff == "SUPER_EFFECTIVE" else 0.5 if eff == "NOT_VERY_EFFECTIVE" else 0.0
         type_chart.append([atk_t.replace("_TYPE", ""), def_t.replace("_TYPE", ""), mult])
 
-    # 3. Learnsets from evos_moves.asm
+    # 3. Evolutions & Learnsets from evos_moves.asm
     with open(f"{POKEYELLOW}/data/pokemon/evos_moves.asm") as f:
         em_txt = f.read()
     learnsets = {}
+    evolutions = {}
     cur_mon = None
-    in_moves = False
+    section = None  # "evos" | "moves"
     for line in em_txt.splitlines():
         s = line.strip()
         m_lbl = re.match(r"^([A-Za-z0-9_]+)EvosMoves:", s)
@@ -501,11 +502,35 @@ def parse_battle_database():
             else:
                 cur_mon = up.replace("_", "") if up not in ("FARFETCH_D",) else "FARFETCHD"
             learnsets[cur_mon] = []
-            in_moves = False
+            evolutions[cur_mon] = []
+            section = None
         elif cur_mon:
-            if s.startswith("; Learnset"):
-                in_moves = True
-            elif in_moves:
+            if s.startswith("; Evolutions"):
+                section = "evos"
+            elif s.startswith("; Learnset"):
+                section = "moves"
+            elif section == "evos":
+                m_lv = re.match(r"^db\s+EVOLVE_LEVEL,\s*(\d+),\s*([A-Z0-9_]+)", s)
+                m_it = re.match(r"^db\s+EVOLVE_ITEM,\s*([A-Z0-9_]+),\s*(\d+),\s*([A-Z0-9_]+)", s)
+                m_tr = re.match(r"^db\s+EVOLVE_TRADE,\s*(\d+),\s*([A-Z0-9_]+)", s)
+                if m_lv:
+                    evolutions[cur_mon].append(
+                        {"method": "LEVEL", "level": int(m_lv.group(1)), "target": m_lv.group(2)}
+                    )
+                elif m_it:
+                    evolutions[cur_mon].append(
+                        {
+                            "method": "ITEM",
+                            "item": m_it.group(1),
+                            "level": int(m_it.group(2)),
+                            "target": m_it.group(3),
+                        }
+                    )
+                elif m_tr:
+                    evolutions[cur_mon].append(
+                        {"method": "TRADE", "level": int(m_tr.group(1)), "target": m_tr.group(2)}
+                    )
+            elif section == "moves":
                 mm = re.match(r"^db\s+(\d+),\s*([A-Z0-9_]+)", s)
                 if mm:
                     learnsets[cur_mon].append([int(mm.group(1)), mm.group(2)])
@@ -549,6 +574,7 @@ def parse_battle_database():
             "catchRate": catch_rate,
             "baseExp": base_exp,
             "baseMoves": base_moves or ["TACKLE"],
+            "evolutions": evolutions.get(lset_key, []),
             "learnset": learnsets.get(lset_key, []),
         }
 
@@ -899,9 +925,10 @@ def build_npc_battle_profile(
     """
     trainer_classes = battle_db["trainerClasses"]
 
-    # Skip pure inanimate item balls / books / clipboards / fossils / boulders
+    # Skip pure inanimate item balls / books / clipboards / fossils / boulders / pokedexes
     if kind == "item" or osprite in (
         "SPRITE_POKE_BALL",
+        "SPRITE_POKEDEX",
         "SPRITE_BOOK_MAP_DEX",
         "SPRITE_CLIPBOARD",
         "SPRITE_OLD_AMBER",
@@ -968,7 +995,7 @@ def build_npc_battle_profile(
             "afterBattleText": tinfo.get("afterBattleText") or "We'll get that PIKACHU next time!",
         }
 
-    if "RIVAL" in up_name or "BLUE" in up_name or osprite == "SPRITE_BLUE":
+    if "RIVAL" in up_name or osprite == "SPRITE_BLUE":
         if "OAKS_LAB" in cname or "PALLET" in cname or "BLUES_HOUSE" in cname:
             party = [[5, "EEVEE"]]
         elif "ROUTE_22" in cname and "RIVAL2" not in up_name:
@@ -1354,7 +1381,7 @@ def parse_maps(text_const_to_info, tilesets, battle_db):
             default_vis = toggle_states.get(obj_export_name, True)
             kind = "npc"
             extra = None
-            if len(parts) == 7:
+            if len(parts) == 7 and parts[6] != "0" and osprite == "SPRITE_POKE_BALL":
                 kind = "item"
                 extra = parts[6]
             elif len(parts) >= 8:
@@ -1363,6 +1390,9 @@ def parse_maps(text_const_to_info, tilesets, battle_db):
 
             tinfo = dict(text_const_to_info.get(otext, {}))
             resolved_txt = tinfo.get("text")
+            if resolved_txt and "RED got a  !" in resolved_txt:
+                resolved_txt = resolved_txt.replace("RED got a  !", "RED got a TOWN MAP!")
+                tinfo["text"] = resolved_txt
             if not resolved_txt:
                 if kind == "item":
                     resolved_txt = f"RED found {extra.replace('_', ' ')}!"

@@ -25,6 +25,11 @@ const state = {
   visitedZones: new Set(["PALLET_TOWN"]),
   caughtPokemon: new Set(["PIKACHU", "BULBASAUR", "CHARMANDER", "SQUIRTLE"]),
   defeatedTrainers: new Set(),
+  events: {
+    enteredBluesHouse: false, // EVENT_ENTERED_BLUES_HOUSE (scripts/BluesHouse.asm:14)
+    gotTownMap: false, // EVENT_GOT_TOWN_MAP (scripts/BluesHouse.asm:47)
+    daisyWalking: false, // EVENT_DAISY_WALKING (scripts/PalletTown.asm:208)
+  },
   party: [],
   bag: [
     { id: "POKE_BALL", name: "POKé BALL", qty: 10, kind: "ball", mult: 1.0 },
@@ -34,6 +39,12 @@ const state = {
     { id: "POTION", name: "POTION", qty: 5, kind: "heal", hp: 20 },
     { id: "SUPER_POTION", name: "SUPER POTION", qty: 3, kind: "heal", hp: 50 },
     { id: "FULL_RESTORE", name: "FULL RESTORE", qty: 2, kind: "heal", hp: 999, cure: true },
+    { id: "RARE_CANDY", name: "RARE CANDY", qty: 10, kind: "candy" },
+    { id: "THUNDER_STONE", name: "THUNDER STONE", qty: 2, kind: "stone" },
+    { id: "FIRE_STONE", name: "FIRE STONE", qty: 2, kind: "stone" },
+    { id: "WATER_STONE", name: "WATER STONE", qty: 2, kind: "stone" },
+    { id: "LEAF_STONE", name: "LEAF STONE", qty: 2, kind: "stone" },
+    { id: "MOON_STONE", name: "MOON STONE", qty: 2, kind: "stone" },
     { id: "POKE_FLUTE", name: "POKé FLUTE", qty: 1, kind: "flute" },
   ],
   player: {
@@ -44,7 +55,8 @@ const state = {
     dir: "DOWN",
     walking: false,
     stepParity: false,
-    mode: "walk", // "walk" | "bike" | "surf"
+    mode: "walk", // "walk" (wWalkBikeSurfState=0) | "bike" (1) | "surf" (2)
+    surfSprite: "seel", // "seel" (SeelSprite) or "surfing_pikachu" (SurfingPikachuSprite if Pikachu knows SURF)
     moveAnim: null,
   },
   pikachu: {
@@ -56,7 +68,10 @@ const state = {
     walking: false,
     stepParity: false,
     visible: true,
-    friendship: 220,
+    spawnDelayed: false, // PIKACHU_SPAWN_DELAYED when stepping from water onto land
+    friendship: 0, // Initial friendship level is 0
+    mood: 128, // $80 neutral mood (engine/movie/oak_speech/init_player_data.asm:18)
+    stepCounter: 0,
     moodIndex: 0,
   },
   activeEmote: null,
@@ -67,38 +82,80 @@ const state = {
   selectedElevatorDest: {},
 };
 
-const PIKACHU_MOODS = [
+// Authentic 7-tier Pikachu Happiness Lookup Table (engine/pikachu/pikachu_pic_animation.asm:38-89)
+const PIKACHU_HAPPINESS_TIERS = [
   {
-    frames: ["pikachu_heart_1", "pikachu_heart_2"],
-    emote: "heart",
-    title: "PIKACHU's Mood: Adoring ♥",
-    text: "PIKACHU: Pika-pii! ♥\n\nPIKACHU is beaming with happiness and nuzzling close to RED!",
+    maxFriendship: 50,
+    frames: ["pikachu_surprised_1", "pikachu_surprised_2"],
+    emote: "bolt",
+    title: "PIKACHU's Mood: Wary ⚡",
+    text: "PIKACHU: Pika...?\n\nPIKACHU is still cautious and unsure about traveling with you.",
   },
   {
-    frames: ["pikachu_2_hearts_1", "pikachu_2_hearts_2"],
-    emote: "heart",
-    title: "PIKACHU's Mood: Overjoyed ♥♥",
-    text: "PIKACHU: Pikachuuu! ♥♥\n\nPIKACHU looks thrilled to be traveling through Kanto with you!",
+    maxFriendship: 100,
+    frames: ["pikachu_smile_1", "pikachu_smile_2"],
+    emote: "question",
+    title: "PIKACHU's Mood: Curious ?",
+    text: "PIKACHU: Pika-pi?\n\nPIKACHU is watching your lead with growing curiosity.",
   },
   {
+    maxFriendship: 130,
+    frames: ["pikachu_happy_1", "pikachu_happy_2"],
+    emote: "happy",
+    title: "PIKACHU's Mood: Warming Up ♪",
+    text: "PIKACHU: Pika! ♪\n\nPIKACHU is starting to warm up to you!",
+  },
+  {
+    maxFriendship: 160,
+    frames: ["pikachu_wink_1", "pikachu_wink_2"],
+    emote: "happy",
+    title: "PIKACHU's Mood: Friendly ★",
+    text: "PIKACHU: Pika-pika! ★\n\nPIKACHU gave you a cheerful wink!",
+  },
+  {
+    maxFriendship: 200,
     frames: ["pikachu_excited_1", "pikachu_excited_2"],
     emote: "happy",
     title: "PIKACHU's Mood: Excited ♪",
     text: "PIKACHU: Pi-pika! ♪\n\nPIKACHU is hopping around energetically and ready for adventure!",
   },
   {
-    frames: ["pikachu_wink_1", "pikachu_wink_2"],
-    emote: "happy",
-    title: "PIKACHU's Mood: Playful ★",
-    text: "PIKACHU: Pika! ★\n\nPIKACHU gave you a confident wink!",
+    maxFriendship: 250,
+    frames: ["pikachu_heart_1", "pikachu_heart_2"],
+    emote: "heart",
+    title: "PIKACHU's Mood: Adoring ♥",
+    text: "PIKACHU: Pika-pii! ♥\n\nPIKACHU is beaming with happiness and nuzzling close to RED!",
   },
   {
-    frames: ["pikachu_lightning_1", "pikachu_lightning_2"],
-    emote: "bolt",
-    title: "PIKACHU's Mood: Charged Up ⚡",
-    text: "PIKACHU: PIKA-CHU!! ⚡\n\nStatic electricity is crackling from PIKACHU's red cheeks!",
+    maxFriendship: 255,
+    frames: ["pikachu_2_hearts_1", "pikachu_2_hearts_2"],
+    emote: "heart",
+    title: "PIKACHU's Mood: Overjoyed ♥♥",
+    text: "PIKACHU: Pikachuuu! ♥♥\n\nPIKACHU adores you with all its heart!",
   },
 ];
+
+// HappinessChangeTable (engine/events/pikachu_happiness.asm:90-104)
+const HAPPINESS_DELTAS = {
+  LEVELUP: [5, 3, 2],
+  USEDITEM: [5, 3, 2],
+  USEDXITEM: [1, 1, 0],
+  GYMLEADER: [3, 2, 1],
+  USEDTMHM: [1, 1, 0],
+  WALKING: [2, 1, 1],
+  DEPOSITED: [-3, -3, -5],
+  FAINTED: [-1, -1, -1],
+};
+
+export function modifyPikachuHappiness(action) {
+  const row = HAPPINESS_DELTAS[action];
+  if (!row) return state.pikachu.friendship;
+  const f = state.pikachu.friendship;
+  const tier = f < 100 ? 0 : f < 200 ? 1 : 2;
+  const delta = row[tier];
+  state.pikachu.friendship = Math.max(0, Math.min(255, f + delta));
+  return state.pikachu.friendship;
+}
 
 const ELEVATOR_FLOORS = {
   CELADON_MART_ELEVATOR: [
@@ -224,32 +281,54 @@ export function buildMonInstance(speciesKey, level = 10, customMoveIds = null) {
 
 function initDefaultParty() {
   if (state.party.length > 0) return;
+  // Authentic pret/pokeyellow starting & gift levels:
+  // - PIKACHU: Lv.5 (scripts/OaksLab.asm:1033 -> THUNDERSHOCK, GROWL)
+  // - BULBASAUR: Lv.10 (scripts/CeruleanMelaniesHouse.asm:37 -> TACKLE, GROWL, LEECH SEED)
+  // - CHARMANDER: Lv.10 (scripts/Route24.asm:301 -> SCRATCH, GROWL, EMBER)
+  // - SQUIRTLE: Lv.10 (scripts/VermilionCity_2.asm:24 -> TACKLE, TAIL WHIP, BUBBLE)
   state.party = [
-    buildMonInstance("PIKACHU", 25, [
-      "THUNDERBOLT",
-      "QUICK_ATTACK",
-      "THUNDER_WAVE",
-      "SLAM",
-    ]),
-    buildMonInstance("BULBASAUR", 22, [
-      "RAZOR_LEAF",
-      "VINE_WHIP",
-      "SLEEP_POWDER",
-      "TACKLE",
-    ]),
-    buildMonInstance("CHARMANDER", 22, [
-      "FLAMETHROWER",
-      "EMBER",
-      "SLASH",
-      "SCRATCH",
-    ]),
-    buildMonInstance("SQUIRTLE", 22, [
-      "BUBBLEBEAM",
-      "WATER_GUN",
-      "BITE",
-      "TACKLE",
-    ]),
+    buildMonInstance("PIKACHU", 5),
+    buildMonInstance("BULBASAUR", 10),
+    buildMonInstance("CHARMANDER", 10),
+    buildMonInstance("SQUIRTLE", 10),
   ];
+}
+
+export function isStarterPikachuAlive() {
+  // IsStarterPikachuAliveInOurParty (engine/pikachu/pikachu_status.asm)
+  const pika = state.party.find((m) => m.species === "PIKACHU");
+  return Boolean(pika && pika.hp > 0);
+}
+
+export function isSurfingPikachuInParty() {
+  // IsSurfingPikachuInParty (home/map_objects.asm:71-113)
+  return state.party.some(
+    (m) =>
+      m.species === "PIKACHU" &&
+      Array.isArray(m.moves) &&
+      m.moves.some((mv) => mv.id === "SURF")
+  );
+}
+
+export function syncPikachuOverworldState() {
+  // LoadSurfingPlayerSpriteGraphicsByState (home/overworld.asm:1745-1770)
+  state.player.surfSprite = isSurfingPikachuInParty()
+    ? "surfing_pikachu"
+    : "seel";
+
+  // ShouldPikachuSpawn (engine/pikachu/pikachu_follow.asm:1-19):
+  // Pikachu only spawns in overworld when wWalkBikeSurfState == 0 ("walk"),
+  // not delayed by exiting Surf, and starter Pikachu is conscious in party.
+  const shouldSpawn =
+    state.player.mode === "walk" &&
+    !state.pikachu.spawnDelayed &&
+    isStarterPikachuAlive();
+
+  state.pikachu.visible = shouldSpawn;
+  if (!shouldSpawn) {
+    state.pikachu.walking = false;
+    state.pikachu.moveAnim = null;
+  }
 }
 
 export function healParty() {
@@ -260,6 +339,7 @@ export function healParty() {
       mv.pp = mv.maxPp;
     }
   }
+  syncPikachuOverworldState();
 }
 
 function saveProgress() {
@@ -418,23 +498,53 @@ function findDefaultSpawn(zone, spawnWarpIndex = null) {
 }
 
 function initZoneNpcs(zone) {
-  return zone.objects.map((o) => ({
-    ...o,
-    x: o.x,
-    y: o.y,
-    originX: o.x,
-    originY: o.y,
-    renderX: o.x,
-    renderY: o.y,
-    facing:
-      o.dir === "UP" || o.dir === "DOWN" || o.dir === "LEFT" || o.dir === "RIGHT"
-        ? o.dir
-        : "DOWN",
-    isWalking: false,
-    stepParity: false,
-    moveAnim: null,
-    collected: false,
-  }));
+  const now = performance.now();
+  // PalletTownDaisyScript (scripts/PalletTown.asm:203-215):
+  // Returning to Pallet Town after getting Town Map in Blue's House switches Daisy to walking state!
+  if (
+    zone.constName === "PALLET_TOWN" &&
+    state.events.gotTownMap &&
+    state.events.enteredBluesHouse
+  ) {
+    state.events.daisyWalking = true;
+  }
+  // BluesHouseDefaultScript (scripts/BluesHouse.asm:13-18):
+  if (zone.constName === "BLUES_HOUSE") {
+    state.events.enteredBluesHouse = true;
+  }
+
+  return zone.objects.map((o, idx) => {
+    let defaultVisible = o.defaultVisible;
+    let collected = false;
+    if (zone.constName === "BLUES_HOUSE") {
+      if (o.name === "BLUESHOUSE_DAISY1") {
+        defaultVisible = !state.events.daisyWalking; // TOGGLE_DAISY_SITTING
+      } else if (o.name === "BLUESHOUSE_DAISY2") {
+        defaultVisible = state.events.daisyWalking; // TOGGLE_DAISY_WALKING
+      } else if (o.name === "BLUESHOUSE_TOWN_MAP" && state.events.gotTownMap) {
+        collected = true; // TOGGLE_TOWN_MAP hidden once Daisy gives it to Red
+      }
+    }
+    return {
+      ...o,
+      defaultVisible,
+      x: o.x,
+      y: o.y,
+      originX: o.x,
+      originY: o.y,
+      renderX: o.x,
+      renderY: o.y,
+      facing:
+        o.dir === "UP" || o.dir === "DOWN" || o.dir === "LEFT" || o.dir === "RIGHT"
+          ? o.dir
+          : "DOWN",
+      isWalking: false,
+      stepParity: false,
+      moveAnim: null,
+      nextMoveTime: now + 350 + (idx % 8) * 160 + Math.random() * 900,
+      collected,
+    };
+  });
 }
 
 export function loadZone(target, options = {}) {
@@ -494,8 +604,14 @@ export function loadZone(target, options = {}) {
   if (zone.romId >= 0x25 && state.player.mode === "bike") {
     state.player.mode = "walk";
   }
+  const spawnTile = engine.getCollisionTileAtStep(zone, spawn.x, spawn.y);
+  if (isWaterTile(zone, spawnTile)) {
+    state.player.mode = "surf";
+  } else if (state.player.mode === "surf") {
+    state.player.mode = "walk";
+  }
 
-  // Place Pikachu 1 step behind Red
+  // Place Pikachu 1 step behind Red (if tile is dry land)
   const behindOffsets = {
     DOWN: [0, -1],
     UP: [0, 1],
@@ -505,13 +621,17 @@ export function loadZone(target, options = {}) {
   const [bx, by] = behindOffsets[state.player.dir] || [0, -1];
   const px = Math.max(0, Math.min(zone.width * 2 - 1, spawn.x + bx));
   const py = Math.max(0, Math.min(zone.height * 2 - 1, spawn.y + by));
-  state.pikachu.x = px;
-  state.pikachu.y = py;
-  state.pikachu.renderX = px;
-  state.pikachu.renderY = py;
+  const pikaTile = engine.getCollisionTileAtStep(zone, px, py);
+  const pikaOnWater = isWaterTile(zone, pikaTile);
+  state.pikachu.x = pikaOnWater ? spawn.x : px;
+  state.pikachu.y = pikaOnWater ? spawn.y : py;
+  state.pikachu.renderX = state.pikachu.x;
+  state.pikachu.renderY = state.pikachu.y;
   state.pikachu.dir = state.player.dir;
   state.pikachu.walking = false;
   state.pikachu.moveAnim = null;
+  state.pikachu.spawnDelayed = false;
+  syncPikachuOverworldState();
 
   audio.playTrack(zone.music);
   updateUIForCurrentZone();
@@ -721,10 +841,31 @@ function attemptStep(dir) {
     return;
   }
 
+  const wasSurfing = state.player.mode === "surf";
   if (water && state.player.mode !== "surf") {
+    // Entering water (ItemUseSurfboard in engine/items/item_effects.asm:715):
+    // wWalkBikeSurfState = 2 -> ShouldPikachuSpawn hides following Pikachu!
     state.player.mode = "surf";
-  } else if (!water && state.player.mode === "surf") {
+    state.pikachu.spawnDelayed = false;
+    syncPikachuOverworldState();
+  } else if (!water && wasSurfing) {
+    // Stepping from water onto land (ItemUseSurfboard.stopSurfing in engine/items/item_effects.asm:743):
+    // wWalkBikeSurfState = 0 with PIKACHU_SPAWN_DELAYED so Pikachu does not spawn on the water tile behind Red!
     state.player.mode = "walk";
+    state.pikachu.spawnDelayed = true;
+    state.pikachu.x = targetX;
+    state.pikachu.y = targetY;
+    state.pikachu.renderX = targetX;
+    state.pikachu.renderY = targetY;
+    syncPikachuOverworldState();
+  } else if (!water && state.player.mode === "walk" && state.pikachu.spawnDelayed) {
+    // Next walking step on dry land: clear PIKACHU_SPAWN_DELAYED so Pikachu emerges at Red's land tile!
+    state.pikachu.spawnDelayed = false;
+    state.pikachu.x = state.player.x;
+    state.pikachu.y = state.player.y;
+    state.pikachu.renderX = state.player.x;
+    state.pikachu.renderY = state.player.y;
+    syncPikachuOverworldState();
   }
 
   const dur = state.player.mode === "bike" ? 105 : 165;
@@ -778,6 +919,11 @@ function onPlayerStepCompleted() {
   const sx = state.player.x;
   const sy = state.player.y;
 
+  state.pikachu.stepCounter = (state.pikachu.stepCounter || 0) + 1;
+  if (state.pikachu.stepCounter % 16 === 0 && state.pikachu.visible) {
+    modifyPikachuHappiness("WALKING");
+  }
+
   updateCoordinatesUI();
 
   // Check if stepped onto a door / staircase warp
@@ -828,6 +974,63 @@ function onPlayerStepCompleted() {
       }
     }
   }
+}
+
+function checkInGameGiftOrEvent(npc, zone) {
+  const upName = `${zone.constName} ${npc.name}`.toUpperCase();
+  const giveGiftMon = (species, level) => {
+    state.caughtPokemon.add(species);
+    if (!state.party.some((m) => m.species === species) && state.party.length < 6) {
+      state.party.push(buildMonInstance(species, level));
+    }
+    saveProgress();
+    updateUIForCurrentZone();
+    return `\n\nRED received ${species.replace(/_/g, " ")} (:L${level})!`;
+  };
+
+  // 1. Summer Beach House Surfing Dude: teaches starter Pikachu SURF (BIT_PIKACHU_SPAWN_SURFING)
+  if (zone.constName === "SUMMER_BEACH_HOUSE" && upName.includes("SURFIN")) {
+    const pika = state.party.find((m) => m.species === "PIKACHU");
+    if (pika && !pika.moves.some((mv) => mv.id === "SURF")) {
+      const surfMove = getMoveObj("SURF");
+      if (pika.moves.length < 4) {
+        pika.moves.push(surfMove);
+      } else {
+        pika.moves[3] = surfMove;
+      }
+      syncPikachuOverworldState();
+      return `\n\nPIKACHU learned SURF! Now PIKACHU can ride its surfboard on water!`;
+    }
+  }
+  // 2. Canonical pret/pokeyellow Gift Pokémon scripts:
+  if (zone.constName === "CERULEAN_MELANIES_HOUSE" && upName.includes("MELANIE")) {
+    return giveGiftMon("BULBASAUR", 10); // scripts/CeruleanMelaniesHouse.asm:37
+  }
+  if (zone.constName === "ROUTE_24" && upName.includes("COOLTRAINER_M4")) {
+    return giveGiftMon("CHARMANDER", 10); // scripts/Route24.asm:301
+  }
+  if (zone.constName === "VERMILION_CITY" && upName.includes("JENNY")) {
+    return giveGiftMon("SQUIRTLE", 10); // scripts/VermilionCity_2.asm:24
+  }
+  if (zone.constName === "MT_MOON_POKECENTER" && upName.includes("MAGIKARP")) {
+    return giveGiftMon("MAGIKARP", 5); // scripts/MtMoonPokecenter_2.asm:23
+  }
+  if (zone.constName === "SILPH_CO_7F" && upName.includes("WORKER_M1")) {
+    return giveGiftMon("LAPRAS", 15); // scripts/SilphCo7F.asm:296
+  }
+  if (zone.constName === "CELADON_MANSION_ROOF_HOUSE" && upName.includes("EEVEE")) {
+    return giveGiftMon("EEVEE", 25); // scripts/CeladonMansionRoofHouse.asm:16
+  }
+  if (zone.constName === "FIGHTING_DOJO" && upName.includes("HITMONLEE")) {
+    return giveGiftMon("HITMONLEE", 30); // scripts/FightingDojo.asm:244
+  }
+  if (zone.constName === "FIGHTING_DOJO" && upName.includes("HITMONCHAN")) {
+    return giveGiftMon("HITMONCHAN", 30); // scripts/FightingDojo.asm:278
+  }
+  if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
+    return giveGiftMon("OMANYTE", 30); // scripts/CinnabarLabFossilRoom.asm:79
+  }
+  return "";
 }
 
 // Interact with what is in front of Red (A button / Space / Enter)
@@ -889,34 +1092,102 @@ export function interactInFront() {
       if (!npc.defaultVisible && !state.showHiddenObjects) continue;
       if (npc.collected) continue;
       if (npc.x === cx && npc.y === cy) {
-        // Turn NPC toward player
-        const opp = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
-        npc.facing = opp[state.player.dir] || "DOWN";
-        if (npc.kind === "item") {
-          npc.collected = true;
-        }
-        if (npc.sprite === "SPRITE_NURSE" || npc.sprite === "SPRITE_MOM") {
-          healParty();
-        }
-        audio.playSfx("blip");
-        const trainerEntry = getTrainerBattleEntry(npc, zone);
-        openDialogue(npc.name.replace(/_/g, " "), npc.text, {
-          trainerBattle: trainerEntry,
-        });
+        triggerNpcDialogue(npc, zone);
         return;
       }
     }
   }
 }
 
+export function triggerNpcDialogue(npc, zone = state.currentZone) {
+  if (!npc || !zone) return;
+  // Turn NPC toward player (unless inanimate item ball / map book)
+  if (
+    npc.kind !== "item" &&
+    npc.sprite !== "SPRITE_POKE_BALL" &&
+    npc.sprite !== "SPRITE_POKEDEX" &&
+    npc.sprite !== "SPRITE_BOOK_MAP_DEX"
+  ) {
+    const opp = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
+    npc.facing = opp[state.player.dir] || "DOWN";
+  }
+
+  // Only actual Poké Ball ground items disappear when picked up; NPCs NEVER disappear!
+  if (npc.kind === "item" && npc.sprite === "SPRITE_POKE_BALL") {
+    npc.collected = true;
+  }
+
+  // Authentic BluesHouse.asm Daisy & Town Map script (scripts/BluesHouse.asm:26-88)
+  if (zone.constName === "BLUES_HOUSE") {
+    if (npc.name === "BLUESHOUSE_DAISY1") {
+      audio.playSfx("blip");
+      if (!state.events.gotTownMap) {
+        state.events.gotTownMap = true;
+        // Hide TOGGLE_TOWN_MAP (BLUESHOUSE_TOWN_MAP at (3,3)) while keeping Daisy visible!
+        const townMapObj = state.npcs.find((o) => o.name === "BLUESHOUSE_TOWN_MAP");
+        if (townMapObj) {
+          townMapObj.collected = true;
+        }
+        if (!state.bag.some((it) => it.id === "TOWN_MAP")) {
+          state.bag.push({ id: "TOWN_MAP", name: "TOWN MAP", qty: 1, kind: "map" });
+        }
+        updateUIForCurrentZone();
+        openDialogue(
+          "DAISY OAK",
+          "Grandpa asked you to run an errand? Here, this will help you!\n\nRED got a TOWN MAP!"
+        );
+      } else {
+        openDialogue(
+          "DAISY OAK",
+          "Use the TOWN MAP to find out where you are."
+        );
+      }
+      return;
+    }
+    if (npc.name === "BLUESHOUSE_DAISY2") {
+      audio.playSfx("blip");
+      openDialogue(
+        "DAISY OAK",
+        "Spending time with your POKéMON makes them more friendly to you."
+      );
+      return;
+    }
+    if (npc.name === "BLUESHOUSE_TOWN_MAP") {
+      audio.playSfx("blip");
+      openDialogue("TOWN MAP", "It's a big map! This is useful!");
+      return;
+    }
+  }
+
+  if (npc.sprite === "SPRITE_NURSE" || npc.sprite === "SPRITE_MOM") {
+    healParty();
+  }
+  const giftSuffix = checkInGameGiftOrEvent(npc, zone);
+  audio.playSfx("blip");
+  const trainerEntry = getTrainerBattleEntry(npc, zone);
+  openDialogue(npc.name.replace(/_/g, " "), npc.text + giftSuffix, {
+    trainerBattle: trainerEntry,
+  });
+}
+
 export function openPikachuInteraction() {
   const opp = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
   state.pikachu.dir = opp[state.player.dir] || "DOWN";
-  const mood = PIKACHU_MOODS[state.pikachu.moodIndex % PIKACHU_MOODS.length];
+  const f = state.pikachu.friendship;
+  const mood =
+    PIKACHU_HAPPINESS_TIERS.find((t) => f <= t.maxFriendship) ||
+    PIKACHU_HAPPINESS_TIERS[PIKACHU_HAPPINESS_TIERS.length - 1];
   state.pikachu.moodIndex++;
+  // Talking to Pikachu builds bond (+5 friendship) after displaying current friendship
+  const shownFriendship = state.pikachu.friendship;
+  modifyPikachuHappiness("USEDITEM");
   triggerEmote(mood.emote, 2400);
   audio.playSfx("pika");
-  openDialogue(mood.title, mood.text, { pikachuMood: mood });
+  openDialogue(
+    `${mood.title} (Friendship: ${shownFriendship}/255)`,
+    mood.text,
+    { pikachuMood: mood }
+  );
 }
 
 function openElevatorMenu(elevatorConst) {
@@ -1110,6 +1381,65 @@ function syncBattleTopLevelProps(b) {
   }
 }
 
+function startEvolutionAnimation(evoStep) {
+  const b = state.battle;
+  if (!b || !evoStep || !evoStep.mon) return;
+  const mon = evoStep.mon;
+  const targetKey = String(evoStep.target || "").toUpperCase();
+  b.evolution = {
+    mon,
+    oldSpecies: mon.species,
+    oldName: mon.nickname,
+    newSpecies: targetKey,
+    newName: targetKey.replace(/_/g, " "),
+    startTime: performance.now(),
+    duration: 2800,
+    cancelled: false,
+    completed: false,
+  };
+  b.menuState = "EVOLVING";
+  b.log = `What? ${mon.nickname}\nis evolving! (Press B to stop)`;
+  audio.playSfx("pika");
+  renderBattleModal();
+}
+
+export function cancelEvolutionAnimation() {
+  // Matches Evolution_CheckForCancel -> .evolutionCancelled -> CancelledEvolution
+  // (engine/movie/evolution.asm:138-156 & engine/pokemon/evos_moves.asm:137)
+  const b = state.battle;
+  if (!b || b.menuState !== "EVOLVING" || !b.evolution) return false;
+  const evo = b.evolution;
+  evo.cancelled = true;
+  b.evolution = null;
+  audio.playSfx("bump");
+  b.log = `Huh? ${evo.oldName}\nstopped evolving!`;
+  b.menuState = "MESSAGE";
+  syncBattleTopLevelProps(b);
+  renderBattleModal();
+  return true;
+}
+
+export function completeEvolutionAnimation() {
+  // Completes EvolveMon (engine/movie/evolution.asm:60-72 & engine/pokemon/evos_moves.asm:138-239)
+  const b = state.battle;
+  if (!b || b.menuState !== "EVOLVING" || !b.evolution) return false;
+  const evo = b.evolution;
+  b.evolution = null;
+  const evoMsgs = [];
+  evolvePokemon(evo.mon, evo.newSpecies, evoMsgs, { skipIntroText: true });
+  audio.playSfx("warp");
+  syncBattleTopLevelProps(b);
+  if (evoMsgs.length > 0) {
+    b.log = evoMsgs[0];
+    b.messageQueue = [...evoMsgs.slice(1), ...(b.messageQueue || [])];
+  } else {
+    b.log = `${evo.oldName} evolved\ninto ${evo.newName}!`;
+  }
+  b.menuState = "MESSAGE";
+  renderBattleModal();
+  return true;
+}
+
 function queueBattleMessages(messages, afterState = "MAIN_MENU") {
   const b = state.battle;
   if (!b) return;
@@ -1119,9 +1449,14 @@ function queueBattleMessages(messages, afterState = "MAIN_MENU") {
     renderBattleModal();
     return;
   }
-  b.log = clean[0];
-  b.messageQueue = clean.slice(1);
   b.afterMessageState = afterState;
+  const first = clean[0];
+  b.messageQueue = clean.slice(1);
+  if (typeof first === "object" && first.type === "EVOLVE") {
+    startEvolutionAnimation(first);
+    return;
+  }
+  b.log = first;
   b.menuState = "MESSAGE";
   renderBattleModal();
 }
@@ -1130,8 +1465,13 @@ function advanceBattleMessage() {
   const b = state.battle;
   if (!b) return;
   if (b.messageQueue && b.messageQueue.length > 0) {
+    const nextItem = b.messageQueue.shift();
+    if (typeof nextItem === "object" && nextItem.type === "EVOLVE") {
+      startEvolutionAnimation(nextItem);
+      return;
+    }
     audio.playSfx("blip");
-    b.log = b.messageQueue.shift();
+    b.log = nextItem;
     renderBattleModal();
     return;
   }
@@ -1264,6 +1604,114 @@ function performMoveAttack(attacker, defender, move, isEnemyTurn = false) {
   return msgs;
 }
 
+export function evolvePokemon(mon, newSpeciesKey, msgs = [], options = {}) {
+  // Matches TryEvolvingMon & EvolveMon (engine/pokemon/evos_moves.asm:111-239)
+  const targetKey = String(newSpeciesKey || "").toUpperCase();
+  const newBase = POKEYELLOW_DATA.battle?.pokemonStats?.[targetKey];
+  if (!mon || !newBase) return false;
+
+  const oldName = mon.nickname;
+  const newName = targetKey.replace(/_/g, " ");
+  if (!options.skipIntroText) {
+    msgs.push(`What? ${oldName}\nis evolving!`);
+  }
+
+  const lv = mon.level;
+  const oldMaxHp = mon.maxHp;
+  const newMaxHp = Math.floor(((newBase.hp + 15) * 2 * lv) / 100) + lv + 10;
+  const hpDiff = Math.max(0, newMaxHp - oldMaxHp);
+
+  mon.species = targetKey;
+  if (oldName === oldName.toUpperCase()) {
+    mon.nickname = newName; // RenameEvolvedMon (engine/pokemon/evos_moves.asm:159)
+  }
+  mon.maxHp = newMaxHp;
+  mon.hp = Math.min(newMaxHp, mon.hp + hpDiff); // engine/pokemon/evos_moves.asm:188-206
+  mon.atk = Math.floor(((newBase.atk + 15) * 2 * lv) / 100) + 5;
+  mon.def = Math.floor(((newBase.def + 15) * 2 * lv) / 100) + 5;
+  mon.spd = Math.floor(((newBase.spd + 15) * 2 * lv) / 100) + 5;
+  mon.spc = Math.floor(((newBase.spc + 15) * 2 * lv) / 100) + 5;
+  mon.types = newBase.types || ["NORMAL"];
+  mon.catchRate = newBase.catchRate ?? mon.catchRate;
+  mon.baseExp = newBase.baseExp ?? mon.baseExp;
+
+  msgs.push(`${oldName} evolved\ninto ${newName}!`);
+
+  // LearnMoveFromLevelUp on evolved species (engine/pokemon/evos_moves.asm:214)
+  for (const [learnLv, mId] of newBase.learnset || []) {
+    if (learnLv === lv && !mon.moves.some((mv) => mv.id === mId)) {
+      const newMove = getMoveObj(mId);
+      if (mon.moves.length < 4) {
+        mon.moves.push(newMove);
+      } else {
+        mon.moves[0] = newMove;
+      }
+      msgs.push(`${mon.nickname} learned\n${newMove.name}!`);
+    }
+  }
+
+  state.caughtPokemon.add(targetKey);
+  saveProgress();
+  updateUIForCurrentZone();
+  return true;
+}
+
+export function levelUpPokemon(mon, msgs = [], options = {}) {
+  if (!mon || mon.level >= 100) return false;
+  mon.level = Math.min(100, mon.level + 1);
+  if (mon.species === "PIKACHU") {
+    modifyPikachuHappiness("LEVELUP");
+  }
+  const base = POKEYELLOW_DATA.battle?.pokemonStats?.[mon.species];
+  if (base) {
+    const lv = mon.level;
+    const oldMaxHp = mon.maxHp;
+    mon.maxHp = Math.floor(((base.hp + 15) * 2 * lv) / 100) + lv + 10;
+    mon.hp = Math.min(mon.maxHp, mon.hp + Math.max(1, mon.maxHp - oldMaxHp));
+    mon.atk = Math.floor(((base.atk + 15) * 2 * lv) / 100) + 5;
+    mon.def = Math.floor(((base.def + 15) * 2 * lv) / 100) + 5;
+    mon.spd = Math.floor(((base.spd + 15) * 2 * lv) / 100) + 5;
+    mon.spc = Math.floor(((base.spc + 15) * 2 * lv) / 100) + 5;
+    msgs.push(`${mon.nickname} grew to\nlevel ${lv}!`);
+
+    // Check data/pokemon/evos_moves.asm learnset for this level
+    for (const [learnLv, mId] of base.learnset || []) {
+      if (learnLv === lv && !mon.moves.some((mv) => mv.id === mId)) {
+        const newMove = getMoveObj(mId);
+        if (mon.moves.length < 4) {
+          mon.moves.push(newMove);
+        } else {
+          mon.moves[0] = newMove;
+        }
+        msgs.push(`${mon.nickname} learned\n${newMove.name}!`);
+      }
+    }
+
+    // Check EVOLVE_LEVEL in data/pokemon/evos_moves.asm (EvolutionAfterBattle)
+    for (const evo of base.evolutions || []) {
+      if (evo.method === "LEVEL" && lv >= evo.level) {
+        if (options.interactive && state.battle) {
+          msgs.push({ type: "EVOLVE", mon, target: evo.target });
+        } else {
+          evolvePokemon(mon, evo.target, msgs);
+        }
+        break;
+      }
+    }
+  }
+  return true;
+}
+
+function awardExpAndCheckLevelUp(mon, expGain, msgs) {
+  if (!mon || mon.level >= 100) return;
+  mon.exp = (mon.exp || 0) + expGain;
+  const needed = Math.max(20, mon.level * mon.level * 2);
+  if (mon.exp >= needed) {
+    mon.exp -= needed;
+    levelUpPokemon(mon, msgs, { interactive: true });
+  }
+}
+
 function handleEnemyFainted(b, msgs) {
   const foe = b.enemyParty[b.activeEnemyIdx];
   const pMon = state.party[b.activePlayerIdx];
@@ -1272,6 +1720,7 @@ function handleEnemyFainted(b, msgs) {
     `${b.isTrainer ? "Enemy " : "Wild "}${foe.nickname}\nfainted!`,
     `${pMon.nickname} gained\n${expGain} EXP. Points!`
   );
+  awardExpAndCheckLevelUp(pMon, expGain, msgs);
 
   // Check if trainer has another conscious Pokémon
   const nextEnemyIdx = b.enemyParty.findIndex((m, idx) => idx > b.activeEnemyIdx && m.hp > 0);
@@ -1302,6 +1751,7 @@ function handleEnemyFainted(b, msgs) {
 function handlePlayerFainted(b, msgs) {
   const pMon = state.party[b.activePlayerIdx];
   msgs.push(`${pMon.nickname}\nfainted!`);
+  syncPikachuOverworldState();
   const nextAliveIdx = state.party.findIndex((m) => m.hp > 0);
   if (nextAliveIdx !== -1) {
     b.forcedSwitch = true;
@@ -1454,6 +1904,53 @@ function executeBagItem(bagIndex) {
     return;
   }
 
+  if (item.kind === "candy") {
+    item.qty = Math.max(1, item.qty - 1);
+    audio.playSfx("warp");
+    const msgs = [`RED used\n${item.name}!`];
+    levelUpPokemon(pMon, msgs, { interactive: true });
+    syncBattleTopLevelProps(b);
+    queueBattleMessages(msgs, "MAIN_MENU");
+    return;
+  }
+
+  if (item.kind === "stone") {
+    // Matches ItemUseEvoStone & CheckEvolveWithUsedStone (engine/items/item_effects.asm:790-849)
+    if (pMon.species === "PIKACHU" && item.id === "THUNDER_STONE") {
+      // IsThisPartyMonStarterPikachu -> RefusingText (engine/items/item_effects.asm:812-825)
+      audio.playSfx("pika");
+      queueBattleMessages(
+        [
+          `RED used\n${item.name}!`,
+          `${pMon.nickname} refused\nto evolve!`,
+        ],
+        "MAIN_MENU"
+      );
+      return;
+    }
+    const base = POKEYELLOW_DATA.battle?.pokemonStats?.[pMon.species];
+    const matchEvo = (base?.evolutions || []).find(
+      (ev) => ev.method === "ITEM" && ev.item === item.id
+    );
+    if (!matchEvo) {
+      audio.playSfx("bump");
+      queueBattleMessages(
+        [`RED used\n${item.name}!`, `It won't have any effect!`],
+        "MAIN_MENU"
+      );
+      return;
+    }
+    item.qty = Math.max(1, item.qty - 1);
+    audio.playSfx("warp");
+    const msgs = [
+      `RED used\n${item.name}!`,
+      { type: "EVOLVE", mon: pMon, target: matchEvo.target },
+    ];
+    syncBattleTopLevelProps(b);
+    queueBattleMessages(msgs, "MAIN_MENU");
+    return;
+  }
+
   if (item.kind === "flute") {
     audio.playSfx("pika");
     for (const m of state.party) {
@@ -1601,6 +2098,17 @@ export function executeBattleAction(action) {
 function handleBattleInput(input) {
   const b = state.battle;
   if (!b) return;
+
+  if (b.menuState === "EVOLVING") {
+    // Evolution_CheckForCancel (engine/movie/evolution.asm:138-156):
+    // Pressing B during the evolution animation cancels the evolution!
+    if (input === "B") {
+      cancelEvolutionAnimation();
+    } else if (input === "A") {
+      completeEvolutionAnimation();
+    }
+    return;
+  }
 
   if (b.menuState === "MESSAGE") {
     if (input === "A" || input === "B") {
@@ -2087,6 +2595,28 @@ function renderBattleModal() {
     }
   }
 
+  // 8b. EvolveMon Stage (0,0..19,11): Back-and-forth sprite animation (engine/movie/evolution.asm)
+  const evoStage = document.getElementById("battle-evo-stage");
+  if (evoStage) {
+    if (b.menuState === "EVOLVING" && b.evolution) {
+      evoStage.classList.remove("hidden");
+      const evo = b.evolution;
+      const elapsed = performance.now() - evo.startTime;
+      const t = Math.min(1, elapsed / evo.duration);
+      // Accelerating back-and-forth swap (Evolution_BackAndForthAnim in engine/movie/evolution.asm:49-59)
+      const periodMs = Math.max(70, 260 - t * 180);
+      const showNew = t > 0.15 && Math.floor(elapsed / periodMs) % 2 === 1;
+      evoStage.classList.toggle("evo-flash-silhouette", t > 0.15 && t < 0.92);
+      const evoCanvas = document.getElementById("battle-evo-canvas");
+      const sprKey = showNew ? evo.newSpecies : evo.oldSpecies;
+      const spr = engine.pokemonSprites[sprKey] || engine.pokemonSprites.PIKACHU;
+      engine.render2BitGraphicToCanvas(evoCanvas, spr, "PAL_YELLOWMON");
+    } else {
+      evoStage.classList.add("hidden");
+      evoStage.classList.remove("evo-flash-silhouette");
+    }
+  }
+
   // 8. DisplayPartyMenu (0,0..19,17) + SWITCH_STATS_CANCEL_MENU_TEMPLATE + StatusScreen
   const partyScreen = document.getElementById("battle-party-screen");
   if (partyScreen) {
@@ -2156,14 +2686,24 @@ function renderBattleModal() {
         if (b.menuState === "PARTY_STATS") {
           statsModal.classList.remove("hidden");
           const sMon = state.party[b.partyCursor] || pMon;
+          const sBase = POKEYELLOW_DATA.battle?.pokemonStats?.[sMon.species];
+          const evoList = (sBase?.evolutions || [])
+            .map((ev) =>
+              ev.method === "LEVEL"
+                ? `LV.${ev.level}→${ev.target}`
+                : ev.method === "ITEM"
+                ? `${ev.item.replace("_STONE", "")}→${ev.target}`
+                : `TRADE→${ev.target}`
+            )
+            .join(", ");
           const content = document.getElementById("battle-stats-content");
           content.innerHTML = `
             <div class="stats-top-grid">
               <canvas id="party-stats-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
               <div>
                 <div><strong>${sMon.nickname}</strong> &nbsp;:L${sMon.level}</div>
-                <div>HP: ${sMon.hp}/${sMon.maxHp} &nbsp;STATUS/${sMon.status}</div>
-                <div>TYPE/${sMon.types.join(" / ")}</div>
+                <div>HP: ${sMon.hp}/${sMon.maxHp} &nbsp;TYPE/${sMon.types.join("/")}</div>
+                <div>EVO: ${evoList || "FINAL STAGE"}</div>
               </div>
             </div>
             <div class="stats-mid-grid">
@@ -2433,6 +2973,8 @@ function updateUIForCurrentZone() {
     npcBox.appendChild(btn);
   });
   state.npcs.forEach((npc) => {
+    if (npc.collected) return;
+    if (!npc.defaultVisible && !state.showHiddenObjects) return;
     const btn = document.createElement("button");
     btn.className = "entity-chip npc-chip";
     const trainerEntry = getTrainerBattleEntry(npc, z);
@@ -2440,10 +2982,7 @@ function updateUIForCurrentZone() {
       !npc.defaultVisible ? " [Event]" : ""
     }`;
     btn.onclick = () => {
-      audio.playSfx("blip");
-      openDialogue(npc.name.replace(/_/g, " "), npc.text, {
-        trainerBattle: trainerEntry,
-      });
+      triggerNpcDialogue(npc, z);
     };
     npcBox.appendChild(btn);
   });
@@ -2589,6 +3128,16 @@ function gameLoop(now) {
     }
   }
 
+  // 1b. Update active EvolveMon animation (engine/movie/evolution.asm:49-65)
+  if (state.battle && state.battle.menuState === "EVOLVING" && state.battle.evolution) {
+    const evo = state.battle.evolution;
+    if (now - evo.startTime >= evo.duration) {
+      completeEvolutionAnimation();
+    } else {
+      renderBattleModal();
+    }
+  }
+
   // 2. Update Player smooth step interpolation
   if (state.player.moveAnim) {
     const anim = state.player.moveAnim;
@@ -2630,43 +3179,97 @@ function gameLoop(now) {
     attemptStep(lastDir);
   }
 
-  // 3. Gentle NPC wander for WALK NPCs
-  if (now - lastNpcTick > 1600 && !state.dialogue && !state.battle) {
-    lastNpcTick = now;
-    for (const npc of state.npcs) {
-      if (npc.movement !== "WALK" || npc.isWalking) continue;
-      if (!npc.defaultVisible && !state.showHiddenObjects) continue;
-      if (Math.random() < 0.35) {
-        const dirs =
-          npc.dir === "UP_DOWN"
-            ? ["UP", "DOWN"]
-            : npc.dir === "LEFT_RIGHT"
-            ? ["LEFT", "RIGHT"]
-            : ["DOWN", "UP", "LEFT", "RIGHT"];
-        const d = dirs[Math.floor(Math.random() * dirs.length)];
-        npc.facing = d;
-        const dx = d === "LEFT" ? -1 : d === "RIGHT" ? 1 : 0;
-        const dy = d === "UP" ? -1 : d === "DOWN" ? 1 : 0;
-        const nx = npc.x + dx;
-        const ny = npc.y + dy;
-        if (
-          Math.abs(nx - npc.originX) <= 2 &&
-          Math.abs(ny - npc.originY) <= 2 &&
-          nx >= 0 &&
-          nx < state.currentZone.width * 2 &&
-          ny >= 0 &&
-          ny < state.currentZone.height * 2 &&
-          !(nx === state.player.x && ny === state.player.y) &&
-          !(nx === state.pikachu.x && ny === state.pikachu.y) &&
-          engine.isStepPassable(state.currentZone, npc.x, npc.y, nx, ny)
-        ) {
+  // 3. Fluid 60fps NPC movement & idle turning (matches engine/overworld/movement.asm UpdateNPCSprite)
+  const zone = state.currentZone;
+  const ts = engine.tilesetsByConst[zone.tileset];
+  for (const npc of state.npcs) {
+    if (!npc.defaultVisible && !state.showHiddenObjects) continue;
+    if (npc.collected) continue;
+
+    // 3a. Interpolate active 16-frame step animation (UpdateSpriteInWalkingAnimation)
+    if (npc.moveAnim) {
+      const na = npc.moveAnim;
+      const nt = Math.min(1, (now - na.startTime) / na.duration);
+      npc.renderX = na.fromX + (na.toX - na.fromX) * nt;
+      npc.renderY = na.fromY + (na.toY - na.fromY) * nt;
+      npc.isWalking = nt > 0.12 && nt < 0.88;
+      if (nt >= 1) {
+        npc.renderX = npc.x;
+        npc.renderY = npc.y;
+        npc.isWalking = false;
+        npc.moveAnim = null;
+      }
+      continue;
+    }
+
+    // 3b. Per-NPC random movement delay timer (SPRITESTATEDATA2_MOVEMENTDELAY)
+    if (state.dialogue || state.battle) continue;
+    if (now < (npc.nextMoveTime || 0)) continue;
+    npc.nextMoveTime = now + 650 + Math.random() * 1450;
+
+    if (npc.movement === "WALK") {
+      const dirs =
+        npc.dir === "UP_DOWN"
+          ? ["UP", "DOWN"]
+          : npc.dir === "LEFT_RIGHT"
+          ? ["LEFT", "RIGHT"]
+          : ["DOWN", "UP", "LEFT", "RIGHT"];
+      const d = dirs[Math.floor(Math.random() * dirs.length)];
+      npc.facing = d;
+      const dx = d === "LEFT" ? -1 : d === "RIGHT" ? 1 : 0;
+      const dy = d === "UP" ? -1 : d === "DOWN" ? 1 : 0;
+      const nx = npc.x + dx;
+      const ny = npc.y + dy;
+
+      if (
+        Math.abs(nx - npc.originX) <= 2 &&
+        Math.abs(ny - npc.originY) <= 2 &&
+        nx >= 0 &&
+        nx < zone.width * 2 &&
+        ny >= 0 &&
+        ny < zone.height * 2 &&
+        !(nx === state.player.x && ny === state.player.y) &&
+        !(state.pikachu.visible && nx === state.pikachu.x && ny === state.pikachu.y) &&
+        !state.npcs.some(
+          (other) =>
+            other !== npc &&
+            !other.collected &&
+            (other.defaultVisible || state.showHiddenObjects) &&
+            other.x === nx &&
+            other.y === ny
+        ) &&
+        engine.isStepPassable(zone, npc.x, npc.y, nx, ny)
+      ) {
+        const destTile = engine.getCollisionTileAtStep(zone, nx, ny);
+        if (!ts.doorSet.has(destTile) && !ts.warpSet.has(destTile)) {
+          const fromX = npc.x;
+          const fromY = npc.y;
           npc.x = nx;
           npc.y = ny;
-          npc.renderX = nx;
-          npc.renderY = ny;
           npc.stepParity = !npc.stepParity;
+          npc.isWalking = true;
+          npc.moveAnim = {
+            fromX,
+            fromY,
+            toX: nx,
+            toY: ny,
+            startTime: now,
+            duration: 265, // 16 Game Boy frames at 60fps
+          };
         }
       }
+    } else if (
+      npc.movement === "STAY" &&
+      (npc.dir === "ANY_DIR" || npc.dir === "UP_DOWN" || npc.dir === "LEFT_RIGHT")
+    ) {
+      // ChangeFacingDirection in engine/overworld/movement.asm:144, 245
+      const dirs =
+        npc.dir === "UP_DOWN"
+          ? ["UP", "DOWN"]
+          : npc.dir === "LEFT_RIGHT"
+          ? ["LEFT", "RIGHT"]
+          : ["DOWN", "UP", "LEFT", "RIGHT"];
+      npc.facing = dirs[Math.floor(Math.random() * dirs.length)];
     }
   }
 
@@ -2787,6 +3390,14 @@ function setupControlsAndEvents() {
       handleBattleInput("B");
     } else {
       state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
+      if (state.player.mode === "walk") {
+        state.pikachu.spawnDelayed = false;
+        state.pikachu.x = state.player.x;
+        state.pikachu.y = state.player.y;
+        state.pikachu.renderX = state.player.x;
+        state.pikachu.renderY = state.player.y;
+      }
+      syncPikachuOverworldState();
     }
   });
   document.getElementById("btn-gb-start")?.addEventListener("click", () => {
@@ -2834,15 +3445,22 @@ function setupControlsAndEvents() {
         return;
       }
     }
-    // Otherwise move Red + Pikachu there and show entities on map
+    // Otherwise move Red + Pikachu there and sync water/land surfing state
+    const clickTile = engine.getCollisionTileAtStep(z, stepX, stepY);
+    const clickWater = isWaterTile(z, clickTile);
+    state.player.mode = clickWater ? "surf" : "walk";
     state.player.x = stepX;
     state.player.y = stepY;
     state.player.renderX = stepX;
     state.player.renderY = stepY;
-    state.pikachu.x = Math.max(0, stepX - 1);
+    const adjX = Math.max(0, stepX - 1);
+    const adjTile = engine.getCollisionTileAtStep(z, adjX, stepY);
+    state.pikachu.x = isWaterTile(z, adjTile) ? stepX : adjX;
     state.pikachu.y = stepY;
     state.pikachu.renderX = state.pikachu.x;
     state.pikachu.renderY = state.pikachu.y;
+    state.pikachu.spawnDelayed = false;
+    syncPikachuOverworldState();
     updateCoordinatesUI();
   });
 
@@ -2903,6 +3521,14 @@ function setupControlsAndEvents() {
   });
   document.getElementById("btn-toggle-bike")?.addEventListener("click", (e) => {
     state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
+    if (state.player.mode === "walk") {
+      state.pikachu.spawnDelayed = false;
+      state.pikachu.x = state.player.x;
+      state.pikachu.y = state.player.y;
+      state.pikachu.renderX = state.player.x;
+      state.pikachu.renderY = state.player.y;
+    }
+    syncPikachuOverworldState();
     e.currentTarget.classList.toggle("active", state.player.mode === "bike");
   });
   document.getElementById("btn-check-pikachu")?.addEventListener("click", () => {
@@ -3026,6 +3652,11 @@ function setupControlsAndEvents() {
     handleBattleInput("B");
   });
 
+  document.getElementById("battle-evo-cancel-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    cancelEvolutionAnimation();
+  });
+
   // Visual Atlas modal
   document.getElementById("btn-open-atlas")?.addEventListener("click", () => {
     openVisualAtlasModal();
@@ -3062,6 +3693,12 @@ window.POKEYELLOW = {
   handleBattleInput,
   executeBattleAction,
   buildMonInstance,
+  evolvePokemon,
+  levelUpPokemon,
+  cancelEvolutionAnimation,
+  completeEvolutionAnimation,
+  modifyPikachuHappiness,
+  triggerNpcDialogue,
   healParty,
 };
 
