@@ -26,6 +26,7 @@ const state = {
   visitedZones: new Set(["PALLET_TOWN"]),
   caughtPokemon: new Set(),
   defeatedTrainers: new Set(),
+  badges: new Set(), // 8 Kanto Gym Badges: BOULDER, CASCADE, THUNDER, RAINBOW, SOUL, MARSH, VOLCANO, EARTH
   events: {
     oakRescuedInGrass: false, // EVENT_FOLLOWED_OAK_INTO_LAB (scripts/PalletTown.asm)
     gotStarterPikachu: false, // EVENT_GOT_STARTER (scripts/OaksLab.asm:1033)
@@ -36,11 +37,13 @@ const state = {
     gotPotionSample: false, // EVENT_GOT_POTION_SAMPLE (scripts/Route1.asm:24)
     gotOaksParcel: false, // EVENT_GOT_OAKS_PARCEL (scripts/ViridianMart.asm:34)
     gotPokedex: false, // EVENT_GOT_POKEDEX (scripts/OaksLab.asm:549)
-    seenOldManTutorial: false, //Viridian City Old Man Catching Tutorial (scripts/ViridianCity.asm)
+    seenOldManTutorial: false, // Viridian City Old Man Catching Tutorial (scripts/ViridianCity.asm)
     helpedBill: false, // EVENT_HELPED_BILL_AT_CAPE (scripts/BillsHouse.asm)
     rescuedMrFuji: false, // EVENT_RESCUED_MR_FUJI (scripts/PokemonTower7F.asm)
     wokeRoute12Snorlax: false, // EVENT_FIGHT_ROUTE12_SNORLAX (scripts/Route12.asm)
     wokeRoute16Snorlax: false, // EVENT_FIGHT_ROUTE16_SNORLAX (scripts/Route16.asm)
+    gotMasterBall: false, // EVENT_GOT_MASTER_BALL (scripts/SilphCo11F.asm)
+    inductedHallOfFame: false, // Indigo Plateau Hall of Fame induction
   },
   party: [],
   bag: [], // Player starts with 0 items; items and HMs are acquired in-game!
@@ -397,6 +400,7 @@ function saveProgress() {
       visitedZones: Array.from(state.visitedZones),
       caughtPokemon: Array.from(state.caughtPokemon),
       defeatedTrainers: Array.from(state.defeatedTrainers),
+      badges: Array.from(state.badges),
       friendship: state.pikachu.friendship,
       events: { ...state.events },
       paletteMode: engine.paletteMode,
@@ -449,6 +453,11 @@ function loadProgress() {
     if (Array.isArray(data.defeatedTrainers)) {
       data.defeatedTrainers.forEach((t) => {
         if (typeof t === "string") state.defeatedTrainers.add(t);
+      });
+    }
+    if (Array.isArray(data.badges)) {
+      data.badges.forEach((b) => {
+        if (typeof b === "string") state.badges.add(b);
       });
     }
     if (typeof data.friendship === "number" && Number.isFinite(data.friendship)) {
@@ -571,8 +580,33 @@ function resolveTrainerSpriteKey(trainerClass, trainerSprite, npcSprite) {
   return sprMap[npcSprite] || null;
 }
 
+const NON_TRAINER_SPRITES = new Set([
+  "SPRITE_MOM",
+  "SPRITE_NURSE",
+  "SPRITE_CLERK",
+  "SPRITE_GYM_GUIDE",
+  "SPRITE_OAK",
+  "SPRITE_DAISY",
+  "SPRITE_MR_FUJI",
+  "SPRITE_WARDEN",
+  "SPRITE_CAPTAIN",
+  "SPRITE_SILPH_PRESIDENT",
+  "SPRITE_OLD_AMBER",
+  "SPRITE_POKEDEX",
+  "SPRITE_BOOK_MAP_DEX",
+  "SPRITE_CLIPBOARD",
+  "SPRITE_SNORLAX",
+  "SPRITE_BOULDER",
+]);
+
 function getTrainerBattleEntry(npc, zone) {
   if (!npc || npc.kind === "item") return null;
+  if (NON_TRAINER_SPRITES.has(npc.sprite)) return null;
+  // In pret/pokeyellow, only object_events with OPP_* (kind === "trainer") or explicit trainerClass are trainers
+  const isGenuineTrainer =
+    npc.kind === "trainer" || Boolean(npc.battle && npc.battle.trainerClass);
+  if (!isGenuineTrainer) return null;
+
   const key = `${zone.constName}:${npc.name}:${npc.id}`;
   if (npc.battle && Array.isArray(npc.battle.party) && npc.battle.party.length > 0) {
     const b = npc.battle;
@@ -588,6 +622,7 @@ function getTrainerBattleEntry(npc, zone) {
       level: firstMon[0],
       battleText: b.battleText || "",
       endBattleText: b.endBattleText || "Impossible! You defeated my POKéMON!",
+      afterBattleText: b.afterBattleText || b.endBattleText || npc.text || "",
     };
   }
   return null;
@@ -1485,6 +1520,11 @@ function onPlayerStepCompleted() {
     }
   }
 
+  // Check undefeated Trainer Line-of-Sight (CheckFightingMapTrainers in engine/overworld/trainer_sight.asm)
+  if (state.events.gotStarterPikachu && checkTrainerLineOfSight(zone, sx, sy)) {
+    return;
+  }
+
   // Check wild Pokémon encounter in tall grass / caves / water
   if (state.wildEncountersEnabled) {
     const ts = engine.tilesetsByConst[zone.tileset];
@@ -1508,6 +1548,57 @@ function onPlayerStepCompleted() {
       }
     }
   }
+}
+
+function checkTrainerLineOfSight(zone, sx, sy) {
+  if (!zone) return false;
+  for (const npc of state.npcs) {
+    if (!npc.defaultVisible && !state.showHiddenObjects) continue;
+    if (npc.collected) continue;
+    const tb = getTrainerBattleEntry(npc, zone);
+    if (!tb || tb.isWild) continue;
+    if (state.defeatedTrainers.has(tb.key)) continue;
+
+    const dir = npc.facing || "DOWN";
+    const dx = dir === "LEFT" ? -1 : dir === "RIGHT" ? 1 : 0;
+    const dy = dir === "UP" ? -1 : dir === "DOWN" ? 1 : 0;
+    if (dx === 0 && dy === 0) continue;
+
+    // Check up to 3 steps in front of the trainer
+    for (let dist = 1; dist <= 3; dist++) {
+      const cx = npc.x + dx * dist;
+      const cy = npc.y + dy * dist;
+      if (cx === sx && cy === sy) {
+        const opp = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
+        state.player.dir = opp[dir] || "DOWN";
+        triggerEmote("bolt", 1200);
+        renderAllCanvases(true);
+        audio.playSfx("blip");
+        openDialogue(
+          npc.name.replace(/_/g, " "),
+          tb.battleText || npc.text || "!",
+          {
+            onComplete: () => {
+              triggerWildEncounter([tb.level, tb.species], tb);
+            },
+          }
+        );
+        return true;
+      }
+      if (
+        !engine.isStepPassable(
+          zone,
+          npc.x + dx * (dist - 1),
+          npc.y + dy * (dist - 1),
+          cx,
+          cy
+        )
+      ) {
+        break;
+      }
+    }
+  }
+  return false;
 }
 
 function checkInGameGiftOrEvent(npc, zone) {
@@ -1983,15 +2074,92 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
     }
   }
 
+  // Power Plant Voltorb & Electrode Mimics (scripts/PowerPlant.asm)
+  if (zone.constName === "POWER_PLANT") {
+    if (npc.name.includes("VOLTORB") || npc.name.includes("ELECTRODE")) {
+      const isElectrode = npc.name.includes("ELECTRODE");
+      const sp = isElectrode ? "ELECTRODE" : "VOLTORB";
+      const lv = isElectrode ? 43 : 40;
+      npc.collected = true;
+      renderAllCanvases(true);
+      audio.playSfx("thunder");
+      openDialogue(sp, "Bzzzt! It was a POKéMON disguised as a POKé BALL!", {
+        onComplete: () => {
+          triggerWildEncounter([lv, sp]);
+        },
+      });
+      return;
+    }
+  }
+
+  // Silph Co. 11F President Master Ball Reward (scripts/SilphCo11F.asm)
+  if (zone.constName === "SILPH_CO_11F" && npc.name === "SILPHCO11F_SILPH_PRESIDENT") {
+    audio.playSfx("blip");
+    if (!state.events.gotMasterBall) {
+      state.events.gotMasterBall = true;
+      giveBagItem("MASTER_BALL", 1);
+      openDialogue(
+        "SILPH CO. PRESIDENT",
+        "PRESIDENT: Thank you for saving SILPH from TEAM ROCKET!\n\nPlease take this secret prototype MASTER BALL — it will catch any POKéMON without fail!\n\nRED received a MASTER BALL!"
+      );
+    } else {
+      openDialogue(
+        "SILPH CO. PRESIDENT",
+        "PRESIDENT: Use that MASTER BALL wisely on a legendary POKéMON!"
+      );
+    }
+    return;
+  }
+
+  // Hall of Fame Induction (scripts/HallOfFame.asm)
+  if (zone.constName === "HALL_OF_FAME" && npc.name === "HALLOFFAME_OAK") {
+    audio.playSfx("warp");
+    state.events.inductedHallOfFame = true;
+    healParty();
+    saveProgress();
+    const partyNames = state.party.map((m) => `${m.nickname} (:L${m.level})`).join(", ");
+    openDialogue(
+      "POKéMON LEAGUE — HALL OF FAME",
+      `OAK: Er-hem! Congratulations, RED!\n\nThis floor is the POKéMON HALL OF FAME! POKéMON LEAGUE CHAMPIONS are honored for their exploits here!\n\nWELCOME TO THE HALL OF FAME!\nCHAMPION RED & PARTY: ${partyNames}`
+    );
+    return;
+  }
+
   if (npc.sprite === "SPRITE_NURSE" || npc.sprite === "SPRITE_MOM") {
     healParty();
   }
   const giftSuffix = checkInGameGiftOrEvent(npc, zone);
   audio.playSfx("blip");
   const trainerEntry = getTrainerBattleEntry(npc, zone);
-  openDialogue(npc.name.replace(/_/g, " "), npc.text + giftSuffix, {
-    trainerBattle: trainerEntry,
-  });
+  if (trainerEntry) {
+    if (state.defeatedTrainers.has(trainerEntry.key)) {
+      openDialogue(
+        npc.name.replace(/_/g, " "),
+        trainerEntry.afterBattleText || npc.text
+      );
+      return;
+    }
+    openDialogue(
+      npc.name.replace(/_/g, " "),
+      (trainerEntry.battleText || npc.text) + giftSuffix,
+      {
+        onComplete: () => {
+          if (trainerEntry.isWild) {
+            npc.collected = true;
+            renderAllCanvases(true);
+            triggerWildEncounter([trainerEntry.level, trainerEntry.species]);
+          } else {
+            triggerWildEncounter(
+              [trainerEntry.level, trainerEntry.species],
+              trainerEntry
+            );
+          }
+        },
+      }
+    );
+    return;
+  }
+  openDialogue(npc.name.replace(/_/g, " "), npc.text + giftSuffix);
 }
 
 export function awardStarterPikachuInLab() {
@@ -2807,6 +2975,17 @@ function awardExpAndCheckLevelUp(mon, expGain, msgs) {
   }
 }
 
+const GYM_BADGE_BY_ZONE = {
+  PEWTER_GYM: { leader: "BROCK", badge: "BOULDER" },
+  CERULEAN_GYM: { leader: "MISTY", badge: "CASCADE" },
+  VERMILION_GYM: { leader: "LT.SURGE", badge: "THUNDER" },
+  CELADON_GYM: { leader: "ERIKA", badge: "RAINBOW" },
+  FUCHSIA_GYM: { leader: "KOGA", badge: "SOUL" },
+  SAFFRON_GYM: { leader: "SABRINA", badge: "MARSH" },
+  CINNABAR_GYM: { leader: "BLAINE", badge: "VOLCANO" },
+  VIRIDIAN_GYM: { leader: "GIOVANNI", badge: "EARTH" },
+};
+
 function handleEnemyFainted(b, msgs) {
   const foe = b.enemyParty[b.activeEnemyIdx];
   const pMon = state.party[b.activePlayerIdx];
@@ -2830,13 +3009,39 @@ function handleEnemyFainted(b, msgs) {
     if (b.isTrainer) {
       if (b.trainerKey) {
         state.defeatedTrainers.add(b.trainerKey);
-        saveProgress();
       }
       b.showTrainerSprite = Boolean(b.trainerSprite);
       msgs.push(`RED defeated\n${b.trainerName}!`);
       if (b.endBattleText) {
         msgs.push(b.endBattleText.split("\n\n")[0]);
       }
+      // Check Gym Leader Badge reward
+      const curZoneConst = state.currentZone?.constName;
+      const gymInfo = curZoneConst && GYM_BADGE_BY_ZONE[curZoneConst];
+      if (
+        gymInfo &&
+        String(b.trainerName || "").toUpperCase().includes(gymInfo.leader)
+      ) {
+        state.badges.add(gymInfo.badge);
+        modifyPikachuHappiness("GYMLEADER");
+        msgs.push(`RED received the\n${gymInfo.badge}BADGE!`);
+      }
+      // Check Indigo Plateau Champion victory -> Hall of Fame induction
+      if (curZoneConst === "CHAMPIONS_ROOM") {
+        state.events.inductedHallOfFame = true;
+        b.onComplete = () => {
+          healParty();
+          loadZone("HALL_OF_FAME", { x: 5, y: 3, dir: "UP" });
+          const partyNames = state.party
+            .map((m) => `${m.nickname} (:L${m.level})`)
+            .join(", ");
+          openDialogue(
+            "POKéMON LEAGUE — HALL OF FAME",
+            `OAK: Congratulations, RED! You are the new POKéMON LEAGUE CHAMPION!\n\nWELCOME TO THE HALL OF FAME!\nCHAMPION RED & PARTY: ${partyNames}`
+          );
+        };
+      }
+      saveProgress();
     }
     syncBattleTopLevelProps(b);
     queueBattleMessages(msgs, "MAIN_MENU");
@@ -3456,18 +3661,7 @@ function renderDialogueModal() {
 
   const battleBtn = document.getElementById("dialogue-battle-btn");
   if (battleBtn) {
-    if (state.dialogue.trainerBattle) {
-      const tb = state.dialogue.trainerBattle;
-      battleBtn.classList.remove("hidden");
-      battleBtn.textContent = tb.trainerName
-        ? `⚔️ BATTLE ${tb.trainerName}`
-        : `⚔️ BATTLE ${tb.species}`;
-      battleBtn.onclick = () => {
-        state.dialogue = null;
-        renderDialogueModal();
-        triggerWildEncounter([tb.level, tb.species], tb);
-      };
-    } else if (state.dialogue.fieldMoveAction) {
+    if (state.dialogue.fieldMoveAction) {
       const fma = state.dialogue.fieldMoveAction;
       battleBtn.classList.remove("hidden");
       battleBtn.textContent = fma.label;
@@ -4493,7 +4687,22 @@ export function renderStartMenu() {
       subBody.appendChild(row);
     });
   } else if (sm.subView === "RED") {
-    subTitle.textContent = `TRAINER CARD — RED`;
+    subTitle.textContent = `TRAINER CARD — RED${
+      state.events.inductedHallOfFame ? " ★ CHAMPION" : ""
+    }`;
+    const allBadges = [
+      "BOULDER",
+      "CASCADE",
+      "THUNDER",
+      "RAINBOW",
+      "SOUL",
+      "MARSH",
+      "VOLCANO",
+      "EARTH",
+    ];
+    const badgeLine = allBadges
+      .map((b) => `${state.badges.has(b) ? "●" : "○"} ${b}`)
+      .join(" ");
     subBody.innerHTML = `
       <div class="stats-top-grid">
         <canvas id="start-red-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
@@ -4506,7 +4715,7 @@ export function renderStartMenu() {
       <div><strong>KANTO ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
       <div><strong>POKéDEX OWNED:</strong> ${state.caughtPokemon.size} / 151</div>
       <div><strong>TRAINERS DEFEATED:</strong> ${state.defeatedTrainers.size}</div>
-      <div><strong>BADGES:</strong> ● BOULDER ● CASCADE ● THUNDER ● RAINBOW</div>
+      <div><strong>BADGES (${state.badges.size}/8):</strong> ${badgeLine}</div>
     `;
     const rc = document.getElementById("start-red-canvas");
     const spr = engine.trainerSprites.BROCK || engine.pokemonSprites.PIKACHU;
