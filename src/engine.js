@@ -91,6 +91,24 @@ export class PokeYellowEngine {
       };
     }
 
+    this.trainerSprites = {};
+    if (data.sprites.trainers) {
+      for (const [k, v] of Object.entries(data.sprites.trainers)) {
+        this.trainerSprites[k] = {
+          width: v.width,
+          height: v.height,
+          pixels: unpack2Bit(v.data, v.width, v.height),
+        };
+      }
+    }
+
+    this.battleDb = data.battle || {
+      moves: {},
+      typeChart: [],
+      pokemonStats: {},
+      trainerClasses: {},
+    };
+
     // Index all zones
     this.allZones = data.zones.map((z) => ({
       ...z,
@@ -878,5 +896,202 @@ export class PokeYellowEngine {
       true
     );
     ctx.putImageData(imgData, 0, 0);
+  }
+
+  getMove(moveId) {
+    const m = this.battleDb.moves[moveId];
+    if (m) return m;
+    return {
+      id: moveId || "TACKLE",
+      name: String(moveId || "TACKLE").replace(/_/g, " "),
+      effect: "NO_ADDITIONAL_EFFECT",
+      power: 40,
+      type: "NORMAL",
+      accuracy: 100,
+      pp: 35,
+    };
+  }
+
+  getTypeEffectiveness(moveType, defenderTypes) {
+    if (!moveType || !defenderTypes || defenderTypes.length === 0) return 1;
+    let mult = 1;
+    for (const defT of defenderTypes) {
+      for (const [atk, def, m] of this.battleDb.typeChart) {
+        if (atk === moveType && def === defT) {
+          mult *= m;
+        }
+      }
+    }
+    return mult;
+  }
+
+  createPokemonInstance(speciesRaw, level = 5, customMoves = null) {
+    const species = String(speciesRaw || "PIKACHU").toUpperCase();
+    const base = this.battleDb.pokemonStats[species] ||
+      this.battleDb.pokemonStats[species.replace(/_/g, "")] ||
+      this.battleDb.pokemonStats.PIKACHU || {
+        species,
+        hp: 45,
+        atk: 55,
+        def: 45,
+        spd: 60,
+        spc: 50,
+        types: ["NORMAL"],
+        catchRate: 120,
+        baseExp: 64,
+        baseMoves: ["TACKLE"],
+        learnset: [],
+      };
+
+    const lv = Math.max(1, Math.min(100, Number(level) || 5));
+    // Authentic Gen 1 stat formula (with DV=9, StatExp=0 baseline)
+    const maxHp = Math.floor(((base.hp + 9) * 2 * lv) / 100) + lv + 10;
+    const calcStat = (val) => Math.floor(((val + 9) * 2 * lv) / 100) + 5;
+
+    let moveIds = [];
+    if (Array.isArray(customMoves) && customMoves.length > 0) {
+      moveIds = [...customMoves];
+    } else {
+      moveIds = [...(base.baseMoves || ["TACKLE"])];
+      for (const [learnLv, mvId] of base.learnset || []) {
+        if (learnLv <= lv && !moveIds.includes(mvId)) {
+          moveIds.push(mvId);
+        }
+      }
+      if (moveIds.length > 4) {
+        moveIds = moveIds.slice(-4);
+      }
+    }
+    if (moveIds.length === 0) moveIds = ["TACKLE"];
+
+    const moves = moveIds.map((id) => {
+      const m = this.getMove(id);
+      return {
+        id: m.id,
+        name: m.name,
+        power: m.power,
+        type: m.type,
+        accuracy: m.accuracy,
+        pp: m.pp,
+        maxPp: m.pp,
+        effect: m.effect,
+      };
+    });
+
+    return {
+      uid: `${species}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      species,
+      nickname: species.replace(/_/g, " "),
+      level: lv,
+      maxHp,
+      hp: maxHp,
+      atk: calcStat(base.atk),
+      def: calcStat(base.def),
+      spd: calcStat(base.spd),
+      spc: calcStat(base.spc),
+      types: base.types || ["NORMAL"],
+      catchRate: base.catchRate || 120,
+      baseExp: base.baseExp || 64,
+      moves,
+      status: null,
+      exp: lv * lv * lv,
+    };
+  }
+
+  getTrainerSpriteObj(battleProfile, npcSpriteConst = "") {
+    if (battleProfile && battleProfile.trainerSprite && this.trainerSprites[battleProfile.trainerSprite]) {
+      return this.trainerSprites[battleProfile.trainerSprite];
+    }
+    const tc = (battleProfile && battleProfile.trainerClass) || "";
+    const mapClassToSprite = {
+      OPP_YOUNGSTER: "YOUNGSTER",
+      OPP_BUG_CATCHER: "BUGCATCHER",
+      OPP_LASS: "LASS",
+      OPP_SAILOR: "SAILOR",
+      OPP_JR_TRAINER_M: "JR_TRAINERM",
+      OPP_JR_TRAINER_F: "JR_TRAINERF",
+      OPP_POKEMANIAC: "POKEMANIAC",
+      OPP_SUPER_NERD: "SUPERNERD",
+      OPP_HIKER: "HIKER",
+      OPP_BIKER: "BIKER",
+      OPP_BURGLAR: "BURGLAR",
+      OPP_ENGINEER: "ENGINEER",
+      OPP_FISHER: "FISHER",
+      OPP_SWIMMER: "SWIMMER",
+      OPP_CUE_BALL: "CUEBALL",
+      OPP_GAMBLER: "GAMBLER",
+      OPP_BEAUTY: "BEAUTY",
+      OPP_PSYCHIC_TR: "PSYCHIC",
+      OPP_ROCKER: "ROCKER",
+      OPP_JUGGLER: "JUGGLER",
+      OPP_TAMER: "TAMER",
+      OPP_BIRD_KEEPER: "BIRDKEEPER",
+      OPP_BLACKBELT: "BLACKBELT",
+      OPP_RIVAL1: "RIVAL1",
+      OPP_PROF_OAK: "PROF_OAK",
+      OPP_SCIENTIST: "SCIENTIST",
+      OPP_GIOVANNI: "GIOVANNI",
+      OPP_ROCKET: "ROCKET",
+      OPP_COOLTRAINER_M: "COOLTRAINERM",
+      OPP_COOLTRAINER_F: "COOLTRAINERF",
+      OPP_BRUNO: "BRUNO",
+      OPP_BROCK: "BROCK",
+      OPP_MISTY: "MISTY",
+      OPP_LT_SURGE: "LT_SURGE",
+      OPP_ERIKA: "ERIKA",
+      OPP_KOGA: "KOGA",
+      OPP_BLAINE: "BLAINE",
+      OPP_SABRINA: "SABRINA",
+      OPP_GENTLEMAN: "GENTLEMAN",
+      OPP_RIVAL2: "RIVAL2",
+      OPP_RIVAL3: "RIVAL3",
+      OPP_LORELEI: "LORELEI",
+      OPP_CHANNELER: "CHANNELER",
+      OPP_AGATHA: "AGATHA",
+      OPP_LANCE: "LANCE",
+    };
+    if (mapClassToSprite[tc] && this.trainerSprites[mapClassToSprite[tc]]) {
+      return this.trainerSprites[mapClassToSprite[tc]];
+    }
+    const sprMap = {
+      SPRITE_BLUE: "RIVAL1",
+      SPRITE_OAK: "PROF_OAK",
+      SPRITE_GIOVANNI: "GIOVANNI",
+      SPRITE_ROCKET: "ROCKET",
+      SPRITE_JESSIE: "JESSIEJAMES",
+      SPRITE_JAMES: "JESSIEJAMES",
+      SPRITE_LORELEI: "LORELEI",
+      SPRITE_BRUNO: "BRUNO",
+      SPRITE_AGATHA: "AGATHA",
+      SPRITE_LANCE: "LANCE",
+      SPRITE_KOGA: "KOGA",
+      SPRITE_GENTLEMAN: "GENTLEMAN",
+      SPRITE_SAILOR: "SAILOR",
+      SPRITE_SCIENTIST: "SCIENTIST",
+      SPRITE_SUPER_NERD: "SUPERNERD",
+      SPRITE_HIKER: "HIKER",
+      SPRITE_BIKER: "BIKER",
+      SPRITE_FISHER: "FISHER",
+      SPRITE_FISHING_GURU: "FISHER",
+      SPRITE_SWIMMER: "SWIMMER",
+      SPRITE_BEAUTY: "BEAUTY",
+      SPRITE_DAISY: "BEAUTY",
+      SPRITE_MOM: "BEAUTY",
+      SPRITE_NURSE: "BEAUTY",
+      SPRITE_OFFICER_JENNY: "COOLTRAINERF",
+      SPRITE_COOLTRAINER_F: "COOLTRAINERF",
+      SPRITE_COOLTRAINER_M: "COOLTRAINERM",
+      SPRITE_CLERK: "JR_TRAINERM",
+      SPRITE_GYM_GUIDE: "JR_TRAINERM",
+      SPRITE_YOUNGSTER: "YOUNGSTER",
+      SPRITE_GIRL: "LASS",
+      SPRITE_LITTLE_GIRL: "JR_TRAINERF",
+      SPRITE_CHANNELER: "CHANNELER",
+      SPRITE_ROCKER: "ROCKER",
+    };
+    if (sprMap[npcSpriteConst] && this.trainerSprites[sprMap[npcSpriteConst]]) {
+      return this.trainerSprites[sprMap[npcSpriteConst]];
+    }
+    return this.trainerSprites.JR_TRAINERM || null;
   }
 }

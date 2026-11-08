@@ -70,6 +70,8 @@
         </div>
 
         <div class="zone-banner-right">
+          <span id="hud-party-summary" class="hud-pill" title="Active Party Status (Click to Open Party &amp; PC)">⚡ Party: 1/6 (100% HP)</span>
+          <span id="hud-money" class="hud-pill gold-pill" title="Pokédollars (Click to Open Poké Mart)">¥3,000</span>
           <span id="hud-player-pos" class="hud-pill">Step (5, 6) • Block (2, 3) • Tile $00</span>
           <span id="visited-counter" class="hud-pill gold-pill">1 / 220 Visited</span>
         </div>
@@ -112,9 +114,18 @@
             <div class="card-header">
               <div>
                 <span class="card-kicker">LIVE PLAYABLE OVERWORLD (160×144 NATIVE GB)</span>
-                <span class="card-hint">WASD / Arrows: Walk • Z / Space / Enter: Talk &amp; Check Pikachu</span>
+                <span class="card-hint">WASD / Arrows: Walk • Z / Space / Enter: Talk, Battle, PokéCenter &amp; Mart</span>
               </div>
               <div class="toolbar-pills">
+                <button type="button" id="btn-open-pokecenter" class="pill-btn" title="Pokémon Center Healing &amp; Bill's PC Storage">
+                  🏥 PokéCenter / PC
+                </button>
+                <button type="button" id="btn-open-mart" class="pill-btn" title="Poké Mart Buy &amp; Sell Shop">
+                  🛒 Poké Mart
+                </button>
+                <button type="button" id="btn-open-party" class="pill-btn" title="Manage Party &amp; Use Bag Items">
+                  🎒 Party &amp; Bag
+                </button>
                 <button type="button" id="btn-check-pikachu" class="pill-btn pika-btn">
                   ⚡ Check Pikachu ♥
                 </button>
@@ -148,6 +159,7 @@
                         <p id="dialogue-text" class="gb-dialogue-text"></p>
                       </div>
                       <div id="dialogue-elevator-options" class="gb-elevator-list hidden"></div>
+                      <div id="dialogue-extra-actions" class="gb-extra-actions hidden"></div>
                       <div class="gb-textbox-footer">
                         <button type="button" id="dialogue-next-btn" class="gb-next-btn">
                           CONTINUE ▼ (SPACE / A)
@@ -156,7 +168,50 @@
                     </div>
                   </div>
 
-                  <!-- Authentic Game Boy Wild Pokémon Battle Overlay -->
+                  <!-- Authentic Pokémon Center Healing & Bill's PC / Red's PC Overlay -->
+                  <div id="pokecenter-overlay" class="gb-overlay facility-modal hidden">
+                    <div class="facility-window">
+                      <div class="facility-header">
+                        <span id="pokecenter-title">🏥 POKéMON CENTER &amp; PC</span>
+                        <button type="button" id="pokecenter-close-btn" class="gb-mini-close">✕</button>
+                      </div>
+                      <div class="facility-tabs">
+                        <button type="button" class="fac-tab active" data-pc-tab="heal">❤️ NURSE JOY</button>
+                        <button type="button" class="fac-tab" data-pc-tab="bill">💻 BILL'S PC</button>
+                        <button type="button" class="fac-tab" data-pc-tab="redpc">📦 RED'S PC</button>
+                        <button type="button" class="fac-tab" data-pc-tab="oak">📟 OAK'S PC</button>
+                      </div>
+                      <div id="pokecenter-status-msg" class="facility-status">
+                        Welcome to our POKéMON CENTER! We heal your POKéMON back to perfect health!
+                      </div>
+                      <div id="pokecenter-body" class="facility-body"></div>
+                    </div>
+                  </div>
+
+                  <!-- Authentic Poké Mart & Celadon Dept. Store Shop Overlay -->
+                  <div id="mart-overlay" class="gb-overlay facility-modal hidden">
+                    <div class="facility-window">
+                      <div class="facility-header">
+                        <span id="mart-title">🛒 POKéMON MART</span>
+                        <div class="facility-header-right">
+                          <span id="mart-money-badge" class="mart-money-badge">¥3,000</span>
+                          <button type="button" id="mart-close-btn" class="gb-mini-close">✕</button>
+                        </div>
+                      </div>
+                      <div class="facility-tabs">
+                        <button type="button" class="fac-tab active" data-mart-tab="buy">🛒 BUY</button>
+                        <button type="button" class="fac-tab" data-mart-tab="sell">💰 SELL</button>
+                        <button type="button" class="fac-tab" data-mart-tab="bag">🎒 USE BAG</button>
+                        <button type="button" class="fac-tab" data-mart-tab="all">🌐 ALL STOCK</button>
+                      </div>
+                      <div id="mart-status-msg" class="facility-status">
+                        Hi there! May I help you? Select an item to buy or sell!
+                      </div>
+                      <div id="mart-body" class="facility-body"></div>
+                    </div>
+                  </div>
+
+                  <!-- Authentic Game Boy Wild & Trainer Pokémon Battle Overlay -->
                   <div id="battle-overlay" class="gb-overlay battle-modal hidden">
                     <div class="gb-battle-screen">
                       <div class="battle-top-row">
@@ -165,6 +220,7 @@
                             <strong id="battle-foe-name">PIDGEY</strong>
                             <span id="battle-foe-lv">:L3</span>
                           </div>
+                          <div id="battle-foe-balls" class="battle-party-balls"></div>
                           <div class="hp-bar-Row">
                             <span class="hp-tag">HP:</span>
                             <div class="hp-track">
@@ -173,7 +229,8 @@
                           </div>
                         </div>
                         <div class="battle-sprite-box foe-sprite-box">
-                          <canvas id="battle-foe-canvas" width="40" height="40"></canvas>
+                          <canvas id="battle-trainer-canvas" class="battle-trainer-badge hidden" width="56" height="56"></canvas>
+                          <canvas id="battle-foe-canvas" width="56" height="56"></canvas>
                         </div>
                       </div>
 
@@ -183,9 +240,10 @@
                         </div>
                         <div class="battle-hud player-hud">
                           <div class="battle-hud-line">
-                            <strong>PIKACHU</strong>
-                            <span>:L25</span>
+                            <strong id="battle-player-name">PIKACHU</strong>
+                            <span id="battle-player-lv">:L25</span>
                           </div>
+                          <div id="battle-player-balls" class="battle-party-balls"></div>
                           <div class="hp-bar-Row">
                             <span class="hp-tag">HP:</span>
                             <div class="hp-track">
@@ -198,12 +256,8 @@
 
                       <div class="battle-bottom-box">
                         <p id="battle-log-text" class="battle-log-text">Wild PIDGEY appeared!</p>
-                        <div class="battle-actions">
-                          <button type="button" class="battle-btn" data-battle-act="thunderbolt">⚡ THUNDERBOLT</button>
-                          <button type="button" class="battle-btn" data-battle-act="quickattack">💨 QUICK ATTACK</button>
-                          <button type="button" class="battle-btn" data-battle-act="ball">🔴 POKé BALL</button>
-                          <button type="button" class="battle-btn" data-battle-act="run">🏃 RUN / CLOSE</button>
-                        </div>
+                        <div id="battle-sub-panel" class="battle-sub-panel hidden"></div>
+                        <div id="battle-moves-grid" class="battle-actions"></div>
                       </div>
                     </div>
                   </div>

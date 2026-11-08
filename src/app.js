@@ -5,10 +5,519 @@ import { GameBoyAudio } from "./audio.js";
 const engine = new PokeYellowEngine(POKEYELLOW_DATA);
 const audio = new GameBoyAudio(POKEYELLOW_DATA.music);
 
+// Authentic Gen 1 Items Catalog & Prices (from data/items/prices.asm & marts.asm)
+export const ITEM_CATALOG = {
+  MASTER_BALL: {
+    id: "MASTER_BALL",
+    name: "MASTER BALL",
+    price: 0,
+    kind: "ball",
+    catchMult: 255,
+    desc: "The ultimate BALL! Catches any wild POKéMON without fail.",
+  },
+  ULTRA_BALL: {
+    id: "ULTRA_BALL",
+    name: "ULTRA BALL",
+    price: 1200,
+    kind: "ball",
+    catchMult: 2.0,
+    desc: "High-performance BALL with a higher catch rate than GREAT BALL.",
+  },
+  GREAT_BALL: {
+    id: "GREAT_BALL",
+    name: "GREAT BALL",
+    price: 600,
+    kind: "ball",
+    catchMult: 1.5,
+    desc: "A good, high-quality BALL with a better catch rate than POKé BALL.",
+  },
+  POKE_BALL: {
+    id: "POKE_BALL",
+    name: "POKé BALL",
+    price: 200,
+    kind: "ball",
+    catchMult: 1.0,
+    desc: "Standard tool used for catching wild POKéMON.",
+  },
+  POTION: {
+    id: "POTION",
+    name: "POTION",
+    price: 300,
+    kind: "heal",
+    healHp: 20,
+    desc: "Restores 20 HP to a party POKéMON.",
+  },
+  SUPER_POTION: {
+    id: "SUPER_POTION",
+    name: "SUPER POTION",
+    price: 700,
+    kind: "heal",
+    healHp: 50,
+    desc: "Restores 50 HP to a party POKéMON.",
+  },
+  HYPER_POTION: {
+    id: "HYPER_POTION",
+    name: "HYPER POTION",
+    price: 1500,
+    kind: "heal",
+    healHp: 200,
+    desc: "Restores 200 HP to a party POKéMON.",
+  },
+  MAX_POTION: {
+    id: "MAX_POTION",
+    name: "MAX POTION",
+    price: 2500,
+    kind: "heal",
+    healHp: 999,
+    desc: "Fully restores HP of a party POKéMON.",
+  },
+  FULL_RESTORE: {
+    id: "FULL_RESTORE",
+    name: "FULL RESTORE",
+    price: 3000,
+    kind: "heal",
+    healHp: 999,
+    cureStatus: true,
+    desc: "Fully restores HP and cures all status problems of a POKéMON.",
+  },
+  REVIVE: {
+    id: "REVIVE",
+    name: "REVIVE",
+    price: 1500,
+    kind: "revive",
+    revivePct: 0.5,
+    desc: "Revives a fainted POKéMON and restores half its maximum HP.",
+  },
+  MAX_REVIVE: {
+    id: "MAX_REVIVE",
+    name: "MAX REVIVE",
+    price: 4000,
+    kind: "revive",
+    revivePct: 1.0,
+    desc: "Revives a fainted POKéMON and fully restores its HP.",
+  },
+  FRESH_WATER: {
+    id: "FRESH_WATER",
+    name: "FRESH WATER",
+    price: 200,
+    kind: "heal",
+    healHp: 50,
+    desc: "Mineral water from Celadon Dept. Roof! Restores 50 HP.",
+  },
+  SODA_POP: {
+    id: "SODA_POP",
+    name: "SODA POP",
+    price: 300,
+    kind: "heal",
+    healHp: 60,
+    desc: "Fizzy soda from Celadon Dept. Roof! Restores 60 HP.",
+  },
+  LEMONADE: {
+    id: "LEMONADE",
+    name: "LEMONADE",
+    price: 350,
+    kind: "heal",
+    healHp: 80,
+    desc: "Sweet lemonade from Celadon Dept. Roof! Restores 80 HP.",
+  },
+  ANTIDOTE: {
+    id: "ANTIDOTE",
+    name: "ANTIDOTE",
+    price: 100,
+    kind: "status",
+    healHp: 10,
+    cureStatus: true,
+    desc: "Cures a poisoned POKéMON (+10 HP).",
+  },
+  BURN_HEAL: {
+    id: "BURN_HEAL",
+    name: "BURN HEAL",
+    price: 250,
+    kind: "status",
+    healHp: 10,
+    cureStatus: true,
+    desc: "Heals a POKéMON suffering from a burn (+10 HP).",
+  },
+  ICE_HEAL: {
+    id: "ICE_HEAL",
+    name: "ICE HEAL",
+    price: 250,
+    kind: "status",
+    healHp: 10,
+    cureStatus: true,
+    desc: "Defrosts a frozen POKéMON (+10 HP).",
+  },
+  AWAKENING: {
+    id: "AWAKENING",
+    name: "AWAKENING",
+    price: 200,
+    kind: "status",
+    healHp: 10,
+    cureStatus: true,
+    desc: "Awakens a sleeping POKéMON (+10 HP).",
+  },
+  PARLYZ_HEAL: {
+    id: "PARLYZ_HEAL",
+    name: "PARLYZ HEAL",
+    price: 200,
+    kind: "status",
+    healHp: 10,
+    cureStatus: true,
+    desc: "Cures a paralyzed POKéMON (+10 HP).",
+  },
+  FULL_HEAL: {
+    id: "FULL_HEAL",
+    name: "FULL HEAL",
+    price: 600,
+    kind: "status",
+    healHp: 25,
+    cureStatus: true,
+    desc: "Eliminates all status problems of one POKéMON.",
+  },
+  ESCAPE_ROPE: {
+    id: "ESCAPE_ROPE",
+    name: "ESCAPE ROPE",
+    price: 550,
+    kind: "field",
+    desc: "Use in a cave or room to warp back to the last outdoor town!",
+  },
+  REPEL: {
+    id: "REPEL",
+    name: "REPEL",
+    price: 350,
+    kind: "repel",
+    steps: 100,
+    desc: "Prevents weak wild POKéMON from appearing for 100 steps.",
+  },
+  SUPER_REPEL: {
+    id: "SUPER_REPEL",
+    name: "SUPER REPEL",
+    price: 500,
+    kind: "repel",
+    steps: 200,
+    desc: "Prevents wild POKéMON from appearing for 200 steps.",
+  },
+  MAX_REPEL: {
+    id: "MAX_REPEL",
+    name: "MAX REPEL",
+    price: 700,
+    kind: "repel",
+    steps: 250,
+    desc: "Prevents wild POKéMON from appearing for 250 steps.",
+  },
+  POKE_DOLL: {
+    id: "POKE_DOLL",
+    name: "POKé DOLL",
+    price: 1000,
+    kind: "field",
+    desc: "An attractive doll! Distracts any wild POKéMON to flee.",
+  },
+  RARE_CANDY: {
+    id: "RARE_CANDY",
+    name: "RARE CANDY",
+    price: 4800,
+    kind: "level",
+    desc: "Raises the level of a selected party POKéMON by 1!",
+  },
+  FIRE_STONE: {
+    id: "FIRE_STONE",
+    name: "FIRE STONE",
+    price: 2100,
+    kind: "stone",
+    evolves: { EEVEE: "FLAREON", VULPIX: "NINETALES", GROWLITHE: "ARCANINE" },
+    desc: "Evolves EEVEE, VULPIX, or GROWLITHE!",
+  },
+  THUNDER_STONE: {
+    id: "THUNDER_STONE",
+    name: "THUNDER STONE",
+    price: 2100,
+    kind: "stone",
+    evolves: { EEVEE: "JOLTEON" },
+    desc: "Evolves EEVEE into JOLTEON! (Partner PIKACHU refuses it!)",
+  },
+  WATER_STONE: {
+    id: "WATER_STONE",
+    name: "WATER STONE",
+    price: 2100,
+    kind: "stone",
+    evolves: {
+      EEVEE: "VAPOREON",
+      POLIWHIRL: "POLIWRATH",
+      SHELLDER: "CLOYSTER",
+      STARYU: "STARMIE",
+    },
+    desc: "Evolves EEVEE, POLIWHIRL, SHELLDER, or STARYU!",
+  },
+  LEAF_STONE: {
+    id: "LEAF_STONE",
+    name: "LEAF STONE",
+    price: 2100,
+    kind: "stone",
+    evolves: {
+      GLOOM: "VILEPLUME",
+      WEEPINBELL: "VICTREEBEL",
+      EXEGGCUTE: "EXEGGUTOR",
+    },
+    desc: "Evolves GLOOM, WEEPINBELL, or EXEGGCUTE!",
+  },
+  MOON_STONE: {
+    id: "MOON_STONE",
+    name: "MOON STONE",
+    price: 2100,
+    kind: "stone",
+    evolves: {
+      NIDORINA: "NIDOQUEEN",
+      NIDORINO: "NIDOKING",
+      CLEFAIRY: "CLEFABLE",
+      JIGGLYPUFF: "WIGGLYTUFF",
+    },
+    desc: "Evolves CLEFAIRY, JIGGLYPUFF, NIDORINA, or NIDORINO!",
+  },
+  HP_UP: {
+    id: "HP_UP",
+    name: "HP UP",
+    price: 9800,
+    kind: "vitamin",
+    stat: "maxHp",
+    boost: 6,
+    desc: "Increases the MAX HP of one party POKéMON!",
+  },
+  PROTEIN: {
+    id: "PROTEIN",
+    name: "PROTEIN",
+    price: 9800,
+    kind: "vitamin",
+    stat: "atk",
+    boost: 4,
+    desc: "Increases the ATTACK stat of one party POKéMON!",
+  },
+  IRON: {
+    id: "IRON",
+    name: "IRON",
+    price: 9800,
+    kind: "vitamin",
+    stat: "def",
+    boost: 4,
+    desc: "Increases the DEFENSE stat of one party POKéMON!",
+  },
+  CARBOS: {
+    id: "CARBOS",
+    name: "CARBOS",
+    price: 9800,
+    kind: "vitamin",
+    stat: "spd",
+    boost: 4,
+    desc: "Increases the SPEED stat of one party POKéMON!",
+  },
+  CALCIUM: {
+    id: "CALCIUM",
+    name: "CALCIUM",
+    price: 9800,
+    kind: "vitamin",
+    stat: "spc",
+    boost: 4,
+    desc: "Increases the SPECIAL stat of one party POKéMON!",
+  },
+  NUGGET: {
+    id: "NUGGET",
+    name: "NUGGET",
+    price: 10000,
+    kind: "treasure",
+    desc: "Made of pure gold! Can be sold at any POKé MART for ¥5,000.",
+  },
+};
+
+// Authentic City-by-City Poké Mart Stock (from data/items/marts.asm)
+export const MART_STOCKS = {
+  VIRIDIAN_MART: ["POKE_BALL", "POTION", "ANTIDOTE", "PARLYZ_HEAL", "BURN_HEAL"],
+  PEWTER_MART: [
+    "POKE_BALL",
+    "POTION",
+    "ESCAPE_ROPE",
+    "ANTIDOTE",
+    "BURN_HEAL",
+    "AWAKENING",
+    "PARLYZ_HEAL",
+  ],
+  CERULEAN_MART: [
+    "POKE_BALL",
+    "POTION",
+    "ESCAPE_ROPE",
+    "REPEL",
+    "ANTIDOTE",
+    "BURN_HEAL",
+    "AWAKENING",
+    "PARLYZ_HEAL",
+  ],
+  VERMILION_MART: [
+    "POKE_BALL",
+    "SUPER_POTION",
+    "ICE_HEAL",
+    "AWAKENING",
+    "PARLYZ_HEAL",
+    "REPEL",
+  ],
+  LAVENDER_MART: [
+    "GREAT_BALL",
+    "SUPER_POTION",
+    "REVIVE",
+    "ESCAPE_ROPE",
+    "SUPER_REPEL",
+    "ANTIDOTE",
+    "BURN_HEAL",
+    "ICE_HEAL",
+    "PARLYZ_HEAL",
+  ],
+  CELADON_MART_1F: [
+    "POKE_BALL",
+    "GREAT_BALL",
+    "POTION",
+    "SUPER_POTION",
+    "REVIVE",
+    "ESCAPE_ROPE",
+  ],
+  CELADON_MART_2F: [
+    "GREAT_BALL",
+    "SUPER_POTION",
+    "REVIVE",
+    "SUPER_REPEL",
+    "ANTIDOTE",
+    "BURN_HEAL",
+    "ICE_HEAL",
+    "AWAKENING",
+    "PARLYZ_HEAL",
+  ],
+  CELADON_MART_3F: [
+    "POKE_DOLL",
+    "GREAT_BALL",
+    "SUPER_POTION",
+    "REVIVE",
+  ],
+  CELADON_MART_4F: [
+    "POKE_DOLL",
+    "FIRE_STONE",
+    "THUNDER_STONE",
+    "WATER_STONE",
+    "LEAF_STONE",
+  ],
+  CELADON_MART_5F: [
+    "HP_UP",
+    "PROTEIN",
+    "IRON",
+    "CARBOS",
+    "CALCIUM",
+    "RARE_CANDY",
+  ],
+  CELADON_MART_ROOF: ["FRESH_WATER", "SODA_POP", "LEMONADE"],
+  FUCHSIA_MART: [
+    "ULTRA_BALL",
+    "GREAT_BALL",
+    "HYPER_POTION",
+    "REVIVE",
+    "FULL_HEAL",
+    "SUPER_REPEL",
+  ],
+  SAFFRON_MART: [
+    "GREAT_BALL",
+    "HYPER_POTION",
+    "MAX_REPEL",
+    "ESCAPE_ROPE",
+    "FULL_HEAL",
+    "REVIVE",
+  ],
+  CINNABAR_MART: [
+    "ULTRA_BALL",
+    "GREAT_BALL",
+    "HYPER_POTION",
+    "MAX_REPEL",
+    "ESCAPE_ROPE",
+    "FULL_HEAL",
+    "REVIVE",
+  ],
+  INDIGO_PLATEAU_LOBBY: [
+    "ULTRA_BALL",
+    "GREAT_BALL",
+    "FULL_RESTORE",
+    "MAX_POTION",
+    "FULL_HEAL",
+    "REVIVE",
+    "MAX_REPEL",
+  ],
+};
+
+function createInitialPartyAndStorage() {
+  const starterPika = engine.createPokemonInstance("PIKACHU", 25, [
+    "THUNDERBOLT",
+    "QUICK_ATTACK",
+    "THUNDER_WAVE",
+    "SLAM",
+  ]);
+  starterPika.isPartnerPikachu = true;
+
+  const pidgeotto = engine.createPokemonInstance("PIDGEOTTO", 18, [
+    "WING_ATTACK",
+    "QUICK_ATTACK",
+    "GUST",
+    "SAND_ATTACK",
+  ]);
+
+  const box1 = [
+    engine.createPokemonInstance("BULBASAUR", 15, [
+      "VINE_WHIP",
+      "RAZOR_LEAF",
+      "LEECH_SEED",
+      "TACKLE",
+    ]),
+    engine.createPokemonInstance("CHARMANDER", 15, [
+      "EMBER",
+      "SLASH",
+      "SCRATCH",
+      "LEER",
+    ]),
+    engine.createPokemonInstance("SQUIRTLE", 15, [
+      "WATER_GUN",
+      "BUBBLE",
+      "BITE",
+      "TACKLE",
+    ]),
+    engine.createPokemonInstance("EEVEE", 20, [
+      "QUICK_ATTACK",
+      "BITE",
+      "TAKE_DOWN",
+      "SAND_ATTACK",
+    ]),
+    engine.createPokemonInstance("LAPRAS", 25, [
+      "SURF",
+      "ICE_BEAM",
+      "BODY_SLAM",
+      "CONFUSE_RAY",
+    ]),
+    engine.createPokemonInstance("SNORLAX", 30, [
+      "BODY_SLAM",
+      "HEADBUTT",
+      "AMNESIA",
+      "REST",
+    ]),
+  ];
+
+  return {
+    party: [starterPika, pidgeotto],
+    pcBoxes: [
+      { name: "BOX 1 (KANTO)", list: box1 },
+      { name: "BOX 2", list: [] },
+      { name: "BOX 3", list: [] },
+      { name: "BOX 4", list: [] },
+    ],
+  };
+}
+
+const initMonsters = createInitialPartyAndStorage();
+
 // State
 const state = {
   currentZone: engine.zonesByConst.PALLET_TOWN,
   lastOutdoorMap: { mapConst: "PALLET_TOWN", warpIndex: 0 },
+  lastPokeCenterMap: "VIRIDIAN_POKECENTER",
   viewMode: "split", // "split" | "zone" | "gb"
   showBorder: false,
   showEntitiesOnZoneMap: false, // Default false so the Full Zone Map matches the clean Pallet Town reference image 1:1 on load!
@@ -18,11 +527,67 @@ const state = {
   noClip: false,
   autoSurf: true,
   wildEncountersEnabled: true,
-  zoneZoom: "fit", // "fit" | 1 | 2 | 3
-  categoryFilter: "canonical220", // "canonical220" | "town" | "route" | "indoor" | "dungeon" | "all224"
+  repelSteps: 0,
+  zoneZoom: "fit",
+  categoryFilter: "canonical220",
   searchQuery: "",
   townMapFilterCoords: null,
   visitedZones: new Set(["PALLET_TOWN"]),
+  pokedexOwned: new Set([
+    "PIKACHU",
+    "PIDGEOTTO",
+    "BULBASAUR",
+    "CHARMANDER",
+    "SQUIRTLE",
+    "EEVEE",
+    "LAPRAS",
+    "SNORLAX",
+  ]),
+  pokedexSeen: new Set([
+    "PIKACHU",
+    "PIDGEY",
+    "PIDGEOTTO",
+    "RATTATA",
+    "SPEAROW",
+    "BULBASAUR",
+    "CHARMANDER",
+    "SQUIRTLE",
+    "EEVEE",
+    "LAPRAS",
+    "SNORLAX",
+    "CHANSEY",
+  ]),
+  money: 3500,
+  bag: {
+    POKE_BALL: 5,
+    GREAT_BALL: 2,
+    POTION: 3,
+    SUPER_POTION: 2,
+    REVIVE: 1,
+    ANTIDOTE: 2,
+    PARLYZ_HEAL: 1,
+    ESCAPE_ROPE: 1,
+  },
+  pcItemStorage: {
+    RARE_CANDY: 3,
+    MOON_STONE: 1,
+    THUNDER_STONE: 1,
+    FIRE_STONE: 1,
+    WATER_STONE: 1,
+    LEAF_STONE: 1,
+    NUGGET: 1,
+    MASTER_BALL: 1,
+  },
+  party: initMonsters.party,
+  pcBoxes: initMonsters.pcBoxes,
+  currentBoxIndex: 0,
+  activeFacility: null, // null | "pokecenter" | "mart"
+  pcActiveTab: "heal", // "heal" | "bill" | "redpc" | "oak"
+  pcStatusText:
+    "Welcome to our POKéMON CENTER! We heal your POKéMON back to perfect health!",
+  martActiveTab: "buy", // "buy" | "sell" | "bag" | "all"
+  martZoneConst: "VIRIDIAN_MART",
+  martStatusText: "Hi there! May I help you? Select an item to buy or sell!",
   player: {
     x: 5,
     y: 6,
@@ -49,8 +614,8 @@ const state = {
   activeEmote: null,
   emoteTimer: null,
   npcs: [],
-  dialogue: null, // { title, pages: [], pageIndex: 0, pikachuMood: null, elevatorOptions: null }
-  battle: null, // { species, level, hp, maxHp, playerHp, playerMaxHp, log, caught, finished }
+  dialogue: null, // { title, pages: [], pageIndex: 0, pikachuMood: null, elevatorOptions: null, extraActions: null }
+  battle: null,
   selectedElevatorDest: {},
 };
 
@@ -120,7 +685,6 @@ function findDefaultSpawn(zone, spawnWarpIndex = null) {
     const w = zone.warps[spawnWarpIndex];
     const ts = engine.tilesetsByConst[zone.tileset];
     const tileAtWarp = engine.getCollisionTileAtStep(zone, w.x, w.y);
-    // If emerging onto an outdoor door tile, step 1 tile down if passable
     if (
       zone.romId < 0x25 &&
       ts.doorSet.has(tileAtWarp) &&
@@ -131,12 +695,10 @@ function findDefaultSpawn(zone, spawnWarpIndex = null) {
     return { x: w.x, y: w.y, dir: "DOWN" };
   }
 
-  // For Pallet Town default spawn right between Red's House and Oak's Lab
   if (zone.constName === "PALLET_TOWN") {
     return { x: 5, y: 6, dir: "DOWN" };
   }
 
-  // If the zone has warps, spawn near the first warp or center
   if (zone.warps.length > 0) {
     const w = zone.warps[0];
     if (zone.romId < 0x25 && w.y + 1 < zone.height * 2) {
@@ -148,7 +710,6 @@ function findDefaultSpawn(zone, spawnWarpIndex = null) {
     return { x: w.x, y: w.y, dir: "DOWN" };
   }
 
-  // Otherwise find nearest passable tile to center
   const cx = Math.floor(zone.width);
   const cy = Math.floor(zone.height);
   const ts = engine.tilesetsByConst[zone.tileset];
@@ -186,6 +747,7 @@ function initZoneNpcs(zone) {
     stepParity: false,
     moveAnim: null,
     collected: false,
+    defeated: false,
   }));
 }
 
@@ -213,7 +775,6 @@ export function loadZone(target, options = {}) {
   }
   if (!zone) return null;
 
-  // Record outdoor map for LAST_MAP indoor exit warps
   if (state.currentZone && state.currentZone.romId < 0x25) {
     state.lastOutdoorMap = {
       mapConst: state.currentZone.constName,
@@ -225,10 +786,17 @@ export function loadZone(target, options = {}) {
     }
   }
 
+  if (zone.constName.includes("POKECENTER")) {
+    state.lastPokeCenterMap = zone.constName;
+  }
+
   state.currentZone = zone;
   state.visitedZones.add(zone.constName);
   state.npcs = initZoneNpcs(zone);
   state.dialogue = null;
+  state.activeFacility = null;
+  renderFacilityModals();
+  renderDialogueModal();
 
   const spawn =
     options.x !== undefined && options.y !== undefined
@@ -293,7 +861,6 @@ function resolveWarpDestination(zone, warp) {
       destConst = "PALLET_TOWN";
     }
   }
-  // Check if we are exiting an elevator that had a floor chosen
   if (
     ELEVATOR_FLOORS[zone.constName] &&
     state.selectedElevatorDest[zone.constName]
@@ -326,8 +893,30 @@ function isWaterTile(zone, tileId) {
   );
 }
 
+// Check if a step coordinate (sx, sy) in `zone` is a Pokémon Center PC or Red's House 2F PC!
+export function isComputerTileAtStep(zone, sx, sy) {
+  if (!zone) return false;
+  if (sx < 0 || sy < 0 || sx >= zone.width * 2 || sy >= zone.height * 2) {
+    return false;
+  }
+  const collTile = engine.getCollisionTileAtStep(zone, sx, sy);
+  const topTile = engine.getTileIdAt8x8(zone, sx * 2, sy * 2);
+  // In POKECENTER and MART (Indigo Plateau Lobby), PC monitor is collision tile $52 / top tile $42
+  if (
+    (zone.tileset === "POKECENTER" || zone.tileset === "MART") &&
+    (collTile === 0x52 || topTile === 0x42 || (zone.tileset === "POKECENTER" && sx === 13 && sy === 3))
+  ) {
+    return true;
+  }
+  // In REDS_HOUSE_2F, Red's PC is at (0, 1) with collision tile $32 / top tile $42
+  if (zone.constName === "REDS_HOUSE_2F" && sx === 0 && (sy === 1 || sy === 0)) {
+    return true;
+  }
+  return false;
+}
+
 function attemptStep(dir) {
-  if (state.dialogue || state.battle) return;
+  if (state.dialogue || state.battle || state.activeFacility) return;
   if (state.player.moveAnim) return;
 
   const zone = state.currentZone;
@@ -464,7 +1053,6 @@ function attemptStep(dir) {
     engine.isStepPassable(zone, state.player.x, state.player.y, targetX, targetY) ||
     (water && (state.player.mode === "surf" || state.autoSurf));
 
-  // Also allow stepping directly onto a warp_event coordinate (e.g. stairs/doors)
   const targetWarp = checkWarpAtStep(zone, targetX, targetY);
 
   if (!passable && !targetWarp) {
@@ -498,7 +1086,6 @@ function startPlayerMove(destX, destY, dir, durationMs, isLedgeJump = false) {
     isLedgeJump,
   };
 
-  // Move Pikachu to Red's previous step
   if (state.pikachu.visible) {
     const pdx = prevPlayerX - state.pikachu.x;
     const pdy = prevPlayerY - state.pikachu.y;
@@ -529,6 +1116,10 @@ function onPlayerStepCompleted() {
   const sx = state.player.x;
   const sy = state.player.y;
 
+  if (state.repelSteps > 0) {
+    state.repelSteps--;
+  }
+
   updateCoordinatesUI();
 
   // Check if stepped onto a door / staircase warp
@@ -536,8 +1127,6 @@ function onPlayerStepCompleted() {
   if (hitWarp) {
     const ts = engine.tilesetsByConst[zone.tileset];
     const tileId = engine.getCollisionTileAtStep(zone, sx, sy);
-    // In Gen 1, doors, stairs, and cave entrances warp immediately on step;
-    // indoor exit mats at the bottom edge warp either on step or when pressing Down.
     const isBottomExitMat =
       zone.romId >= 0x25 &&
       sy === zone.height * 2 - 1 &&
@@ -557,7 +1146,7 @@ function onPlayerStepCompleted() {
   }
 
   // Check wild Pokémon encounter in tall grass / caves / water
-  if (state.wildEncountersEnabled) {
+  if (state.wildEncountersEnabled && state.repelSteps <= 0) {
     const ts = engine.tilesetsByConst[zone.tileset];
     const tileId = engine.getCollisionTileAtStep(zone, sx, sy);
     const inGrass = tileId === ts.grassTile;
@@ -584,6 +1173,7 @@ function onPlayerStepCompleted() {
 // Interact with what is in front of Red (A button / Space / Enter)
 export function interactInFront() {
   if (state.battle) return;
+  if (state.activeFacility) return;
   if (state.dialogue) {
     advanceDialogue();
     return;
@@ -597,7 +1187,16 @@ export function interactInFront() {
   const fx = state.player.x + dx;
   const fy = state.player.y + dy;
 
-  // 1. Check if facing following Pikachu!
+  // 1. Check if facing a Pokémon Center PC or Red's House 2F PC!
+  if (
+    isComputerTileAtStep(zone, fx, fy) ||
+    isComputerTileAtStep(zone, state.player.x, state.player.y)
+  ) {
+    openPokeCenterModal(zone.constName === "REDS_HOUSE_2F" ? "redpc" : "bill");
+    return;
+  }
+
+  // 2. Check if facing following Pikachu!
   if (
     state.pikachu.visible &&
     state.pikachu.x === fx &&
@@ -607,7 +1206,7 @@ export function interactInFront() {
     return;
   }
 
-  // 2. Check Elevator control panel
+  // 3. Check Elevator control panel
   if (ELEVATOR_FLOORS[zone.constName]) {
     for (const s of zone.signs) {
       if (s.x === fx && s.y === fy) {
@@ -617,16 +1216,23 @@ export function interactInFront() {
     }
   }
 
-  // 3. Check Signs (bg_events)
+  // 4. Check Celadon Rooftop Vending Machines or Signs (bg_events)
   for (const s of zone.signs) {
     if (s.x === fx && s.y === fy) {
+      if (
+        zone.constName === "CELADON_MART_ROOF" &&
+        s.text.toUpperCase().includes("VENDING")
+      ) {
+        openMartModal("buy", "CELADON_MART_ROOF");
+        return;
+      }
       audio.playSfx("blip");
       openDialogue("SIGNPOST", s.text);
       return;
     }
   }
 
-  // 4. Check NPCs / Items (including 2 steps away across counter tiles in PokéCenters & Marts!)
+  // 5. Check NPCs / Items (including 2 steps away across counter tiles in PokéCenters & Marts!)
   const ts = engine.tilesetsByConst[zone.tileset];
   const frontTile = engine.getCollisionTileAtStep(zone, fx, fy);
   const acrossCounter = ts.counterSet.has(frontTile);
@@ -640,15 +1246,784 @@ export function interactInFront() {
       if (!npc.defaultVisible && !state.showHiddenObjects) continue;
       if (npc.collected) continue;
       if (npc.x === cx && npc.y === cy) {
-        // Turn NPC toward player
-        const opp = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
-        npc.facing = opp[state.player.dir] || "DOWN";
-        if (npc.kind === "item") {
-          npc.collected = true;
-        }
-        audio.playSfx("blip");
-        openDialogue(npc.name.replace(/_/g, " "), npc.text);
+        interactWithNpc(npc);
         return;
+      }
+    }
+  }
+}
+
+export function interactWithNpc(npc) {
+  if (!npc) return;
+  const zone = state.currentZone;
+  const opp = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
+  npc.facing = opp[state.player.dir] || "DOWN";
+
+  // 1. Item Ball pickup on overworld
+  if (npc.kind === "item") {
+    npc.collected = true;
+    const rawItem = (npc.extra || "POTION").toUpperCase();
+    const itemKey = ITEM_CATALOG[rawItem] ? rawItem : "POTION";
+    state.bag[itemKey] = (state.bag[itemKey] || 0) + 1;
+    audio.playSfx("buy");
+    updateHudTelemetry();
+    openDialogue(
+      "FOUND ITEM!",
+      `${npc.text}\n\nPut ${ITEM_CATALOG[itemKey].name} into the BAG!`
+    );
+    return;
+  }
+
+  const upName = (npc.name || "").toUpperCase();
+
+  // 2. Nurse Joy in Pokémon Centers (or Indigo Plateau Lobby) -> Full PokéCenter Heal & PC Service!
+  if (npc.sprite === "SPRITE_NURSE" || upName.includes("NURSE")) {
+    openPokeCenterModal("heal");
+    return;
+  }
+
+  // 3. Chansey beside Nurse Joy in Pokémon Centers -> Heals Party & Pikachu Friendship!
+  if (npc.sprite === "SPRITE_CHANSEY" || upName.includes("CHANSEY")) {
+    healPartyAtPokeCenter(true);
+    openDialogue(
+      "POKéMON CENTER CHANSEY",
+      `${npc.text}\n\nCHANSEY's gentle song restored your party's HP & PP and filled PIKACHU with joy! ♥`,
+      {
+        extraActions: [
+          {
+            label: "🏥 Open PokéCenter & PC",
+            onClick: () => {
+              state.dialogue = null;
+              renderDialogueModal();
+              openPokeCenterModal("heal");
+            },
+          },
+          ...(npc.battle
+            ? [
+                {
+                  label: "⚔️ Friendly Spar",
+                  onClick: () => {
+                    state.dialogue = null;
+                    renderDialogueModal();
+                    triggerTrainerBattle(npc);
+                  },
+                },
+              ]
+            : []),
+        ],
+      }
+    );
+    return;
+  }
+
+  // 4. Poké Mart Clerk (in any Town Mart, Celadon Dept. Store, or Indigo Plateau Lobby) -> Full Poké Mart Shop!
+  if (npc.sprite === "SPRITE_CLERK" || upName.includes("CLERK")) {
+    openMartModal("buy", zone.constName);
+    return;
+  }
+
+  // 5. Cable Club Receptionist -> Keep area usable for later content (standard dialogue + optional room access)
+  if (
+    npc.sprite === "SPRITE_LINK_RECEPTIONIST" ||
+    upName.includes("LINK_RECEPTIONIST")
+  ) {
+    audio.playSfx("blip");
+    openDialogue(npc.name.replace(/_/g, " "), npc.text, {
+      extraActions: [
+        {
+          label: "🚪 Enter Trade Center",
+          onClick: () => {
+            state.dialogue = null;
+            renderDialogueModal();
+            loadZone("TRADE_CENTER", { resetParent: false });
+          },
+        },
+        {
+          label: "🏟️ Enter Colosseum",
+          onClick: () => {
+            state.dialogue = null;
+            renderDialogueModal();
+            loadZone("COLOSSEUM", { resetParent: false });
+          },
+        },
+      ],
+    });
+    return;
+  }
+
+  // 6. Official Trainers, Gym Leaders, Rival Blue, Giovanni, Jessie & James, Elite Four, Snorlax, Legendaries
+  const isMajorBossOrTrainer =
+    npc.kind === "trainer" ||
+    npc.sprite === "SPRITE_BLUE" ||
+    npc.sprite === "SPRITE_GIOVANNI" ||
+    npc.sprite === "SPRITE_LORELEI" ||
+    npc.sprite === "SPRITE_BRUNO" ||
+    npc.sprite === "SPRITE_AGATHA" ||
+    npc.sprite === "SPRITE_LANCE" ||
+    npc.sprite === "SPRITE_SNORLAX" ||
+    upName.includes("JESSIE") ||
+    upName.includes("JAMES") ||
+    upName.includes("RIVAL") ||
+    upName.includes("ARTICUNO") ||
+    upName.includes("ZAPDOS") ||
+    upName.includes("MOLTRES") ||
+    upName.includes("MEWTWO");
+
+  if (isMajorBossOrTrainer && npc.battle && !npc.defeated) {
+    audio.playSfx("blip");
+    openDialogue(
+      npc.battle.trainerName || npc.name.replace(/_/g, " "),
+      npc.battle.battleText || npc.text,
+      {
+        onFinish: () => triggerTrainerBattle(npc),
+        extraActions: [
+          {
+            label: "⚔️ START BATTLE!",
+            onClick: () => {
+              state.dialogue = null;
+              renderDialogueModal();
+              triggerTrainerBattle(npc);
+            },
+          },
+        ],
+      }
+    );
+    return;
+  }
+
+  // 7. Standard Town / Indoor NPC: show authentic dialogue + optional "⚔️ Challenge to Battle" button
+  audio.playSfx("blip");
+  const extraActions = [];
+  if (npc.battle) {
+    extraActions.push({
+      label: `⚔️ Battle (${npc.battle.trainerName})`,
+      onClick: () => {
+        state.dialogue = null;
+        renderDialogueModal();
+        triggerTrainerBattle(npc);
+      },
+    });
+  }
+  openDialogue(
+    npc.name.replace(/_/g, " "),
+    npc.defeated && npc.battle?.afterBattleText
+      ? npc.battle.afterBattleText
+      : npc.text,
+    { extraActions }
+  );
+}
+
+// ============================================================================
+// POKéMON CENTER & COMPUTER (BILL'S PC / RED'S PC / OAK'S PC) FUNCTIONALITY
+// ============================================================================
+
+export function healPartyAtPokeCenter(silentModal = false) {
+  for (const mon of state.party) {
+    mon.hp = mon.maxHp;
+    mon.status = null;
+    for (const mv of mon.moves) {
+      mv.pp = mv.maxPp;
+    }
+  }
+  state.pikachu.friendship = Math.min(255, state.pikachu.friendship + 15);
+  triggerEmote("heart", 2200);
+  audio.playSfx("heal");
+  state.pcStatusText =
+    "♪ Ding-ding-ding-ding-ding! ♪ Thank you! Your POKéMON are fighting fit and all HP & PP are 100% restored!";
+  updateHudTelemetry();
+  if (!silentModal && state.activeFacility === "pokecenter") {
+    renderFacilityModals();
+  }
+}
+
+export function openPokeCenterModal(initialTab = "heal") {
+  state.dialogue = null;
+  renderDialogueModal();
+  state.activeFacility = "pokecenter";
+  state.pcActiveTab = initialTab;
+  if (initialTab === "bill") {
+    audio.playSfx("pc");
+    state.pcStatusText =
+      "Accessed BILL'S PC! POKéMON Storage System opened. Withdraw or Deposit POKéMON below.";
+  } else if (initialTab === "redpc") {
+    audio.playSfx("pc");
+    state.pcStatusText =
+      "Accessed RED'S PC! Item Storage System opened. Withdraw, Deposit, or Use items.";
+  } else if (initialTab === "oak") {
+    audio.playSfx("pc");
+    state.pcStatusText = `PROF. OAK'S PC: You have seen ${state.pokedexSeen.size} and owned ${state.pokedexOwned.size} POKéMON species!`;
+  } else {
+    audio.playSfx("blip");
+    state.pcStatusText =
+      "Welcome to our POKéMON CENTER! Shall we heal your POKéMON back to perfect health?";
+  }
+  renderFacilityModals();
+}
+
+export function depositPartyPokemonToPc(partyIdx) {
+  if (state.party.length <= 1) {
+    state.pcStatusText = "You can't deposit your last POKéMON!";
+    renderFacilityModals();
+    return false;
+  }
+  const box = state.pcBoxes[state.currentBoxIndex];
+  if (box.list.length >= 20) {
+    state.pcStatusText = `${box.name} is full (20/20)! Switch to another BOX first.`;
+    renderFacilityModals();
+    return false;
+  }
+  const [removed] = state.party.splice(partyIdx, 1);
+  box.list.push(removed);
+  audio.playSfx("pc");
+  state.pcStatusText = `${removed.nickname} (Lv.${removed.level}) was stored in ${box.name}!`;
+  updateHudTelemetry();
+  renderFacilityModals();
+  return true;
+}
+
+export function withdrawPokemonFromPc(boxPokemonIdx) {
+  if (state.party.length >= 6) {
+    state.pcStatusText =
+      "Your PARTY is full (6/6)! Deposit a POKéMON into the BOX first.";
+    renderFacilityModals();
+    return false;
+  }
+  const box = state.pcBoxes[state.currentBoxIndex];
+  const [withdrawn] = box.list.splice(boxPokemonIdx, 1);
+  if (!withdrawn) return false;
+  state.party.push(withdrawn);
+  state.pokedexOwned.add(withdrawn.species);
+  state.pokedexSeen.add(withdrawn.species);
+  audio.playSfx("pc");
+  state.pcStatusText = `Withdrew ${withdrawn.nickname} (Lv.${withdrawn.level}) from ${box.name} to your PARTY!`;
+  updateHudTelemetry();
+  renderFacilityModals();
+  return true;
+}
+
+export function depositItemToPc(itemId) {
+  if (!state.bag[itemId] || state.bag[itemId] <= 0) return false;
+  state.bag[itemId]--;
+  if (state.bag[itemId] <= 0) delete state.bag[itemId];
+  state.pcItemStorage[itemId] = (state.pcItemStorage[itemId] || 0) + 1;
+  audio.playSfx("pc");
+  state.pcStatusText = `Stored 1× ${ITEM_CATALOG[itemId]?.name || itemId} in RED'S PC!`;
+  renderFacilityModals();
+  return true;
+}
+
+export function withdrawItemFromPc(itemId) {
+  if (!state.pcItemStorage[itemId] || state.pcItemStorage[itemId] <= 0) return false;
+  state.pcItemStorage[itemId]--;
+  if (state.pcItemStorage[itemId] <= 0) delete state.pcItemStorage[itemId];
+  state.bag[itemId] = (state.bag[itemId] || 0) + 1;
+  audio.playSfx("pc");
+  state.pcStatusText = `Withdrew 1× ${ITEM_CATALOG[itemId]?.name || itemId} from RED'S PC into your BAG!`;
+  renderFacilityModals();
+  return true;
+}
+
+// ============================================================================
+// POKé MART & DEPARTMENT STORE FUNCTIONALITY (BUY / SELL / USE BAG)
+// ============================================================================
+
+export function openMartModal(initialTab = "buy", martZoneConst = null) {
+  state.dialogue = null;
+  renderDialogueModal();
+  state.activeFacility = "mart";
+  state.martActiveTab = initialTab;
+  const zConst = martZoneConst || state.currentZone.constName;
+  state.martZoneConst = MART_STOCKS[zConst] ? zConst : "VIRIDIAN_MART";
+  audio.playSfx("blip");
+  state.martStatusText =
+    initialTab === "sell"
+      ? "What would you like to sell from your BAG?"
+      : initialTab === "bag"
+      ? "Select an item from your BAG to use on your POKéMON!"
+      : "Hi there! May I help you? Welcome to the POKéMON MART!";
+  renderFacilityModals();
+}
+
+export function buyMartItem(itemId, qty = 1) {
+  const item = ITEM_CATALOG[itemId];
+  if (!item) return false;
+  const totalCost = item.price * qty;
+  if (state.money < totalCost) {
+    audio.playSfx("bump");
+    state.martStatusText = `You don't have enough money! (Need ¥${totalCost.toLocaleString()}, have ¥${state.money.toLocaleString()})`;
+    renderFacilityModals();
+    return false;
+  }
+  state.money -= totalCost;
+  state.bag[itemId] = (state.bag[itemId] || 0) + qty;
+  audio.playSfx("buy");
+  state.martStatusText = `Here you are! Bought ${qty}× ${item.name} for ¥${totalCost.toLocaleString()}. Thank you!`;
+  updateHudTelemetry();
+  renderFacilityModals();
+  return true;
+}
+
+export function sellBagItem(itemId, qty = 1) {
+  const item = ITEM_CATALOG[itemId];
+  if (!item || !state.bag[itemId] || state.bag[itemId] < qty) return false;
+  const unitSell = Math.max(50, Math.floor(item.price / 2));
+  const totalGain = unitSell * qty;
+  state.bag[itemId] -= qty;
+  if (state.bag[itemId] <= 0) delete state.bag[itemId];
+  state.money += totalGain;
+  audio.playSfx("buy");
+  state.martStatusText = `Sold ${qty}× ${item.name} for ¥${totalGain.toLocaleString()}!`;
+  updateHudTelemetry();
+  renderFacilityModals();
+  return true;
+}
+
+export function useBagItemOnParty(itemId, targetPartyIndex = 0) {
+  const item = ITEM_CATALOG[itemId];
+  if (!item || !state.bag[itemId] || state.bag[itemId] <= 0) return false;
+  const mon = state.party[targetPartyIndex] || state.party[0];
+  if (!mon) return false;
+
+  if (item.kind === "repel") {
+    state.bag[itemId]--;
+    if (state.bag[itemId] <= 0) delete state.bag[itemId];
+    state.repelSteps = item.steps;
+    audio.playSfx("blip");
+    const msg = `RED sprayed ${item.name}! Wild POKéMON will be repelled for ${item.steps} steps.`;
+    state.martStatusText = msg;
+    state.pcStatusText = msg;
+    renderFacilityModals();
+    return true;
+  }
+
+  if (itemId === "ESCAPE_ROPE") {
+    state.bag[itemId]--;
+    if (state.bag[itemId] <= 0) delete state.bag[itemId];
+    state.activeFacility = null;
+    renderFacilityModals();
+    audio.playSfx("warp");
+    const dest = state.lastOutdoorMap?.mapConst || "PALLET_TOWN";
+    loadZone(dest, { warpIndex: state.lastOutdoorMap?.warpIndex || 0 });
+    return true;
+  }
+
+  if (item.kind === "heal" || item.kind === "status") {
+    if (mon.hp <= 0 && !item.revivePct) {
+      const msg = `${mon.nickname} has fainted! Use a REVIVE or visit a POKéMON CENTER first.`;
+      state.martStatusText = msg;
+      state.pcStatusText = msg;
+      renderFacilityModals();
+      return false;
+    }
+    state.bag[itemId]--;
+    if (state.bag[itemId] <= 0) delete state.bag[itemId];
+    const prevHp = mon.hp;
+    mon.hp = Math.min(mon.maxHp, mon.hp + (item.healHp || 20));
+    if (item.cureStatus) mon.status = null;
+    audio.playSfx("heal");
+    const msg = `Used ${item.name} on ${mon.nickname}! Restored ${mon.hp - prevHp} HP (${mon.hp}/${mon.maxHp}).`;
+    state.martStatusText = msg;
+    state.pcStatusText = msg;
+    updateHudTelemetry();
+    renderFacilityModals();
+    return true;
+  }
+
+  if (item.kind === "revive") {
+    state.bag[itemId]--;
+    if (state.bag[itemId] <= 0) delete state.bag[itemId];
+    mon.hp = Math.max(1, Math.floor(mon.maxHp * (item.revivePct || 0.5)));
+    mon.status = null;
+    audio.playSfx("heal");
+    const msg = `${mon.nickname} was revived by ${item.name} (${mon.hp}/${mon.maxHp} HP)!`;
+    state.martStatusText = msg;
+    state.pcStatusText = msg;
+    updateHudTelemetry();
+    renderFacilityModals();
+    return true;
+  }
+
+  if (item.kind === "level") {
+    state.bag[itemId]--;
+    if (state.bag[itemId] <= 0) delete state.bag[itemId];
+    const upgraded = engine.createPokemonInstance(mon.species, mon.level + 1);
+    mon.level = upgraded.level;
+    mon.maxHp = upgraded.maxHp;
+    mon.hp = upgraded.maxHp;
+    mon.atk = upgraded.atk;
+    mon.def = upgraded.def;
+    mon.spd = upgraded.spd;
+    mon.spc = upgraded.spc;
+    mon.moves = upgraded.moves;
+    audio.playSfx("victory");
+    const msg = `${mon.nickname} grew to Lv.${mon.level}! All stats increased!`;
+    state.martStatusText = msg;
+    state.pcStatusText = msg;
+    updateHudTelemetry();
+    renderFacilityModals();
+    return true;
+  }
+
+  if (item.kind === "vitamin") {
+    state.bag[itemId]--;
+    if (state.bag[itemId] <= 0) delete state.bag[itemId];
+    mon[item.stat] = (mon[item.stat] || 20) + item.boost;
+    if (item.stat === "maxHp") mon.hp += item.boost;
+    audio.playSfx("heal");
+    const msg = `${mon.nickname}'s ${item.stat.toUpperCase()} rose after taking ${item.name}!`;
+    state.martStatusText = msg;
+    state.pcStatusText = msg;
+    updateHudTelemetry();
+    renderFacilityModals();
+    return true;
+  }
+
+  if (item.kind === "stone") {
+    // Authentic Pokémon Yellow: Partner Pikachu refuses the Thunder Stone!
+    if (itemId === "THUNDER_STONE" && mon.species === "PIKACHU") {
+      audio.playSfx("pika");
+      triggerEmote("shock", 2000);
+      const msg =
+        "PIKACHU: Pika-pi!! (PIKACHU batted the THUNDER STONE away! It refuses to evolve!)";
+      state.martStatusText = msg;
+      state.pcStatusText = msg;
+      renderFacilityModals();
+      return false;
+    }
+    const targetSpecies = item.evolves && item.evolves[mon.species];
+    if (!targetSpecies) {
+      const msg = `${item.name} had no effect on ${mon.nickname}.`;
+      state.martStatusText = msg;
+      state.pcStatusText = msg;
+      renderFacilityModals();
+      return false;
+    }
+    state.bag[itemId]--;
+    if (state.bag[itemId] <= 0) delete state.bag[itemId];
+    const oldName = mon.nickname;
+    const evolved = engine.createPokemonInstance(targetSpecies, mon.level);
+    mon.species = evolved.species;
+    mon.nickname = evolved.nickname;
+    mon.maxHp = evolved.maxHp;
+    mon.hp = evolved.maxHp;
+    mon.atk = evolved.atk;
+    mon.def = evolved.def;
+    mon.spd = evolved.spd;
+    mon.spc = evolved.spc;
+    mon.types = evolved.types;
+    mon.moves = evolved.moves;
+    state.pokedexOwned.add(mon.species);
+    state.pokedexSeen.add(mon.species);
+    audio.playSfx("victory");
+    const msg = `Congratulations! Your ${oldName} evolved into ${mon.nickname}!`;
+    state.martStatusText = msg;
+    state.pcStatusText = msg;
+    updateHudTelemetry();
+    renderFacilityModals();
+    return true;
+  }
+
+  return false;
+}
+
+function renderFacilityModals() {
+  const pcModal = document.getElementById("pokecenter-overlay");
+  const martModal = document.getElementById("mart-overlay");
+
+  if (pcModal) {
+    if (state.activeFacility !== "pokecenter") {
+      pcModal.classList.add("hidden");
+    } else {
+      pcModal.classList.remove("hidden");
+      document.getElementById("pokecenter-title").textContent =
+        state.currentZone.constName === "REDS_HOUSE_2F"
+          ? "💻 RED'S BEDROOM PC"
+          : `🏥 ${state.currentZone.displayName.toUpperCase()}`;
+      document.getElementById("pokecenter-status-msg").textContent =
+        state.pcStatusText;
+
+      document.querySelectorAll("[data-pc-tab]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.pcTab === state.pcActiveTab);
+      });
+
+      const body = document.getElementById("pokecenter-body");
+      body.innerHTML = "";
+
+      if (state.pcActiveTab === "heal") {
+        const healBtn = document.createElement("button");
+        healBtn.className = "fac-primary-btn";
+        healBtn.textContent = "❤️ HEAL PARTY TO 100% HP & PP";
+        healBtn.onclick = () => healPartyAtPokeCenter(false);
+        body.appendChild(healBtn);
+
+        state.party.forEach((mon, idx) => {
+          const row = document.createElement("div");
+          row.className = "fac-row";
+          const movesStr = mon.moves
+            .map((m) => `${m.name} (${m.pp}/${m.maxPp})`)
+            .join(", ");
+          row.innerHTML = `
+            <div class="fac-row-main">
+              <span class="fac-row-title">#${idx + 1} ${mon.nickname} :L${mon.level} [${mon.types.join("/")}]</span>
+              <span class="fac-row-sub">HP: ${mon.hp}/${mon.maxHp} • ${movesStr}</span>
+            </div>
+            <div class="fac-row-actions">
+              ${
+                idx > 0
+                  ? `<button type="button" class="fac-mini-btn secondary" data-lead-idx="${idx}">Make Lead</button>`
+                  : `<span class="fac-row-sub">★ LEAD</span>`
+              }
+            </div>
+          `;
+          const leadBtn = row.querySelector("[data-lead-idx]");
+          if (leadBtn) {
+            leadBtn.onclick = () => {
+              const [chosen] = state.party.splice(idx, 1);
+              state.party.unshift(chosen);
+              state.pcStatusText = `${chosen.nickname} is now your lead POKéMON!`;
+              renderFacilityModals();
+            };
+          }
+          body.appendChild(row);
+        });
+      } else if (state.pcActiveTab === "bill") {
+        // Bill's PC: Box selector + Party Deposit + Box Withdraw
+        const boxBar = document.createElement("div");
+        boxBar.className = "fac-row";
+        const box = state.pcBoxes[state.currentBoxIndex];
+        boxBar.innerHTML = `
+          <div class="fac-row-main">
+            <span class="fac-row-title">💻 ACTIVE STORAGE: ${box.name} (${box.list.length}/20)</span>
+            <span class="fac-row-sub">Party: ${state.party.length}/6 • Deposit from Party or Withdraw from Box</span>
+          </div>
+          <div class="fac-row-actions"></div>
+        `;
+        const boxActs = boxBar.querySelector(".fac-row-actions");
+        state.pcBoxes.forEach((b, bIdx) => {
+          const bBtn = document.createElement("button");
+          bBtn.className = `fac-mini-btn ${
+            bIdx === state.currentBoxIndex ? "" : "secondary"
+          }`;
+          bBtn.textContent = `B${bIdx + 1}`;
+          bBtn.onclick = () => {
+            state.currentBoxIndex = bIdx;
+            audio.playSfx("pc");
+            state.pcStatusText = `Switched to ${state.pcBoxes[bIdx].name}!`;
+            renderFacilityModals();
+          };
+          boxActs.appendChild(bBtn);
+        });
+        body.appendChild(boxBar);
+
+        // Party section (Deposit)
+        state.party.forEach((mon, idx) => {
+          const row = document.createElement("div");
+          row.className = "fac-row";
+          row.innerHTML = `
+            <div class="fac-row-main">
+              <span class="fac-row-title">[PARTY #${idx + 1}] ${mon.nickname} :L${mon.level}</span>
+              <span class="fac-row-sub">HP ${mon.hp}/${mon.maxHp} • ${mon.types.join("/")}</span>
+            </div>
+            <div class="fac-row-actions">
+              <button type="button" class="fac-mini-btn secondary">Deposit → Box</button>
+            </div>
+          `;
+          row.querySelector("button").onclick = () => depositPartyPokemonToPc(idx);
+          body.appendChild(row);
+        });
+
+        // Box section (Withdraw)
+        if (box.list.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "fac-row";
+          empty.innerHTML = `<span class="fac-row-sub">${box.name} is currently empty.</span>`;
+          body.appendChild(empty);
+        } else {
+          box.list.forEach((mon, bIdx) => {
+            const row = document.createElement("div");
+            row.className = "fac-row";
+            row.innerHTML = `
+              <div class="fac-row-main">
+                <span class="fac-row-title">[BOX] ${mon.nickname} :L${mon.level}</span>
+                <span class="fac-row-sub">HP ${mon.hp}/${mon.maxHp} • ${mon.types.join("/")}</span>
+              </div>
+              <div class="fac-row-actions">
+                <button type="button" class="fac-mini-btn">← Withdraw</button>
+              </div>
+            `;
+            row.querySelector("button").onclick = () =>
+              withdrawPokemonFromPc(bIdx);
+            body.appendChild(row);
+          });
+        }
+      } else if (state.pcActiveTab === "redpc") {
+        // Red's PC: Item Storage (Withdraw from PC / Deposit from Bag / Use on Lead)
+        const pcEntries = Object.entries(state.pcItemStorage).filter(
+          ([, c]) => c > 0
+        );
+        const bagEntries = Object.entries(state.bag).filter(([, c]) => c > 0);
+
+        pcEntries.forEach(([itemId, count]) => {
+          const info = ITEM_CATALOG[itemId] || {
+            name: itemId,
+            desc: "Stored item",
+          };
+          const row = document.createElement("div");
+          row.className = "fac-row";
+          row.innerHTML = `
+            <div class="fac-row-main">
+              <span class="fac-row-title">[PC BOX] ${info.name} ×${count}</span>
+              <span class="fac-row-sub">${info.desc}</span>
+            </div>
+            <div class="fac-row-actions">
+              <button type="button" class="fac-mini-btn">Withdraw ×1</button>
+            </div>
+          `;
+          row.querySelector("button").onclick = () => withdrawItemFromPc(itemId);
+          body.appendChild(row);
+        });
+
+        bagEntries.forEach(([itemId, count]) => {
+          const info = ITEM_CATALOG[itemId] || {
+            name: itemId,
+            desc: "Bag item",
+          };
+          const row = document.createElement("div");
+          row.className = "fac-row";
+          row.innerHTML = `
+            <div class="fac-row-main">
+              <span class="fac-row-title">[BAG] ${info.name} ×${count}</span>
+              <span class="fac-row-sub">${info.desc}</span>
+            </div>
+            <div class="fac-row-actions">
+              <button type="button" class="fac-mini-btn" data-act="use">Use</button>
+              <button type="button" class="fac-mini-btn secondary" data-act="dep">Deposit</button>
+            </div>
+          `;
+          row.querySelector('[data-act="use"]').onclick = () =>
+            useBagItemOnParty(itemId, 0);
+          row.querySelector('[data-act="dep"]').onclick = () =>
+            depositItemToPc(itemId);
+          body.appendChild(row);
+        });
+      } else if (state.pcActiveTab === "oak") {
+        const ratingRow = document.createElement("div");
+        ratingRow.className = "fac-row";
+        ratingRow.innerHTML = `
+          <div class="fac-row-main">
+            <span class="fac-row-title">PROF. OAK'S POKéDEX EVALUATION</span>
+            <span class="fac-row-sub">POKéMON Seen: ${state.pokedexSeen.size} / 151 • POKéMON Owned: ${state.pokedexOwned.size} / 151</span>
+            <span class="fac-row-sub">Zones Visited: ${state.visitedZones.size} / 220 • Money: ¥${state.money.toLocaleString()}</span>
+            <span class="fac-row-sub">"OAK: Good! I see you and PIKACHU are working hard filling your POKéDEX!"</span>
+          </div>
+        `;
+        body.appendChild(ratingRow);
+      }
+    }
+  }
+
+  if (martModal) {
+    if (state.activeFacility !== "mart") {
+      martModal.classList.add("hidden");
+    } else {
+      martModal.classList.remove("hidden");
+      const martZone =
+        engine.zonesByConst[state.martZoneConst] || state.currentZone;
+      document.getElementById("mart-title").textContent = `🛒 ${martZone.displayName.toUpperCase()}`;
+      document.getElementById("mart-money-badge").textContent = `¥${state.money.toLocaleString()}`;
+      document.getElementById("mart-status-msg").textContent =
+        state.martStatusText;
+
+      document.querySelectorAll("[data-mart-tab]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.martTab === state.martActiveTab);
+      });
+
+      const body = document.getElementById("mart-body");
+      body.innerHTML = "";
+
+      if (state.martActiveTab === "buy" || state.martActiveTab === "all") {
+        const stockIds =
+          state.martActiveTab === "all"
+            ? Object.keys(ITEM_CATALOG).filter((k) => ITEM_CATALOG[k].price > 0)
+            : MART_STOCKS[state.martZoneConst] || MART_STOCKS.VIRIDIAN_MART;
+
+        stockIds.forEach((itemId) => {
+          const item = ITEM_CATALOG[itemId];
+          if (!item) return;
+          const owned = state.bag[itemId] || 0;
+          const row = document.createElement("div");
+          row.className = "fac-row";
+          row.innerHTML = `
+            <div class="fac-row-main">
+              <span class="fac-row-title">${item.name} — ¥${item.price.toLocaleString()} <small>(In Bag: ${owned})</small></span>
+              <span class="fac-row-sub">${item.desc}</span>
+            </div>
+            <div class="fac-row-actions">
+              <button type="button" class="fac-mini-btn" data-qty="1">Buy ×1</button>
+              <button type="button" class="fac-mini-btn secondary" data-qty="5">×5</button>
+            </div>
+          `;
+          row.querySelector('[data-qty="1"]').onclick = () =>
+            buyMartItem(itemId, 1);
+          row.querySelector('[data-qty="5"]').onclick = () =>
+            buyMartItem(itemId, 5);
+          body.appendChild(row);
+        });
+      } else if (state.martActiveTab === "sell") {
+        const bagEntries = Object.entries(state.bag).filter(([, c]) => c > 0);
+        if (bagEntries.length === 0) {
+          body.innerHTML = `<div class="fac-row"><span class="fac-row-sub">Your BAG is currently empty.</span></div>`;
+        } else {
+          bagEntries.forEach(([itemId, count]) => {
+            const item = ITEM_CATALOG[itemId] || {
+              name: itemId,
+              price: 200,
+              desc: "",
+            };
+            const sellVal = Math.max(50, Math.floor(item.price / 2));
+            const row = document.createElement("div");
+            row.className = "fac-row";
+            row.innerHTML = `
+              <div class="fac-row-main">
+                <span class="fac-row-title">${item.name} ×${count}</span>
+                <span class="fac-row-sub">Sell value: ¥${sellVal.toLocaleString()} each</span>
+              </div>
+              <div class="fac-row-actions">
+                <button type="button" class="fac-mini-btn">Sell ×1</button>
+              </div>
+            `;
+            row.querySelector("button").onclick = () => sellBagItem(itemId, 1);
+            body.appendChild(row);
+          });
+        }
+      } else if (state.martActiveTab === "bag") {
+        const bagEntries = Object.entries(state.bag).filter(([, c]) => c > 0);
+        if (bagEntries.length === 0) {
+          body.innerHTML = `<div class="fac-row"><span class="fac-row-sub">Your BAG is empty.</span></div>`;
+        } else {
+          bagEntries.forEach(([itemId, count]) => {
+            const item = ITEM_CATALOG[itemId] || {
+              name: itemId,
+              desc: "",
+            };
+            const row = document.createElement("div");
+            row.className = "fac-row";
+            row.innerHTML = `
+              <div class="fac-row-main">
+                <span class="fac-row-title">${item.name} ×${count}</span>
+                <span class="fac-row-sub">${item.desc}</span>
+              </div>
+              <div class="fac-row-actions">
+                <button type="button" class="fac-mini-btn">Use on ${
+                  state.party[0]?.nickname || "Lead"
+                }</button>
+              </div>
+            `;
+            row.querySelector("button").onclick = () =>
+              useBagItemOnParty(itemId, 0);
+            body.appendChild(row);
+          });
+        }
       }
     }
   }
@@ -699,16 +2074,33 @@ function advanceDialogue() {
     audio.playSfx("blip");
     renderDialogueModal();
   } else {
+    const onFinish = state.dialogue.onFinish;
     state.dialogue = null;
     renderDialogueModal();
+    if (typeof onFinish === "function") {
+      onFinish();
+    }
   }
+}
+
+// ============================================================================
+// AUTHENTIC GEN 1 WILD & TRAINER BATTLE ENGINE
+// ============================================================================
+
+function ensureHealthyPlayerLead() {
+  let idx = state.party.findIndex((m) => m.hp > 0);
+  if (idx === -1) {
+    // Emergency revive lead so player is never soft-locked
+    state.party[0].hp = state.party[0].maxHp;
+    idx = 0;
+  }
+  return idx;
 }
 
 export function triggerWildEncounter(poolOrEntry) {
   let level = 5;
   let species = "PIDGEY";
   if (Array.isArray(poolOrEntry) && Array.isArray(poolOrEntry[0])) {
-    // Gen 1 slot weights: 20%, 20%, 15%, 10%, 10%, 10%, 5%, 5%, 4%, 1%
     const pick = poolOrEntry[Math.floor(Math.random() * poolOrEntry.length)];
     level = pick[0];
     species = pick[1];
@@ -716,19 +2108,264 @@ export function triggerWildEncounter(poolOrEntry) {
     level = poolOrEntry[0];
     species = poolOrEntry[1];
   }
-  const maxHp = 14 + level * 3;
+  const foeMon = engine.createPokemonInstance(species, level);
+  state.pokedexSeen.add(foeMon.species);
+  const playerIdx = ensureHealthyPlayerLead();
+
   state.battle = {
-    species,
-    level,
-    hp: maxHp,
-    maxHp,
-    playerHp: 68,
-    playerMaxHp: 68,
-    log: `Wild ${species.replace(/_/g, " ")} (Lv.${level}) appeared in ${state.currentZone.displayName}!`,
+    isWild: true,
+    trainerName: null,
+    trainerSpriteObj: null,
+    npcRef: null,
+    enemyParty: [foeMon],
+    enemyIndex: 0,
+    playerIndex: playerIdx,
+    subMenu: null, // null | "bag" | "pkmn"
+    log: `Wild ${foeMon.nickname} (Lv.${foeMon.level}) appeared in ${state.currentZone.displayName}!`,
+    endBattleText: null,
     finished: false,
   };
   audio.playSfx("thunder");
   renderBattleModal();
+}
+
+export function triggerTrainerBattle(npcOrProfile) {
+  const prof = npcOrProfile?.battle || npcOrProfile;
+  if (!prof || !Array.isArray(prof.party) || prof.party.length === 0) return;
+
+  const enemyParty = prof.party.map(([lv, sp]) => {
+    const m = engine.createPokemonInstance(sp, lv);
+    state.pokedexSeen.add(m.species);
+    return m;
+  });
+
+  const playerIdx = ensureHealthyPlayerLead();
+  const trainerSpriteObj = prof.isWild
+    ? null
+    : engine.getTrainerSpriteObj(prof, npcOrProfile?.sprite);
+
+  state.battle = {
+    isWild: Boolean(prof.isWild),
+    trainerName: prof.trainerName || "PKMN TRAINER",
+    trainerSpriteObj,
+    npcRef: npcOrProfile?.battle ? npcOrProfile : null,
+    enemyParty,
+    enemyIndex: 0,
+    playerIndex: playerIdx,
+    subMenu: null,
+    log: prof.isWild
+      ? `${enemyParty[0].nickname} (Lv.${enemyParty[0].level}) attacked!`
+      : `${prof.trainerName} wants to battle! Sent out ${enemyParty[0].nickname} (Lv.${enemyParty[0].level})!`,
+    endBattleText: prof.endBattleText || "What an incredible battle!",
+    finished: false,
+  };
+  audio.playSfx("thunder");
+  renderBattleModal();
+}
+
+function calcGen1Damage(attacker, defender, move) {
+  if (!move.power || move.power <= 0) {
+    return { damage: 0, eff: 1, crit: false };
+  }
+  const eff = engine.getTypeEffectiveness(move.type, defender.types);
+  if (eff === 0) {
+    return { damage: 0, eff: 0, crit: false };
+  }
+  const crit = Math.random() < Math.min(0.25, (attacker.spd || 50) / 512);
+  const lv = crit ? attacker.level * 2 : attacker.level;
+  const specialTypes = new Set([
+    "FIRE",
+    "WATER",
+    "GRASS",
+    "ELECTRIC",
+    "ICE",
+    "PSYCHIC",
+    "DRAGON",
+  ]);
+  const isSpec = specialTypes.has(move.type);
+  const atkStat = Math.max(1, isSpec ? attacker.spc : attacker.atk);
+  const defStat = Math.max(1, isSpec ? defender.spc : defender.def);
+  const stab = attacker.types.includes(move.type) ? 1.5 : 1.0;
+  const rand = 0.85 + Math.random() * 0.15;
+
+  const baseDmg =
+    (((2 * lv) / 5 + 2) * move.power * (atkStat / defStat)) / 50 + 2;
+  const finalDmg = Math.max(1, Math.floor(baseDmg * stab * eff * rand));
+  return { damage: finalDmg, eff, crit };
+}
+
+function executePlayerMoveInBattle(moveIndex) {
+  const b = state.battle;
+  if (!b || b.finished) return;
+  const playerMon = state.party[b.playerIndex];
+  const foeMon = b.enemyParty[b.enemyIndex];
+  if (!playerMon || !foeMon) return;
+
+  const mv = playerMon.moves[moveIndex] || playerMon.moves[0];
+  if (mv.pp > 0) mv.pp--;
+
+  audio.playSfx("thunder");
+
+  // Status/non-damaging move handling
+  let msg = `${playerMon.nickname} used ${mv.name}!`;
+  if (!mv.power || mv.power <= 0) {
+    const statBonus = Math.max(2, Math.floor(playerMon.level * 0.35));
+    playerMon.atk += statBonus;
+    foeMon.hp = Math.max(0, foeMon.hp - statBonus);
+    msg += ` Foe ${foeMon.nickname} was disrupted (-${statBonus} HP)!`;
+  } else {
+    const { damage, eff, crit } = calcGen1Damage(playerMon, foeMon, mv);
+    foeMon.hp = Math.max(0, foeMon.hp - damage);
+    if (eff === 0) msg += " It had no effect!";
+    else {
+      if (crit) msg += " Critical hit!";
+      if (eff > 1) msg += " It's super effective!";
+      else if (eff < 1) msg += " It's not very effective...";
+      msg += ` (-${damage} HP)`;
+    }
+  }
+
+  // Check if Foe Pokémon fainted
+  if (foeMon.hp <= 0) {
+    const expGain = Math.max(12, Math.floor((foeMon.baseExp * foeMon.level) / 5));
+    playerMon.exp += expGain;
+    msg += ` Foe ${foeMon.nickname} fainted! (+${expGain} EXP)`;
+
+    // Check level-up
+    const nextLvExp = Math.pow(playerMon.level + 1, 3);
+    if (playerMon.exp >= nextLvExp && playerMon.level < 100) {
+      const nextInst = engine.createPokemonInstance(
+        playerMon.species,
+        playerMon.level + 1
+      );
+      playerMon.level = nextInst.level;
+      playerMon.maxHp = nextInst.maxHp;
+      playerMon.hp = nextInst.maxHp;
+      playerMon.atk = nextInst.atk;
+      playerMon.def = nextInst.def;
+      playerMon.spd = nextInst.spd;
+      playerMon.spc = nextInst.spc;
+      msg += ` ${playerMon.nickname} grew to Lv.${playerMon.level}!`;
+    }
+
+    // Check if Trainer has another Pokémon
+    if (b.enemyIndex + 1 < b.enemyParty.length) {
+      b.enemyIndex++;
+      const nextFoe = b.enemyParty[b.enemyIndex];
+      state.pokedexSeen.add(nextFoe.species);
+      b.log = `${msg} ${b.trainerName} sent out ${nextFoe.nickname} (Lv.${nextFoe.level})!`;
+      updateHudTelemetry();
+      renderBattleModal();
+      return;
+    }
+
+    // Battle won!
+    b.finished = true;
+    audio.playSfx("victory");
+    if (!b.isWild) {
+      const prize = Math.max(200, foeMon.level * 45);
+      state.money += prize;
+      if (b.npcRef) b.npcRef.defeated = true;
+      b.log = `${msg} Defeated ${b.trainerName}! "${b.endBattleText}" Got ¥${prize.toLocaleString()} for winning!`;
+    } else {
+      if (b.npcRef && b.npcRef.sprite === "SPRITE_SNORLAX") {
+        b.npcRef.collected = true;
+      }
+      b.log = `${msg} Wild ${foeMon.nickname} was defeated!`;
+    }
+    updateHudTelemetry();
+    renderBattleModal();
+    return;
+  }
+
+  // Enemy counter-attack
+  enemyCounterTurn(msg);
+}
+
+function enemyCounterTurn(prefixMsg) {
+  const b = state.battle;
+  if (!b || b.finished) return;
+  const playerMon = state.party[b.playerIndex];
+  const foeMon = b.enemyParty[b.enemyIndex];
+  const foeMove =
+    foeMon.moves[Math.floor(Math.random() * foeMon.moves.length)] ||
+    engine.getMove("TACKLE");
+  const { damage, eff } = calcGen1Damage(foeMon, playerMon, foeMove);
+  const actualDmg = Math.max(1, damage || Math.floor(foeMon.level * 0.35));
+  playerMon.hp = Math.max(0, playerMon.hp - actualDmg);
+
+  let enemyMsg = ` Foe ${foeMon.nickname} used ${foeMove.name} (-${actualDmg} HP)!`;
+  if (eff > 1) enemyMsg += " Super effective!";
+
+  if (playerMon.hp <= 0) {
+    const nextAlive = state.party.findIndex((m) => m.hp > 0);
+    if (nextAlive !== -1) {
+      b.playerIndex = nextAlive;
+      enemyMsg += ` ${playerMon.nickname} fainted! Go, ${state.party[nextAlive].nickname}!`;
+    } else {
+      // Heal party so player can continue exploring
+      for (const m of state.party) m.hp = m.maxHp;
+      b.finished = true;
+      enemyMsg += ` All POKéMON fainted! Rushed to POKéMON CENTER and restored party!`;
+    }
+  }
+
+  b.log = `${prefixMsg}${enemyMsg}`;
+  updateHudTelemetry();
+  renderBattleModal();
+}
+
+function throwBallInBattle(ballId = "POKE_BALL") {
+  const b = state.battle;
+  if (!b || b.finished) return;
+  if (!b.isWild) {
+    audio.playSfx("bump");
+    b.log =
+      "The trainer blocked the BALL! Don't be a thief! (Only wild POKéMON can be caught!)";
+    renderBattleModal();
+    return;
+  }
+
+  const ball = ITEM_CATALOG[ballId] || ITEM_CATALOG.POKE_BALL;
+  if (state.bag[ballId] && state.bag[ballId] > 0) {
+    state.bag[ballId]--;
+    if (state.bag[ballId] <= 0) delete state.bag[ballId];
+  }
+
+  const foeMon = b.enemyParty[b.enemyIndex];
+  audio.playSfx("warp");
+
+  const hpFactor = (3 * foeMon.maxHp - 2 * foeMon.hp) / (3 * foeMon.maxHp);
+  const catchChance =
+    ball.catchMult >= 255
+      ? 1.0
+      : Math.min(0.95, Math.max(0.35, hpFactor * 0.65 * (ball.catchMult || 1)));
+
+  if (Math.random() <= catchChance) {
+    foeMon.hp = foeMon.maxHp;
+    state.pokedexOwned.add(foeMon.species);
+    state.pokedexSeen.add(foeMon.species);
+    let destStr = "";
+    if (state.party.length < 6) {
+      state.party.push(foeMon);
+      destStr = `Added ${foeMon.nickname} to your PARTY (${state.party.length}/6)!`;
+    } else {
+      const box = state.pcBoxes[state.currentBoxIndex];
+      box.list.push(foeMon);
+      destStr = `PARTY is full (6/6) — ${foeMon.nickname} was transferred to ${box.name} in BILL'S PC!`;
+    }
+    if (b.npcRef && b.npcRef.sprite === "SPRITE_SNORLAX") {
+      b.npcRef.collected = true;
+    }
+    b.finished = true;
+    audio.playSfx("victory");
+    b.log = `RED used ${ball.name}! Gotcha! ${foeMon.nickname} (Lv.${foeMon.level}) was caught! ${destStr}`;
+    updateHudTelemetry();
+    renderBattleModal();
+  } else {
+    b.subMenu = null;
+    enemyCounterTurn(`RED threw a ${ball.name}! Shoot! It was so close too!`);
+  }
 }
 
 // Render functions for Modals & Inspector UI
@@ -781,6 +2418,28 @@ function renderDialogueModal() {
   } else {
     elevBox.classList.add("hidden");
   }
+
+  const extraBox = document.getElementById("dialogue-extra-actions");
+  if (extraBox) {
+    if (
+      Array.isArray(state.dialogue.extraActions) &&
+      state.dialogue.extraActions.length > 0
+    ) {
+      extraBox.classList.remove("hidden");
+      extraBox.innerHTML = "";
+      state.dialogue.extraActions.forEach((act) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "gb-action-chip";
+        btn.textContent = act.label;
+        btn.onclick = act.onClick;
+        extraBox.appendChild(btn);
+      });
+    } else {
+      extraBox.classList.add("hidden");
+      extraBox.innerHTML = "";
+    }
+  }
 }
 
 function renderBattleModal() {
@@ -792,67 +2451,221 @@ function renderBattleModal() {
   }
   modal.classList.remove("hidden");
   const b = state.battle;
-  document.getElementById("battle-foe-name").textContent =
-    b.species.replace(/_/g, " ");
-  document.getElementById("battle-foe-lv").textContent = `:L${b.level}`;
-  const foePct = Math.max(0, Math.round((b.hp / b.maxHp) * 100));
+  const foeMon = b.enemyParty[b.enemyIndex] || b.enemyParty[0];
+  const playerMon = state.party[b.playerIndex] || state.party[0];
+
+  document.getElementById("battle-foe-name").textContent = b.isWild
+    ? foeMon.nickname
+    : `${foeMon.nickname}`;
+  document.getElementById("battle-foe-lv").textContent = `:L${foeMon.level}`;
+
+  const foeBallsEl = document.getElementById("battle-foe-balls");
+  if (foeBallsEl) {
+    foeBallsEl.textContent = b.enemyParty
+      .map((m) => (m.hp > 0 ? "●" : "○"))
+      .join("");
+  }
+
+  const foePct = Math.max(0, Math.round((foeMon.hp / foeMon.maxHp) * 100));
   const foeBar = document.getElementById("battle-foe-hp-fill");
   foeBar.style.width = `${foePct}%`;
   foeBar.style.background =
     foePct > 50 ? "#22c55e" : foePct > 20 ? "#eab308" : "#ef4444";
 
-  const playerPct = Math.max(0, Math.round((b.playerHp / b.playerMaxHp) * 100));
-  document.getElementById("battle-player-hp-fill").style.width = `${playerPct}%`;
-  document.getElementById("battle-player-hp-nums").textContent = `${b.playerHp}/${b.playerMaxHp}`;
+  document.getElementById("battle-player-name").textContent =
+    playerMon.nickname;
+  document.getElementById("battle-player-lv").textContent = `:L${playerMon.level}`;
+
+  const playerBallsEl = document.getElementById("battle-player-balls");
+  if (playerBallsEl) {
+    playerBallsEl.textContent = state.party
+      .map((m) => (m.hp > 0 ? "●" : "○"))
+      .join("");
+  }
+
+  const playerPct = Math.max(
+    0,
+    Math.round((playerMon.hp / playerMon.maxHp) * 100)
+  );
+  const playerBar = document.getElementById("battle-player-hp-fill");
+  playerBar.style.width = `${playerPct}%`;
+  playerBar.style.background =
+    playerPct > 50 ? "#22c55e" : playerPct > 20 ? "#eab308" : "#ef4444";
+
+  document.getElementById(
+    "battle-player-hp-nums"
+  ).textContent = `${playerMon.hp}/${playerMon.maxHp}`;
   document.getElementById("battle-log-text").textContent = b.log;
 
-  // Draw sprites
+  // Draw Trainer Badge Sprite if Trainer battle
+  const trainerCanvas = document.getElementById("battle-trainer-canvas");
+  if (trainerCanvas) {
+    if (!b.isWild && b.trainerSpriteObj) {
+      trainerCanvas.classList.remove("hidden");
+      engine.render2BitGraphicToCanvas(
+        trainerCanvas,
+        b.trainerSpriteObj,
+        state.currentZone.palette
+      );
+    } else {
+      trainerCanvas.classList.add("hidden");
+    }
+  }
+
+  // Draw Enemy Pokémon Front Sprite
   const foeCanvas = document.getElementById("battle-foe-canvas");
   const foeSpr =
-    engine.pokemonSprites[b.species] || engine.pokemonSprites.PIDGEY;
+    engine.pokemonSprites[foeMon.species] || engine.pokemonSprites.PIDGEY;
   engine.render2BitGraphicToCanvas(foeCanvas, foeSpr, state.currentZone.palette);
 
+  // Draw Player Pokémon Back Sprite
   const backCanvas = document.getElementById("battle-player-canvas");
+  const backSpr =
+    engine.pokemonSprites[`${playerMon.species}_BACK`] ||
+    engine.pokemonSprites.PIKACHU_BACK;
   engine.render2BitGraphicToCanvas(
     backCanvas,
-    engine.pokemonSprites.PIKACHU_BACK,
-    "PAL_YELLOWMON"
+    backSpr,
+    playerMon.species === "PIKACHU" ? "PAL_YELLOWMON" : state.currentZone.palette
   );
-}
 
-function executeBattleAction(action) {
-  const b = state.battle;
-  if (!b) return;
-  if (b.finished || action === "run") {
-    state.battle = null;
-    renderBattleModal();
+  // Render Sub-Panel (Bag items or Party Switch)
+  const subPanel = document.getElementById("battle-sub-panel");
+  if (subPanel) {
+    if (!b.subMenu || b.finished) {
+      subPanel.classList.add("hidden");
+      subPanel.innerHTML = "";
+    } else if (b.subMenu === "bag") {
+      subPanel.classList.remove("hidden");
+      subPanel.innerHTML = "";
+      const usableIds = [
+        "POKE_BALL",
+        "GREAT_BALL",
+        "ULTRA_BALL",
+        "MASTER_BALL",
+        "POTION",
+        "SUPER_POTION",
+        "HYPER_POTION",
+        "MAX_POTION",
+        "FULL_RESTORE",
+      ].filter((id) => (state.bag[id] || 0) > 0);
+      if (usableIds.length === 0) {
+        subPanel.innerHTML = `<span class="fac-row-sub">No usable battle items in BAG!</span>`;
+      } else {
+        usableIds.forEach((id) => {
+          const item = ITEM_CATALOG[id];
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "fac-mini-btn";
+          btn.textContent = `${item.name} ×${state.bag[id]}`;
+          btn.onclick = () => {
+            if (item.kind === "ball") {
+              throwBallInBattle(id);
+            } else {
+              useBagItemOnParty(id, b.playerIndex);
+              b.subMenu = null;
+              b.log = `RED used ${item.name} on ${playerMon.nickname}!`;
+              renderBattleModal();
+            }
+          };
+          subPanel.appendChild(btn);
+        });
+      }
+    } else if (b.subMenu === "pkmn") {
+      subPanel.classList.remove("hidden");
+      subPanel.innerHTML = "";
+      state.party.forEach((m, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `fac-mini-btn ${
+          idx === b.playerIndex ? "" : "secondary"
+        }`;
+        btn.textContent = `${m.nickname} :L${m.level} (${m.hp}/${m.maxHp})`;
+        btn.onclick = () => {
+          if (m.hp <= 0) return;
+          b.playerIndex = idx;
+          b.subMenu = null;
+          b.log = `Come back! Go, ${m.nickname}!`;
+          renderBattleModal();
+        };
+        subPanel.appendChild(btn);
+      });
+    }
+  }
+
+  // Render Battle Move / Action Buttons
+  const grid = document.getElementById("battle-moves-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  if (b.finished) {
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "battle-btn";
+    closeBtn.style.gridColumn = "1 / -1";
+    closeBtn.textContent = "▶ CONTINUE OVERWORLD (SPACE / ENTER)";
+    closeBtn.onclick = () => {
+      state.battle = null;
+      renderBattleModal();
+    };
+    grid.appendChild(closeBtn);
     return;
   }
-  if (action === "ball") {
-    audio.playSfx("warp");
-    b.hp = 0;
-    b.finished = true;
-    b.log = `RED threw a POKé BALL! Gotcha! Wild ${b.species.replace(/_/g, " ")} was caught! (Click RUN/CLOSE to continue)`;
-    renderBattleModal();
-    return;
-  }
-  const dmg =
-    action === "thunderbolt"
-      ? Math.max(8, Math.floor(b.maxHp * 0.65))
-      : Math.max(5, Math.floor(b.maxHp * 0.42));
-  audio.playSfx("thunder");
-  b.hp = Math.max(0, b.hp - dmg);
-  const moveLabel =
-    action === "thunderbolt" ? "THUNDERBOLT" : "QUICK ATTACK";
-  if (b.hp === 0) {
-    b.finished = true;
-    b.log = `PIKACHU used ${moveLabel}! Wild ${b.species.replace(/_/g, " ")} fainted! PIKACHU gained ${b.level * 18} EXP!`;
-  } else {
-    const counterDmg = Math.max(1, Math.floor(b.level * 0.4));
-    b.playerHp = Math.max(1, b.playerHp - counterDmg);
-    b.log = `PIKACHU used ${moveLabel}! Wild ${b.species.replace(/_/g, " ")} used TACKLE (-${counterDmg} HP)!`;
-  }
-  renderBattleModal();
+
+  // Show up to 2 signature moves + BAG/BALL + PKMN/RUN so all 4 buttons fit cleanly
+  const m0 = playerMon.moves[0] || { name: "TACKLE", type: "NORMAL" };
+  const m1 = playerMon.moves[1] || playerMon.moves[0] || { name: "QUICK ATTACK", type: "NORMAL" };
+
+  const btnMove0 = document.createElement("button");
+  btnMove0.type = "button";
+  btnMove0.className = "battle-btn";
+  btnMove0.textContent = `⚔️ ${m0.name}`;
+  btnMove0.onclick = () => executePlayerMoveInBattle(0);
+  grid.appendChild(btnMove0);
+
+  const btnMove1 = document.createElement("button");
+  btnMove1.type = "button";
+  btnMove1.className = "battle-btn";
+  btnMove1.textContent = `⚡ ${m1.name}`;
+  btnMove1.onclick = () => executePlayerMoveInBattle(playerMon.moves[1] ? 1 : 0);
+  grid.appendChild(btnMove1);
+
+  const btnBag = document.createElement("button");
+  btnBag.type = "button";
+  btnBag.className = "battle-btn";
+  btnBag.textContent = b.isWild ? "🔴 BALL / BAG" : "🎒 BAG / HEAL";
+  btnBag.onclick = () => {
+    if (b.isWild && !b.subMenu) {
+      // Quick-throw best ball or open bag
+      const bestBall =
+        (state.bag.ULTRA_BALL && "ULTRA_BALL") ||
+        (state.bag.GREAT_BALL && "GREAT_BALL") ||
+        (state.bag.POKE_BALL && "POKE_BALL") ||
+        "POKE_BALL";
+      throwBallInBattle(bestBall);
+    } else {
+      b.subMenu = b.subMenu === "bag" ? null : "bag";
+      renderBattleModal();
+    }
+  };
+  grid.appendChild(btnBag);
+
+  const btnSwitchOrRun = document.createElement("button");
+  btnSwitchOrRun.type = "button";
+  btnSwitchOrRun.className = "battle-btn";
+  btnSwitchOrRun.textContent =
+    state.party.length > 1 ? "🔄 PKMN / RUN" : "🏃 RUN / CLOSE";
+  btnSwitchOrRun.onclick = () => {
+    if (b.subMenu !== "pkmn" && state.party.length > 1) {
+      b.subMenu = "pkmn";
+      // Also allow closing battle on second click
+      renderBattleModal();
+    } else {
+      state.battle = null;
+      renderBattleModal();
+    }
+  };
+  grid.appendChild(btnSwitchOrRun);
 }
 
 function getFilteredZones() {
@@ -942,7 +2755,6 @@ function renderKantoTownMap() {
   ctx.fillStyle = "#162436";
   ctx.fillRect(0, 0, W, H);
 
-  // Subtle grid
   ctx.strokeStyle = "rgba(148, 163, 184, 0.14)";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 16; i++) {
@@ -956,7 +2768,6 @@ function renderKantoTownMap() {
     ctx.stroke();
   }
 
-  // Group zones by (townMapX, townMapY)
   const coordMap = {};
   for (const z of engine.canonicalZones) {
     const key = `${z.townMapX},${z.townMapY}`;
@@ -983,7 +2794,6 @@ function renderKantoTownMap() {
     }
   }
 
-  // Highlight active zone's Kanto Town Map coordinate
   const cur = state.currentZone;
   const cx = cur.townMapX * cellW;
   const cy = cur.townMapY * cellH;
@@ -992,9 +2802,25 @@ function renderKantoTownMap() {
   ctx.strokeRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
 }
 
+function updateHudTelemetry() {
+  const partyEl = document.getElementById("hud-party-summary");
+  if (partyEl) {
+    const totalHp = state.party.reduce((acc, m) => acc + m.hp, 0);
+    const totalMax = state.party.reduce((acc, m) => acc + m.maxHp, 0) || 1;
+    const pct = Math.round((totalHp / totalMax) * 100);
+    const lead = state.party[0];
+    partyEl.textContent = `⚡ Party: ${state.party.length}/6 (${
+      lead ? `${lead.nickname} :L${lead.level}` : ""
+    } • ${pct}% HP)`;
+  }
+  const moneyEl = document.getElementById("hud-money");
+  if (moneyEl) {
+    moneyEl.textContent = `¥${state.money.toLocaleString()}`;
+  }
+}
+
 function updateCoordinatesUI() {
   const z = state.currentZone;
-  const ts = engine.tilesetsByConst[z.tileset];
   const tid = engine.getCollisionTileAtStep(z, state.player.x, state.player.y);
   const posEl = document.getElementById("hud-player-pos");
   if (posEl) {
@@ -1005,6 +2831,7 @@ function updateCoordinatesUI() {
       .toUpperCase()
       .padStart(2, "0")}`;
   }
+  updateHudTelemetry();
 }
 
 function updateUIForCurrentZone() {
@@ -1020,7 +2847,6 @@ function updateUIForCurrentZone() {
   updateCoordinatesUI();
   renderKantoTownMap();
 
-  // Highlight active row in zone list
   document.querySelectorAll(".zone-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.zoneConst === z.constName);
   });
@@ -1075,9 +2901,27 @@ function updateUIForCurrentZone() {
     });
   }
 
-  // Signs & NPCs
+  // Signs, PC Computers & NPCs
   const npcBox = document.getElementById("inspector-entities");
   npcBox.innerHTML = "";
+
+  // If this zone has a Pokémon Center PC or Red's House 2F PC, surface a direct Computer chip!
+  if (
+    z.tileset === "POKECENTER" ||
+    z.constName === "INDIGO_PLATEAU_LOBBY" ||
+    z.constName === "REDS_HOUSE_2F"
+  ) {
+    const pcBtn = document.createElement("button");
+    pcBtn.className = "entity-chip";
+    pcBtn.textContent =
+      z.constName === "REDS_HOUSE_2F"
+        ? "💻 RED'S PC (0,1) [Item & Box Storage]"
+        : "💻 POKéMON CENTER PC (13,3) [Bill's & Red's Storage]";
+    pcBtn.onclick = () =>
+      openPokeCenterModal(z.constName === "REDS_HOUSE_2F" ? "redpc" : "bill");
+    npcBox.appendChild(pcBtn);
+  }
+
   z.signs.forEach((s, idx) => {
     const btn = document.createElement("button");
     btn.className = "entity-chip sign-chip";
@@ -1085,24 +2929,41 @@ function updateUIForCurrentZone() {
       s.text.length > 42 ? "…" : ""
     }"`;
     btn.onclick = () => {
+      if (
+        z.constName === "CELADON_MART_ROOF" &&
+        s.text.toUpperCase().includes("VENDING")
+      ) {
+        openMartModal("buy", "CELADON_MART_ROOF");
+        return;
+      }
       audio.playSfx("blip");
       openDialogue(`SIGNPOST (${s.x}, ${s.y})`, s.text);
     };
     npcBox.appendChild(btn);
   });
+
   state.npcs.forEach((npc) => {
     const btn = document.createElement("button");
     btn.className = "entity-chip npc-chip";
-    btn.textContent = `${npc.name.replace(/_/g, " ")} (${npc.x},${npc.y})${
+    const up = npc.name.toUpperCase();
+    const roleTag =
+      npc.sprite === "SPRITE_NURSE" || up.includes("NURSE")
+        ? " [🏥 Heal & PC]"
+        : npc.sprite === "SPRITE_CLERK" || up.includes("CLERK")
+        ? " [🛒 Mart Shop]"
+        : npc.kind === "trainer"
+        ? " [⚔️ Trainer]"
+        : npc.kind === "item"
+        ? " [🔴 Item]"
+        : "";
+    btn.textContent = `${npc.name.replace(/_/g, " ")} (${npc.x},${npc.y})${roleTag}${
       !npc.defaultVisible ? " [Event]" : ""
     }`;
-    btn.onclick = () => {
-      audio.playSfx("blip");
-      openDialogue(npc.name.replace(/_/g, " "), npc.text);
-    };
+    btn.onclick = () => interactWithNpc(npc);
     npcBox.appendChild(btn);
   });
-  if (z.signs.length === 0 && state.npcs.length === 0) {
+
+  if (npcBox.children.length === 0) {
     npcBox.innerHTML = `<span class="muted-note">No signs or NPCs in this segment</span>`;
   }
 
@@ -1235,7 +3096,6 @@ let lastNpcTick = 0;
 const heldDirs = new Set();
 
 function gameLoop(now) {
-  // 1. Update water & flower tile animation counter every 280ms (matching ~20 Game Boy frames)
   if (now - lastAnimTick > 280) {
     lastAnimTick = now;
     engine.animCounter = (engine.animCounter + 1) & 7;
@@ -1244,7 +3104,6 @@ function gameLoop(now) {
     }
   }
 
-  // 2. Update Player smooth step interpolation
   if (state.player.moveAnim) {
     const anim = state.player.moveAnim;
     const t = Math.min(1, (now - anim.startTime) / anim.duration);
@@ -1280,13 +3139,22 @@ function gameLoop(now) {
 
       onPlayerStepCompleted();
     }
-  } else if (heldDirs.size > 0 && !state.dialogue && !state.battle) {
+  } else if (
+    heldDirs.size > 0 &&
+    !state.dialogue &&
+    !state.battle &&
+    !state.activeFacility
+  ) {
     const lastDir = Array.from(heldDirs).pop();
     attemptStep(lastDir);
   }
 
-  // 3. Gentle NPC wander for WALK NPCs
-  if (now - lastNpcTick > 1600 && !state.dialogue && !state.battle) {
+  if (
+    now - lastNpcTick > 1600 &&
+    !state.dialogue &&
+    !state.battle &&
+    !state.activeFacility
+  ) {
     lastNpcTick = now;
     for (const npc of state.npcs) {
       if (npc.movement !== "WALK" || npc.isWalking) continue;
@@ -1330,7 +3198,6 @@ function gameLoop(now) {
 }
 
 function setupControlsAndEvents() {
-  // Keyboard controls
   const keyToDir = {
     ArrowUp: "UP",
     KeyW: "UP",
@@ -1361,9 +3228,17 @@ function setupControlsAndEvents() {
       e.code === "KeyZ"
     ) {
       e.preventDefault();
-      interactInFront();
+      if (state.battle && state.battle.finished) {
+        state.battle = null;
+        renderBattleModal();
+      } else {
+        interactInFront();
+      }
     } else if (e.code === "KeyX" || e.code === "Escape") {
-      if (state.dialogue) {
+      if (state.activeFacility) {
+        state.activeFacility = null;
+        renderFacilityModals();
+      } else if (state.dialogue) {
         state.dialogue = null;
         renderDialogueModal();
       } else if (state.battle) {
@@ -1402,10 +3277,18 @@ function setupControlsAndEvents() {
   });
 
   document.getElementById("btn-gb-a")?.addEventListener("click", () => {
-    interactInFront();
+    if (state.battle && state.battle.finished) {
+      state.battle = null;
+      renderBattleModal();
+    } else {
+      interactInFront();
+    }
   });
   document.getElementById("btn-gb-b")?.addEventListener("click", () => {
-    if (state.dialogue) {
+    if (state.activeFacility) {
+      state.activeFacility = null;
+      renderFacilityModals();
+    } else if (state.dialogue) {
       state.dialogue = null;
       renderDialogueModal();
     } else if (state.battle) {
@@ -1422,7 +3305,7 @@ function setupControlsAndEvents() {
     openPikachuInteraction();
   });
 
-  // Click on Full Zone Canvas to teleport / walk or trigger warp!
+  // Click on Full Zone Canvas to teleport / walk, trigger warp, or open PC / NPC!
   const fullCanvas = document.getElementById("full-zone-canvas");
   fullCanvas?.addEventListener("click", (e) => {
     const rect = fullCanvas.getBoundingClientRect();
@@ -1436,6 +3319,20 @@ function setupControlsAndEvents() {
     const z = state.currentZone;
     if (stepX < 0 || stepX >= z.width * 2 || stepY < 0 || stepY >= z.height * 2) {
       return;
+    }
+    // Check if clicked on a Pokémon Center PC or Red's House 2F PC
+    if (isComputerTileAtStep(z, stepX, stepY)) {
+      openPokeCenterModal(z.constName === "REDS_HOUSE_2F" ? "redpc" : "bill");
+      return;
+    }
+    // Check if clicked on an NPC
+    for (const npc of state.npcs) {
+      if (!npc.defaultVisible && !state.showHiddenObjects) continue;
+      if (npc.collected) continue;
+      if (npc.x === stepX && npc.y === stepY) {
+        interactWithNpc(npc);
+        return;
+      }
     }
     // Check if clicked on a Warp
     const wHit = checkWarpAtStep(z, stepX, stepY);
@@ -1451,12 +3348,19 @@ function setupControlsAndEvents() {
     // Check if clicked on a Sign
     for (const s of z.signs) {
       if (s.x === stepX && s.y === stepY) {
+        if (
+          z.constName === "CELADON_MART_ROOF" &&
+          s.text.toUpperCase().includes("VENDING")
+        ) {
+          openMartModal("buy", "CELADON_MART_ROOF");
+          return;
+        }
         audio.playSfx("blip");
         openDialogue(`SIGNPOST (${s.x}, ${s.y})`, s.text);
         return;
       }
     }
-    // Otherwise move Red + Pikachu there and show entities on map
+    // Otherwise move Red + Pikachu there
     state.player.x = stepX;
     state.player.y = stepY;
     state.player.renderX = stepX;
@@ -1530,6 +3434,46 @@ function setupControlsAndEvents() {
   document.getElementById("btn-check-pikachu")?.addEventListener("click", () => {
     openPikachuInteraction();
   });
+
+  // Facility Toolbar & HUD Pill Buttons
+  document.getElementById("btn-open-pokecenter")?.addEventListener("click", () => {
+    openPokeCenterModal("heal");
+  });
+  document.getElementById("btn-open-mart")?.addEventListener("click", () => {
+    openMartModal("buy", state.currentZone.constName);
+  });
+  document.getElementById("btn-open-party")?.addEventListener("click", () => {
+    openPokeCenterModal("bill");
+  });
+  document.getElementById("hud-party-summary")?.addEventListener("click", () => {
+    openPokeCenterModal("bill");
+  });
+  document.getElementById("hud-money")?.addEventListener("click", () => {
+    openMartModal("buy", state.currentZone.constName);
+  });
+
+  // Facility Modal Tabs & Close Buttons
+  document.getElementById("pokecenter-close-btn")?.addEventListener("click", () => {
+    state.activeFacility = null;
+    renderFacilityModals();
+  });
+  document.querySelectorAll("[data-pc-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openPokeCenterModal(btn.dataset.pcTab);
+    });
+  });
+
+  document.getElementById("mart-close-btn")?.addEventListener("click", () => {
+    state.activeFacility = null;
+    renderFacilityModals();
+  });
+  document.querySelectorAll("[data-mart-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.martActiveTab = btn.dataset.martTab;
+      renderFacilityModals();
+    });
+  });
+
   document.getElementById("btn-audio-toggle")?.addEventListener("click", (e) => {
     const on = audio.toggle();
     e.currentTarget.textContent = on ? "🔊 BGM: ON" : "🔇 BGM: OFF";
@@ -1553,19 +3497,13 @@ function setupControlsAndEvents() {
     renderZoneList();
   });
 
-  // Dialogue & Battle buttons
+  // Dialogue buttons
   document.getElementById("dialogue-next-btn")?.addEventListener("click", () => {
     advanceDialogue();
   });
   document.getElementById("dialogue-close-btn")?.addEventListener("click", () => {
     state.dialogue = null;
     renderDialogueModal();
-  });
-
-  document.querySelectorAll("[data-battle-act]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      executeBattleAction(btn.dataset.battleAct);
-    });
   });
 
   // Visual Atlas modal
@@ -1597,10 +3535,24 @@ window.POKEYELLOW = {
   state,
   zones: engine.canonicalZones, // Exact 220 unique loadable Kanto zone segments
   allHeaders: engine.allZones, // All 224 ROM map headers
+  ITEM_CATALOG,
+  MART_STOCKS,
   loadZone,
   interactInFront,
+  interactWithNpc,
   openPikachuInteraction,
+  openPokeCenterModal,
+  healPartyAtPokeCenter,
+  depositPartyPokemonToPc,
+  withdrawPokemonFromPc,
+  depositItemToPc,
+  withdrawItemFromPc,
+  openMartModal,
+  buyMartItem,
+  sellBagItem,
+  useBagItemOnParty,
   triggerWildEncounter,
+  triggerTrainerBattle,
 };
 
 window.addEventListener("DOMContentLoaded", () => {

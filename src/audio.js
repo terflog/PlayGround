@@ -146,6 +146,32 @@ export class GameBoyAudio {
       [1567, 1318, 1046, 880, 1760, 1396].forEach((f, i) => {
         setTimeout(() => this.playNote(f, 55, "sawtooth", 0.4), i * 45);
       });
+    } else if (kind === "heal") {
+      // Classic 5-note Pokémon Center healing jingle: B4 - B4 - B4 - G#4 - E5
+      const notes = [
+        [493.88, 0, 140],
+        [493.88, 160, 140],
+        [493.88, 320, 140],
+        [415.3, 480, 180],
+        [659.25, 680, 320],
+      ];
+      notes.forEach(([f, delay, dur]) => {
+        setTimeout(() => this.playNote(f, dur, "square", 0.38), delay);
+      });
+    } else if (kind === "buy") {
+      // Classic Poké Mart cash register chime
+      this.playNote(1046.5, 65, "square", 0.35);
+      setTimeout(() => this.playNote(1567.98, 120, "square", 0.38), 70);
+    } else if (kind === "pc") {
+      // Classic Game Boy PC boot-up beep
+      this.playNote(880, 50, "square", 0.32);
+      setTimeout(() => this.playNote(1760, 75, "square", 0.35), 60);
+    } else if (kind === "victory") {
+      [523.25, 523.25, 523.25, 523.25, 415.3, 466.16, 523.25, 466.16, 523.25].forEach(
+        (f, i) => {
+          setTimeout(() => this.playNote(f, i === 8 ? 220 : 80, "square", 0.36), i * 90);
+        }
+      );
     }
   }
 }

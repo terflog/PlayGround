@@ -438,7 +438,7 @@ def parse_battle_database():
         mv_txt = f.read()
     moves = {}
     for m in re.finditer(
-        r"move\s+([A-Z0-9_]+),\s*([A-Z0-9_]+),\s*(\d+),\s*([A-Z0-9_]+),\s*(\d+)\s*percent,\s*(\d+)",
+        r"move\s+([A-Z0-9_]+),\s*([A-Z0-9_]+),\s*(\d+),\s*([A-Z0-9_]+),\s*(\d+),\s*(\d+)",
         mv_txt,
     ):
         mname, effect, pwr, mtype, acc, pp = m.groups()
