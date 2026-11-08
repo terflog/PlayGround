@@ -24,6 +24,7 @@ const state = {
   searchQuery: "",
   townMapFilterCoords: null,
   visitedZones: new Set(["PALLET_TOWN"]),
+  seenPokemon: new Set(),
   caughtPokemon: new Set(),
   defeatedTrainers: new Set(),
   badges: new Set(), // 8 Kanto Gym Badges: BOULDER, CASCADE, THUNDER, RAINBOW, SOUL, MARSH, VOLCANO, EARTH
@@ -341,6 +342,7 @@ function initDefaultParty() {
   if (state.party.length > 0) return;
   // Used as a safety fallback when a battle/HM is invoked directly via API before the Oak intro event
   state.party = [buildMonInstance("PIKACHU", 5)];
+  state.seenPokemon.add("PIKACHU");
   state.caughtPokemon.add("PIKACHU");
   state.events.gotStarterPikachu = true;
   syncPikachuOverworldState();
@@ -398,6 +400,7 @@ function saveProgress() {
   try {
     const payload = {
       visitedZones: Array.from(state.visitedZones),
+      seenPokemon: Array.from(state.seenPokemon),
       caughtPokemon: Array.from(state.caughtPokemon),
       defeatedTrainers: Array.from(state.defeatedTrainers),
       badges: Array.from(state.badges),
@@ -443,10 +446,18 @@ function loadProgress() {
         }
       });
     }
+    if (Array.isArray(data.seenPokemon)) {
+      data.seenPokemon.forEach((p) => {
+        if (typeof p === "string" && POKEYELLOW_DATA.battle?.pokemonStats?.[p]) {
+          state.seenPokemon.add(p);
+        }
+      });
+    }
     if (Array.isArray(data.caughtPokemon)) {
       data.caughtPokemon.forEach((p) => {
         if (typeof p === "string" && POKEYELLOW_DATA.battle?.pokemonStats?.[p]) {
           state.caughtPokemon.add(p);
+          state.seenPokemon.add(p);
         }
       });
     }
@@ -602,6 +613,12 @@ const NON_TRAINER_SPRITES = new Set([
 function getTrainerBattleEntry(npc, zone) {
   if (!npc || npc.kind === "item") return null;
   if (NON_TRAINER_SPRITES.has(npc.sprite)) return null;
+  // Cannot enter a trainer battle before receiving starter Pokémon!
+  if (!state.events.gotStarterPikachu || state.party.length === 0) return null;
+  // Oak's Lab Rival is handled by the scripted Oak's Lab rival event
+  if (zone && zone.constName === "OAKS_LAB" && npc.name === "OAKSLAB_RIVAL") {
+    return null;
+  }
   // In pret/pokeyellow, only object_events with OPP_* (kind === "trainer") or explicit trainerClass are trainers
   const isGenuineTrainer =
     npc.kind === "trainer" || Boolean(npc.battle && npc.battle.trainerClass);
@@ -1604,6 +1621,7 @@ function checkTrainerLineOfSight(zone, sx, sy) {
 function checkInGameGiftOrEvent(npc, zone) {
   const upName = `${zone.constName} ${npc.name}`.toUpperCase();
   const giveGiftMon = (species, level) => {
+    state.seenPokemon.add(species);
     state.caughtPokemon.add(species);
     if (!state.party.some((m) => m.species === species) && state.party.length < 6) {
       state.party.push(buildMonInstance(species, level));
@@ -1653,27 +1671,27 @@ function checkInGameGiftOrEvent(npc, zone) {
     return giveGiftMon("HITMONCHAN", 30); // scripts/FightingDojo.asm:278
   }
   // 3. Canonical Hidden Machine (HM01–HM05), Key Item & Ground Item Ball scripts:
-  if (zone.constName === "SS_ANNE_CAPTAINS_ROOM" && upName.includes("CAPTAIN")) {
+  if (zone.constName === "SS_ANNE_CAPTAINS_ROOM" && npc.sprite === "SPRITE_CAPTAIN") {
     giveBagItem("HM01_CUT", 1);
     return `\n\nRED received HM01 (CUT) from the CAPTAIN!`;
   }
-  if (zone.constName === "ROUTE_16_FLY_HOUSE" && upName.includes("GIRL")) {
+  if (zone.constName === "ROUTE_16_FLY_HOUSE" && npc.sprite === "SPRITE_BRUNETTE_GIRL") {
     giveBagItem("HM02_FLY", 1);
     return `\n\nRED received HM02 (FLY)!`;
   }
-  if (zone.constName === "SAFARI_ZONE_SECRET_HOUSE" && upName.includes("GURU")) {
+  if (zone.constName === "SAFARI_ZONE_SECRET_HOUSE" && npc.sprite === "SPRITE_FISHING_GURU") {
     giveBagItem("HM03_SURF", 1);
     return `\n\nRED received HM03 (SURF)!`;
   }
-  if (zone.constName === "WARDENS_HOUSE" && upName.includes("WARDEN")) {
+  if (zone.constName === "WARDENS_HOUSE" && npc.sprite === "SPRITE_WARDEN") {
     giveBagItem("HM04_STRENGTH", 1);
     return `\n\nRED received HM04 (STRENGTH) from the WARDEN!`;
   }
-  if (zone.constName === "ROUTE_2_GATE" && upName.includes("AIDE")) {
+  if (zone.constName === "ROUTE_2_GATE" && npc.name === "ROUTE2GATE_OAKS_AIDE") {
     giveBagItem("HM05_FLASH", 1);
     return `\n\nRED received HM05 (FLASH) from OAK's AIDE!`;
   }
-  if (zone.constName === "MR_FUJIS_HOUSE" && upName.includes("MR_FUJI")) {
+  if (zone.constName === "MR_FUJIS_HOUSE" && npc.sprite === "SPRITE_MR_FUJI") {
     giveBagItem("POKE_FLUTE", 1);
     return `\n\nRED received a POKé FLUTE from MR. FUJI!`;
   }
@@ -1692,7 +1710,7 @@ function checkInGameGiftOrEvent(npc, zone) {
       return `\n\nYou came from PALLET TOWN? Here, please deliver OAK's PARCEL to PROF. OAK!\n\nRED got OAK's PARCEL!`;
     }
   }
-  if (zone.constName === "OAKS_LAB" && upName.includes("OAK")) {
+  if (zone.constName === "OAKS_LAB" && npc.sprite === "SPRITE_OAK") {
     if (state.events.gotOaksParcel && !state.events.gotPokedex) {
       state.events.gotPokedex = true;
       state.bag = state.bag.filter((it) => it.id !== "OAKS_PARCEL");
@@ -1704,8 +1722,7 @@ function checkInGameGiftOrEvent(npc, zone) {
       giveBagItem("POKE_BALL", 5);
       return `\n\nOAK: Oh! That's the custom POKé BALL I ordered! Thank you, RED!\n\nRED delivered OAK's PARCEL and received a POKéDEX and 5 POKé BALLs!`;
     }
-    giveBagItem("POKE_BALL", 5);
-    return `\n\nPROF. OAK gave RED 5 POKé BALLs!`;
+    return "";
   }
   if (npc.sprite === "SPRITE_CLERK") {
     giveBagItem("POKE_BALL", 5);
@@ -1901,8 +1918,30 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
     npc.collected = true;
   }
 
-  // Authentic Oak's Lab Eevee Poké Ball & Starter Pikachu event (scripts/OaksLab.asm)
+  // Authentic Oak's Lab Eevee Poké Ball, Rival Blue & Starter Pikachu event (scripts/OaksLab.asm)
   if (zone.constName === "OAKS_LAB") {
+    if (npc.name === "OAKSLAB_RIVAL") {
+      audio.playSfx("blip");
+      if (!state.events.oakRescuedInGrass && !state.events.gotStarterPikachu) {
+        openDialogue(
+          "RIVAL BLUE",
+          "BLUE: Yo RED! Gramps isn't around!\n\nI ran here 'cos he said he had a POKéMON for me!"
+        );
+      } else if (state.events.oakRescuedInGrass && !state.events.gotStarterPikachu) {
+        openDialogue(
+          "RIVAL BLUE",
+          "BLUE: Heh, I don't need to be greedy like you!\n\nGo ahead and choose, Gramps!"
+        );
+      } else if (state.events.gotStarterPikachu && !state.events.battledRivalInLab) {
+        triggerRivalLabBattle();
+      } else {
+        openDialogue(
+          "RIVAL BLUE",
+          "BLUE: Okay! I'll make my POKéMON fight to toughen it up!\n\nRED! Gramps! Smell ya later!"
+        );
+      }
+      return;
+    }
     if (npc.name === "OAKSLAB_EEVEE_POKE_BALL") {
       audio.playSfx("blip");
       if (state.events.oakRescuedInGrass && !state.events.gotStarterPikachu) {
@@ -2168,6 +2207,8 @@ export function awardStarterPikachuInLab() {
   if (!state.party.some((m) => m.species === "PIKACHU")) {
     state.party.unshift(buildMonInstance("PIKACHU", 5));
   }
+  state.seenPokemon.add("PIKACHU");
+  state.seenPokemon.add("EEVEE");
   state.caughtPokemon.add("PIKACHU");
   const eeveeBall = state.npcs.find((n) => n.name === "OAKSLAB_EEVEE_POKE_BALL");
   if (eeveeBall) eeveeBall.collected = true;
@@ -2195,6 +2236,7 @@ export function startScriptedCatchScene(mode = "OAK_PIKACHU") {
   }
   const isOak = mode === "OAK_PIKACHU";
   const foeMon = buildMonInstance(isOak ? "PIKACHU" : "RATTATA", 5);
+  state.seenPokemon.add(foeMon.species);
   const demoPlayerMon = {
     species: isOak ? "PROF_OAK" : "OLD_MAN",
     nickname: isOak ? "PROF. OAK" : "OLD MAN",
@@ -2566,7 +2608,13 @@ export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
     state.currentZone.constName.startsWith("SAFARI_ZONE");
 
   const firstFoe = enemyParty[0];
+  if (firstFoe) {
+    state.seenPokemon.add(firstFoe.species);
+  }
   const pMon = state.party[activePlayerIdx];
+  if (pMon) {
+    state.seenPokemon.add(pMon.species);
+  }
 
   // Open directly in MAIN_MENU (DisplayBattleMenu in engine/battle/core.asm) with intro banner text
   const introLog = isTrainer
@@ -2905,6 +2953,7 @@ export function evolvePokemon(mon, newSpeciesKey, msgs = [], options = {}) {
     }
   }
 
+  state.seenPokemon.add(targetKey);
   state.caughtPokemon.add(targetKey);
   saveProgress();
   updateUIForCurrentZone();
@@ -3001,6 +3050,9 @@ function handleEnemyFainted(b, msgs) {
   if (nextEnemyIdx !== -1) {
     b.activeEnemyIdx = nextEnemyIdx;
     const nextFoe = b.enemyParty[nextEnemyIdx];
+    if (nextFoe) {
+      state.seenPokemon.add(nextFoe.species);
+    }
     syncBattleTopLevelProps(b);
     msgs.push(`${b.trainerName} sent out\n${nextFoe.nickname}!`);
     queueBattleMessages(msgs, "MAIN_MENU");
@@ -4414,6 +4466,39 @@ function renderAllCanvases(force = true) {
   }
 }
 
+const KANTO_DEX_ORDER = [
+  "BULBASAUR", "IVYSAUR", "VENUSAUR", "CHARMANDER", "CHARMELEON", "CHARIZARD",
+  "SQUIRTLE", "WARTORTLE", "BLASTOISE", "CATERPIE", "METAPOD", "BUTTERFREE",
+  "WEEDLE", "KAKUNA", "BEEDRILL", "PIDGEY", "PIDGEOTTO", "PIDGEOT",
+  "RATTATA", "RATICATE", "SPEAROW", "FEAROW", "EKANS", "ARBOK",
+  "PIKACHU", "RAICHU", "SANDSHREW", "SANDSLASH", "NIDORAN_F", "NIDORINA",
+  "NIDOQUEEN", "NIDORAN_M", "NIDORINO", "NIDOKING", "CLEFAIRY", "CLEFABLE",
+  "VULPIX", "NINETALES", "JIGGLYPUFF", "WIGGLYTUFF", "ZUBAT", "GOLBAT",
+  "ODDISH", "GLOOM", "VILEPLUME", "PARAS", "PARASECT", "VENONAT",
+  "VENOMOTH", "DIGLETT", "DUGTRIO", "MEOWTH", "PERSIAN", "PSYDUCK",
+  "GOLDUCK", "MANKEY", "PRIMEAPE", "GROWLITHE", "ARCANINE", "POLIWAG",
+  "POLIWHIRL", "POLIWRATH", "ABRA", "KADABRA", "ALAKAZAM", "MACHOP",
+  "MACHOKE", "MACHAMP", "BELLSPROUT", "WEEPINBELL", "VICTREEBEL", "TENTACOOL",
+  "TENTACRUEL", "GEODUDE", "GRAVELER", "GOLEM", "PONYTA", "RAPIDASH",
+  "SLOWPOKE", "SLOWBRO", "MAGNEMITE", "MAGNETON", "FARFETCHD", "DODUO",
+  "DODRIO", "SEEL", "DEWGONG", "GRIMER", "MUK", "SHELLDER",
+  "CLOYSTER", "GASTLY", "HAUNTER", "GENGAR", "ONIX", "DROWZEE",
+  "HYPNO", "KRABBY", "KINGLER", "VOLTORB", "ELECTRODE", "EXEGGCUTE",
+  "EXEGGUTOR", "CUBONE", "MAROWAK", "HITMONLEE", "HITMONCHAN", "LICKITUNG",
+  "KOFFING", "WEEZING", "RHYHORN", "RHYDON", "CHANSEY", "TANGELA",
+  "KANGASKHAN", "HORSEA", "SEADRA", "GOLDEEN", "SEAKING", "STARYU",
+  "STARMIE", "MR_MIME", "SCYTHER", "JYNX", "ELECTABUZZ", "MAGMAR",
+  "PINSIR", "TAUROS", "MAGIKARP", "GYARADOS", "LAPRAS", "DITTO",
+  "EEVEE", "VAPOREON", "JOLTEON", "FLAREON", "PORYGON", "OMANYTE",
+  "OMASTAR", "KABUTO", "KABUTOPS", "AERODACTYL", "SNORLAX", "ARTICUNO",
+  "ZAPDOS", "MOLTRES", "DRATINI", "DRAGONAIR", "DRAGONITE", "MEWTWO", "MEW",
+];
+
+function getOrderedPokedexStats() {
+  const dict = POKEYELLOW_DATA.battle?.pokemonStats || {};
+  return KANTO_DEX_ORDER.map((sp) => dict[sp]).filter(Boolean);
+}
+
 // Authentic Generation I In-Game START Menu (home/start_menu.asm & engine/menus/draw_start_menu.asm)
 const START_MENU_SECTIONS = [
   "POKEDEX",
@@ -4440,12 +4525,149 @@ export function handleStartMenuInput(input) {
   if (!sm.open) return;
 
   if (sm.subView) {
+    if (sm.subView === "POKEDEX") {
+      const allStats = getOrderedPokedexStats();
+      if (sm.selectedDexSpecies) {
+        if (input === "B" || input === "A" || input === "START") {
+          audio.playSfx("blip");
+          sm.selectedDexSpecies = null;
+          renderStartMenu();
+        }
+        return;
+      }
+      if (input === "UP") {
+        sm.subCursor = (sm.subCursor - 1 + allStats.length) % allStats.length;
+        audio.playSfx("blip");
+        renderStartMenu();
+        return;
+      }
+      if (input === "DOWN") {
+        sm.subCursor = (sm.subCursor + 1) % allStats.length;
+        audio.playSfx("blip");
+        renderStartMenu();
+        return;
+      }
+      if (input === "A") {
+        const st = allStats[sm.subCursor];
+        if (st && (state.seenPokemon.has(st.species) || state.caughtPokemon.has(st.species))) {
+          audio.playSfx("blip");
+          sm.selectedDexSpecies = st.species;
+          renderStartMenu();
+        } else {
+          audio.playSfx("bump");
+        }
+        return;
+      }
+    }
+
+    if (sm.subView === "POKEMON" && state.party.length > 0) {
+      if (sm.partyStatsOpen) {
+        if (input === "A" || input === "B" || input === "START") {
+          audio.playSfx("blip");
+          sm.partyStatsOpen = false;
+          renderStartMenu();
+        }
+        return;
+      }
+      if (sm.partySubOpen) {
+        const mon = state.party[sm.subCursor] || state.party[0];
+        const hmSet = new Set(["CUT", "FLY", "SURF", "STRENGTH", "FLASH"]);
+        const fieldMoves = (mon?.moves || []).filter((m) => hmSet.has(m.id));
+        const actions = [
+          ...fieldMoves.map((m) => ({ type: "HM", id: m.id, label: m.name })),
+          { type: "STATS", label: "STATS" },
+          { type: "SWITCH", label: "SWITCH" },
+          { type: "CANCEL", label: "CANCEL" },
+        ];
+        if (input === "UP") {
+          sm.partySubCursor = (sm.partySubCursor - 1 + actions.length) % actions.length;
+          audio.playSfx("blip");
+          renderStartMenu();
+          return;
+        }
+        if (input === "DOWN") {
+          sm.partySubCursor = (sm.partySubCursor + 1) % actions.length;
+          audio.playSfx("blip");
+          renderStartMenu();
+          return;
+        }
+        if (input === "B") {
+          audio.playSfx("blip");
+          sm.partySubOpen = false;
+          renderStartMenu();
+          return;
+        }
+        if (input === "A") {
+          const act = actions[sm.partySubCursor] || actions[actions.length - 1];
+          audio.playSfx("blip");
+          if (act.type === "HM") {
+            sm.partySubOpen = false;
+            useFieldMove(act.id, { teachIfMissing: false });
+          } else if (act.type === "STATS") {
+            sm.partyStatsOpen = true;
+            renderStartMenu();
+          } else if (act.type === "SWITCH") {
+            sm.partySwitchFrom = sm.subCursor;
+            sm.partySubOpen = false;
+            renderStartMenu();
+          } else {
+            sm.partySubOpen = false;
+            renderStartMenu();
+          }
+          return;
+        }
+        return;
+      }
+      const count = state.party.length;
+      if (input === "UP") {
+        sm.subCursor = (sm.subCursor - 1 + count) % count;
+        audio.playSfx("blip");
+        renderStartMenu();
+        return;
+      }
+      if (input === "DOWN") {
+        sm.subCursor = (sm.subCursor + 1) % count;
+        audio.playSfx("blip");
+        renderStartMenu();
+        return;
+      }
+      if (input === "A") {
+        audio.playSfx("blip");
+        if (sm.partySwitchFrom !== null && sm.partySwitchFrom !== undefined) {
+          const fromIdx = sm.partySwitchFrom;
+          const toIdx = sm.subCursor;
+          sm.partySwitchFrom = null;
+          if (fromIdx !== toIdx && state.party[fromIdx] && state.party[toIdx]) {
+            const tmp = state.party[fromIdx];
+            state.party[fromIdx] = state.party[toIdx];
+            state.party[toIdx] = tmp;
+            saveProgress();
+          }
+          renderStartMenu();
+          return;
+        }
+        sm.partySubOpen = true;
+        sm.partySubCursor = 0;
+        renderStartMenu();
+        return;
+      }
+      if (input === "B" && sm.partySwitchFrom !== null && sm.partySwitchFrom !== undefined) {
+        audio.playSfx("blip");
+        sm.partySwitchFrom = null;
+        renderStartMenu();
+        return;
+      }
+    }
+
     if (input === "B" || input === "START") {
       audio.playSfx("blip");
       if (sm.selectedDexSpecies) {
         sm.selectedDexSpecies = null;
       } else {
         sm.subView = null;
+        sm.partySubOpen = false;
+        sm.partyStatsOpen = false;
+        sm.partySwitchFrom = null;
       }
       renderStartMenu();
     }
@@ -4478,6 +4700,9 @@ export function handleStartMenuInput(input) {
       sm.subView = chosen;
       sm.subCursor = 0;
       sm.selectedDexSpecies = null;
+      sm.partySubOpen = false;
+      sm.partyStatsOpen = false;
+      sm.partySwitchFrom = null;
       renderStartMenu();
     }
   }
@@ -4513,32 +4738,40 @@ export function renderStartMenu() {
   subBody.innerHTML = "";
 
   if (sm.subView === "POKEDEX") {
-    subTitle.textContent = `POKéDEX — OWN: ${state.caughtPokemon.size}/151`;
-    const allStats = Object.values(POKEYELLOW_DATA.battle?.pokemonStats || {});
+    const seenCount = new Set([...state.seenPokemon, ...state.caughtPokemon]).size;
+    subTitle.textContent = `SEEN:${seenCount} OWN:${state.caughtPokemon.size}`;
+    const allStats = getOrderedPokedexStats();
     if (sm.selectedDexSpecies) {
       const sp = sm.selectedDexSpecies;
       const base = POKEYELLOW_DATA.battle.pokemonStats[sp];
+      const owned = state.caughtPokemon.has(sp);
+      const dexNum = allStats.findIndex((s) => s.species === sp) + 1;
       const evoStr =
         (base.evolutions || [])
           .map((e) =>
             e.method === "LEVEL"
-              ? `LV.${e.level} → ${e.target}`
+              ? `LV.${e.level} -> ${e.target}`
               : e.method === "ITEM"
-              ? `${e.item.replace("_STONE", "")} → ${e.target}`
-              : `TRADE → ${e.target}`
+              ? `${e.item.replace("_STONE", "")} -> ${e.target}`
+              : `TRADE -> ${e.target}`
           )
-          .join(", ") || "None";
+          .join(", ") || "NONE";
       subBody.innerHTML = `
         <div class="stats-top-grid">
           <canvas id="start-dex-canvas" width="40" height="40" style="width:52px;height:52px"></canvas>
           <div>
-            <div><strong>${sp.replace(/_/g, " ")}</strong></div>
+            <div><strong>No.${String(dexNum).padStart(3, "0")} ${sp.replace(/_/g, " ")}</strong></div>
+            <div>STATUS: ${owned ? "● OWNED" : "○ SEEN ONLY"}</div>
             <div>TYPE: ${base.types.join(" / ")}</div>
-            <div>BASE HP:${base.hp} ATK:${base.atk} DEF:${base.def} SPD:${base.spd} SPC:${base.spc}</div>
           </div>
         </div>
-        <div><strong>EVOLUTIONS:</strong> ${evoStr}</div>
-        <div><strong>BASE MOVES:</strong> ${(base.baseMoves || []).join(", ")}</div>
+        ${
+          owned
+            ? `<div>BASE HP:${base.hp} ATK:${base.atk} DEF:${base.def} SPD:${base.spd} SPC:${base.spc}</div>
+               <div><strong>EVOLUTIONS:</strong> ${evoStr}</div>
+               <div><strong>BASE MOVES:</strong> ${(base.baseMoves || []).join(", ")}</div>`
+            : `<div style="margin-top:4px">Catch this POKéMON to record full POKéDEX data!</div>`
+        }
       `;
       const c = document.getElementById("start-dex-canvas");
       const spr = engine.pokemonSprites[sp] || engine.pokemonSprites.PIKACHU;
@@ -4548,79 +4781,198 @@ export function renderStartMenu() {
 
     allStats.forEach((st, idx) => {
       const owned = state.caughtPokemon.has(st.species);
+      const seen = owned || state.seenPokemon.has(st.species);
       const row = document.createElement("button");
       row.type = "button";
       row.className = "sub-list-row";
-      row.innerHTML = `<span>#${String(idx + 1).padStart(3, "0")} ${
-        owned ? "◓" : " "
-      } ${st.species.replace(/_/g, " ")}</span><span>${st.types.join("/")}</span>`;
-      row.onclick = () => {
-        audio.playSfx("blip");
-        sm.selectedDexSpecies = st.species;
-        renderStartMenu();
-      };
+      const curChar = idx === sm.subCursor ? "▶" : " ";
+      if (!seen) {
+        // Hidden until encountered (engine/menus/pokedex.asm: DrawPokedexList "----------")
+        row.innerHTML = `<span><span class="bcursor">${curChar}</span>${String(
+          idx + 1
+        ).padStart(3, "0")}   ----------</span><span></span>`;
+        row.onclick = () => {
+          sm.subCursor = idx;
+          audio.playSfx("bump");
+          renderStartMenu();
+        };
+      } else {
+        const mark = owned ? "●" : "○";
+        row.innerHTML = `<span><span class="bcursor">${curChar}</span>${String(
+          idx + 1
+        ).padStart(3, "0")} ${mark} ${st.species.replace(
+          /_/g,
+          " "
+        )}</span><span>${st.types.join("/")}</span>`;
+        row.onclick = () => {
+          sm.subCursor = idx;
+          audio.playSfx("blip");
+          sm.selectedDexSpecies = st.species;
+          renderStartMenu();
+        };
+      }
       subBody.appendChild(row);
     });
   } else if (sm.subView === "POKEMON") {
-    initDefaultParty();
-    subTitle.textContent = `PARTY POKéMON (${state.party.length}/6)`;
+    // Authentic pret/pokeyellow Party Menu UI (engine/menus/party_menu.asm DrawPartyMenu & PreparePokemonMenu)
+    subTitle.textContent = `POKéMON`;
+    if (state.party.length === 0) {
+      const emptyEl = document.createElement("div");
+      emptyEl.style.padding = "8px 4px";
+      emptyEl.textContent = "No POKéMON in party yet!";
+      subBody.appendChild(emptyEl);
+      return;
+    }
+
+    if (sm.subCursor >= state.party.length) sm.subCursor = 0;
     const hmSet = new Set(["CUT", "FLY", "SURF", "STRENGTH", "FLASH"]);
-    state.party.forEach((mon, idx) => {
-      const base = POKEYELLOW_DATA.battle?.pokemonStats?.[mon.species];
-      const evoStr =
-        (base?.evolutions || [])
-          .map((e) =>
-            e.method === "LEVEL"
-              ? `Lv.${e.level}→${e.target}`
-              : `${e.item?.replace("_STONE", "") || "TRADE"}→${e.target}`
-          )
-          .join(", ") || "Final";
-      const row = document.createElement("div");
-      row.className = "sub-list-row";
-      row.style.flexDirection = "column";
-      row.style.alignItems = "stretch";
-      row.style.gap = "3px";
-      row.innerHTML = `
-        <div style="display:flex;justify-content:space-between">
-          <strong>${idx === 0 ? "★ " : ""}${mon.nickname} :L${mon.level}</strong>
-          <span>HP ${mon.hp}/${mon.maxHp} (${mon.status})</span>
+
+    if (sm.partyStatsOpen) {
+      const sMon = state.party[sm.subCursor] || state.party[0];
+      const allStats = KANTO_DEX_ORDER;
+      const dexNum = Math.max(1, allStats.indexOf(sMon.species) + 1);
+      subTitle.textContent = `STATUS — ${sMon.nickname}`;
+      subBody.innerHTML = `
+        <div class="stats-top-grid">
+          <canvas id="start-party-stats-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
+          <div>
+            <div><strong>No.${String(dexNum).padStart(3, "0")} ${sMon.nickname}</strong> :L${sMon.level}</div>
+            <div>HP: ${sMon.hp}/${sMon.maxHp} &nbsp;STATUS/${sMon.status}</div>
+            <div>TYPE/${sMon.types.join("/")}</div>
+          </div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:#334155">
-          <span>Moves: ${mon.moves.map((m) => m.name).join(", ")}</span>
-          <span>Evo: ${evoStr}</span>
+        <div class="stats-mid-grid">
+          <div>ATTACK &nbsp;${sMon.atk}<br/>DEFENSE ${sMon.def}</div>
+          <div>SPEED &nbsp;&nbsp;${sMon.spd}<br/>SPECIAL ${sMon.spc}</div>
+        </div>
+        <div class="stats-moves-box">
+          ${sMon.moves
+            .map(
+              (mv) =>
+                `<div style="display:flex;justify-content:space-between"><span>- ${mv.name}</span><span>PP ${mv.pp}/${mv.maxPp}</span></div>`
+            )
+            .join("")}
         </div>
       `;
-      const fieldMoves = (mon.moves || []).filter((m) => hmSet.has(m.id));
-      if (fieldMoves.length > 0) {
-        const fmWrap = document.createElement("div");
-        fmWrap.style.display = "flex";
-        fmWrap.style.gap = "4px";
-        fmWrap.style.marginTop = "2px";
-        fieldMoves.forEach((fm) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "gb-floor-btn";
-          btn.textContent = `USE ${fm.name}`;
-          btn.onclick = (e) => {
-            e.stopPropagation();
-            useFieldMove(fm.id, { teachIfMissing: false });
-          };
-          fmWrap.appendChild(btn);
-        });
-        row.appendChild(fmWrap);
-      }
+      const stCanvas = document.getElementById("start-party-stats-canvas");
+      const spr =
+        engine.pokemonSprites[sMon.species] || engine.pokemonSprites.PIKACHU;
+      engine.render2BitGraphicToCanvas(stCanvas, spr, "PAL_YELLOWMON");
+      return;
+    }
+
+    const partyWrap = document.createElement("div");
+    partyWrap.style.display = "flex";
+    partyWrap.style.flexDirection = "column";
+    partyWrap.style.justifyContent = "space-between";
+    partyWrap.style.height = "100%";
+    partyWrap.style.position = "relative";
+
+    const listEl = document.createElement("div");
+    listEl.className = "battle-party-list";
+    listEl.style.padding = "2px 0";
+
+    state.party.forEach((mon, idx) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = `bparty-row ${idx === sm.subCursor ? "selected" : ""}`;
+      const pct = Math.max(0, Math.round((mon.hp / Math.max(1, mon.maxHp)) * 100));
+      const barColor =
+        pct > 50 ? "#22c55e" : pct > 20 ? "#eab308" : "#ef4444";
+      const curChar =
+        idx === sm.subCursor
+          ? sm.partySubOpen
+            ? "▷"
+            : "▶"
+          : idx === sm.partySwitchFrom
+          ? "▷"
+          : " ";
+      row.innerHTML = `
+        <span class="bcursor">${curChar}</span>
+        <span class="bparty-icon">●</span>
+        <div class="bparty-main">
+          <div class="bparty-top">
+            <span>${mon.nickname}</span>
+            <span>${mon.hp <= 0 ? "FNT" : mon.status !== "OK" ? mon.status : `:L${mon.level}`}</span>
+          </div>
+          <div class="bparty-hp-wrap">
+            <span class="hp-tag">HP:</span>
+            <div class="hp-track"><div class="hp-fill" style="width:${pct}%;background:${barColor}"></div></div>
+          </div>
+        </div>
+        <span class="bparty-nums">${String(mon.hp).padStart(2, " ")}/${String(mon.maxHp).padStart(2, " ")}</span>
+      `;
       row.onclick = () => {
-        if (idx > 0) {
-          // Swap party lead (SwitchPartyMon)
-          audio.playSfx("blip");
-          const tmp = state.party[0];
-          state.party[0] = state.party[idx];
-          state.party[idx] = tmp;
+        audio.playSfx("blip");
+        if (sm.partySwitchFrom !== null && sm.partySwitchFrom !== undefined) {
+          const fromIdx = sm.partySwitchFrom;
+          sm.partySwitchFrom = null;
+          sm.subCursor = idx;
+          if (fromIdx !== idx && state.party[fromIdx] && state.party[idx]) {
+            const tmp = state.party[fromIdx];
+            state.party[fromIdx] = state.party[idx];
+            state.party[idx] = tmp;
+            saveProgress();
+          }
           renderStartMenu();
+          return;
         }
+        sm.subCursor = idx;
+        sm.partySubOpen = true;
+        sm.partySubCursor = 0;
+        renderStartMenu();
       };
-      subBody.appendChild(row);
+      listEl.appendChild(row);
     });
+
+    const footerBox = document.createElement("div");
+    footerBox.className = "gb-poke-box battle-party-footer";
+    footerBox.style.height = "36px";
+    footerBox.innerHTML = `<span>${
+      sm.partySwitchFrom !== null && sm.partySwitchFrom !== undefined
+        ? "Move POKéMON where?"
+        : "Choose a POKéMON."
+    }</span>`;
+
+    partyWrap.appendChild(listEl);
+    partyWrap.appendChild(footerBox);
+
+    if (sm.partySubOpen) {
+      const selMon = state.party[sm.subCursor] || state.party[0];
+      const fieldMoves = (selMon?.moves || []).filter((m) => hmSet.has(m.id));
+      const actions = [
+        ...fieldMoves.map((m) => ({ type: "HM", id: m.id, label: m.name })),
+        { type: "STATS", label: "STATS" },
+        { type: "SWITCH", label: "SWITCH" },
+        { type: "CANCEL", label: "CANCEL" },
+      ];
+      const subBox = document.createElement("div");
+      subBox.className = "gb-poke-box battle-party-sub-menu";
+      subBox.style.width = "52%";
+      actions.forEach((act, aIdx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "bmenu-item";
+        btn.innerHTML = `<span class="bcursor">${
+          aIdx === sm.partySubCursor ? "▶" : " "
+        }</span><span>${act.label}</span>`;
+        btn.onmouseenter = () => {
+          sm.partySubCursor = aIdx;
+          subBox.querySelectorAll(".bcursor").forEach((cEl, cIdx) => {
+            cEl.textContent = cIdx === aIdx ? "▶" : " ";
+          });
+        };
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          sm.partySubCursor = aIdx;
+          handleStartMenuInput("A");
+        };
+        subBox.appendChild(btn);
+      });
+      partyWrap.appendChild(subBox);
+    }
+
+    subBody.appendChild(partyWrap);
   } else if (sm.subView === "ITEM") {
     subTitle.textContent = `ITEM BAG`;
     if (state.bag.length === 0) {
