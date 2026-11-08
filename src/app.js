@@ -45,7 +45,9 @@ const state = {
     wokeRoute16Snorlax: false, // EVENT_FIGHT_ROUTE16_SNORLAX (scripts/Route16.asm)
     gotBikeVoucher: false, // EVENT_GOT_BIKE_VOUCHER (scripts/PokemonFanClub.asm)
     gotBicycle: false, // EVENT_GOT_BICYCLE (scripts/BikeShop.asm)
-    gotMtMoonFossil: false, // EVENT_GOT_DOME_FOSSIL / EVENT_GOT_HELIX_FOSSIL (scripts/MtMoonB2F.asm)
+    gotDomeFossil: false, // EVENT_GOT_DOME_FOSSIL (scripts/MtMoonB2F.asm)
+    gotHelixFossil: false, // EVENT_GOT_HELIX_FOSSIL (scripts/MtMoonB2F.asm)
+    mtMoonNerdLeft: false, // Super Nerd leaves Mt. Moon B2F without taking the other fossil
     calmedMarowak: false, // EVENT_BEAT_GHOST_MAROWAK (scripts/PokemonTower6F.asm)
   },
   party: [],
@@ -228,6 +230,7 @@ const ITEM_CATALOG = {
   SECRET_KEY: { id: "SECRET_KEY", name: "SECRET KEY", qty: 1, kind: "key" },
   HELIX_FOSSIL: { id: "HELIX_FOSSIL", name: "HELIX FOSSIL", qty: 1, kind: "key" },
   DOME_FOSSIL: { id: "DOME_FOSSIL", name: "DOME FOSSIL", qty: 1, kind: "key" },
+  OLD_AMBER: { id: "OLD_AMBER", name: "OLD AMBER", qty: 1, kind: "key" },
 };
 
 export function giveBagItem(itemKey, count = 1) {
@@ -825,6 +828,14 @@ function initZoneNpcs(zone) {
       if (o.name === "POKEMONTOWER7F_JESSIE" || o.name === "POKEMONTOWER7F_JAMES") {
         defaultVisible = !state.events.rescuedMrFuji;
       } else if (o.name === "POKEMONTOWER7F_MR_FUJI" && state.events.rescuedMrFuji) {
+        collected = true;
+      }
+    } else if (zone.constName === "MT_MOON_B2F") {
+      if (o.name === "MTMOONB2F_SUPER_NERD" && state.events.mtMoonNerdLeft) {
+        collected = true;
+      } else if (o.name === "MTMOONB2F_DOME_FOSSIL" && state.events.gotDomeFossil) {
+        collected = true;
+      } else if (o.name === "MTMOONB2F_HELIX_FOSSIL" && state.events.gotHelixFossil) {
         collected = true;
       }
     }
@@ -1688,13 +1699,37 @@ function checkInGameGiftOrEvent(npc, zone) {
       return `\n\nCLERK: Oh, that's a BIKE VOUCHER! Here you go!\n\nRED exchanged the BIKE VOUCHER for a BICYCLE!`;
     }
   }
-  if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
-    if (state.bag.some((it) => it.id === "DOME_FOSSIL")) {
-      state.bag = state.bag.filter((it) => it.id !== "DOME_FOSSIL");
-      return giveGiftMon("KABUTO", 30);
+  if (zone.constName === "MUSEUM_1F" && npc.name === "MUSEUM1F_SCIENTIST2") {
+    if (!state.bag.some((it) => it.id === "OLD_AMBER") && !state.caughtPokemon.has("AERODACTYL")) {
+      giveBagItem("OLD_AMBER", 1);
+      const amberObj = state.npcs.find((n) => n.name === "MUSEUM1F_OLD_AMBER");
+      if (amberObj) amberObj.collected = true;
+      renderAllCanvases(true);
     }
-    state.bag = state.bag.filter((it) => it.id !== "HELIX_FOSSIL");
-    return giveGiftMon("OMANYTE", 30);
+  }
+  if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
+    const hasDome = state.bag.some((it) => it.id === "DOME_FOSSIL");
+    const hasHelix = state.bag.some((it) => it.id === "HELIX_FOSSIL");
+    const hasAmber = state.bag.some((it) => it.id === "OLD_AMBER");
+    const revivedMsgs = [];
+    if (hasDome) {
+      state.bag = state.bag.filter((it) => it.id !== "DOME_FOSSIL");
+      revivedMsgs.push(giveGiftMon("KABUTO", 30).trim());
+    }
+    if (hasHelix) {
+      state.bag = state.bag.filter((it) => it.id !== "HELIX_FOSSIL");
+      revivedMsgs.push(giveGiftMon("OMANYTE", 30).trim());
+    }
+    if (hasAmber) {
+      state.bag = state.bag.filter((it) => it.id !== "OLD_AMBER");
+      revivedMsgs.push(giveGiftMon("AERODACTYL", 30).trim());
+    }
+    if (revivedMsgs.length > 0) {
+      return `\n\nSCIENTIST: Fantastic! Let me resurrect your prehistoric fossil${
+        revivedMsgs.length > 1 ? "s" : ""
+      } right away!\n\n${revivedMsgs.join("\n\n")}`;
+    }
+    return `\n\nBring me the DOME FOSSIL, HELIX FOSSIL, or OLD AMBER and I will resurrect them!`;
   }
   if (zone.constName === "SS_ANNE_CAPTAINS_ROOM" && upName.includes("CAPTAIN")) {
     giveBagItem("HM01_CUT", 1);
@@ -1769,15 +1804,26 @@ function checkInGameGiftOrEvent(npc, zone) {
     }
     return `\n\nPicked up POKé BALLs & POTIONs at the POKéMON MART!`;
   }
-  if (npc.kind === "item" && npc.sprite === "SPRITE_FOSSIL") {
+  if (npc.sprite === "SPRITE_FOSSIL") {
     const isDome = upName.includes("DOME");
-    state.events.gotMtMoonFossil = true;
-    state.npcs.forEach((n) => {
-      if (n.sprite === "SPRITE_FOSSIL") n.collected = true;
-    });
+    npc.collected = true;
+    if (isDome) {
+      state.events.gotDomeFossil = true;
+    } else {
+      state.events.gotHelixFossil = true;
+    }
     const added = giveBagItem(isDome ? "DOME_FOSSIL" : "HELIX_FOSSIL", 1);
+    const superNerd = state.npcs.find((n) => n.name === "MTMOONB2F_SUPER_NERD");
+    let nerdMsg = "";
+    if (!state.events.mtMoonNerdLeft) {
+      state.events.mtMoonNerdLeft = true;
+      if (superNerd) superNerd.collected = true;
+      nerdMsg = `\n\nSUPER NERD: Ugh, I'm a dumbass! I'm outta here!\n\nSUPER NERD ran off and left the other fossil behind!`;
+    }
+    saveProgress();
+    renderAllCanvases(true);
     if (added) {
-      return `\n\nRED got the ${added.name}! SUPER NERD took the other fossil!`;
+      return `\n\nRED got the ${added.name}!${nerdMsg}`;
     }
   }
   if (npc.kind === "item" && npc.sprite === "SPRITE_POKE_BALL") {
@@ -2149,7 +2195,9 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
   const npcKey = `${zone.constName}:${npc.name}:${npc.id}`;
   const isDefeated = state.defeatedTrainers.has(npcKey);
   const baseText =
-    isDefeated && npc.battle?.afterBattleText
+    npc.sprite === "SPRITE_FOSSIL"
+      ? `You want the ${npc.name.includes("DOME") ? "DOME FOSSIL" : "HELIX FOSSIL"}?`
+      : isDefeated && npc.battle?.afterBattleText
       ? npc.battle.afterBattleText
       : npc.text;
   openDialogue(npc.name.replace(/_/g, " "), baseText + giftSuffix, {
@@ -3013,6 +3061,13 @@ function handleEnemyFainted(b, msgs) {
         if (b.trainerKey.startsWith("GAME_CORNER:GAMECORNER_ROCKET")) {
           const rNpc = state.npcs.find((n) => n.name === "GAMECORNER_ROCKET");
           if (rNpc) rNpc.collected = true;
+        }
+        // Defeating Super Nerd in Mt. Moon B2F makes him call himself a dumbass and leave without taking either fossil
+        if (b.trainerKey.startsWith("MT_MOON_B2F:MTMOONB2F_SUPER_NERD")) {
+          state.events.mtMoonNerdLeft = true;
+          const nerdNpc = state.npcs.find((n) => n.name === "MTMOONB2F_SUPER_NERD");
+          if (nerdNpc) nerdNpc.collected = true;
+          b.endBattleText = "SUPER NERD: I'm a dumbass! I'm leaving—keep both fossils!";
         }
         // Defeating Giovanni in Rocket Hideout B4F drops the Silph Scope & Lift Key
         if (b.trainerKey.startsWith("ROCKET_HIDEOUT_B4F:ROCKETHIDEOUTB4F_GIOVANNI")) {
