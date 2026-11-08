@@ -116,6 +116,8 @@ export class PokeYellowEngine {
     this.animCounter = 0; // 0..7
     this.animateTiles = true;
     this.paletteMode = "reference"; // "reference" | "sgb" | "cgb" | "dmg"
+    this.cutTrees = new Set(); // Step coordinates cleared by HM01 CUT ("ZONE:sx,sy")
+    this.flashIlluminated = false; // Dark cave illumination via HM05 FLASH
   }
 
   getOrCreateImageData(canvas, ctx, w, h) {
@@ -298,6 +300,11 @@ export class PokeYellowEngine {
   // Get 8x8 tile ID at 8x8 tile coordinate (tx, ty) in zone
   getTileIdAt8x8(zone, tx, ty) {
     if (!zone) return 0;
+    const stepX = Math.floor(tx / 2);
+    const stepY = Math.floor(ty / 2);
+    if (this.cutTrees && this.cutTrees.has(`${zone.constName}:${stepX},${stepY}`)) {
+      return zone.tileset === "GYM" ? 0x11 : 0x2c;
+    }
     const bx = Math.floor(tx / 4);
     const by = Math.floor(ty / 4);
     const subX = ((tx % 4) + 4) % 4;
@@ -550,7 +557,16 @@ export class PokeYellowEngine {
         const destBlockY = (by + borderBlocks) * 32;
         for (let ty = 0; ty < 4; ty++) {
           for (let tx = 0; tx < 4; tx++) {
-            const tileId = bst[blockId * 16 + ty * 4 + tx] || 0;
+            const stepX = bx * 2 + Math.floor(tx / 2);
+            const stepY = by * 2 + Math.floor(ty / 2);
+            const isCut =
+              this.cutTrees &&
+              this.cutTrees.has(`${zone.constName}:${stepX},${stepY}`);
+            const tileId = isCut
+              ? zone.tileset === "GYM"
+                ? 0x11
+                : 0x2c
+              : bst[blockId * 16 + ty * 4 + tx] || 0;
             this.drawTile8x8(
               buf,
               pxW,
@@ -767,10 +783,41 @@ export class PokeYellowEngine {
       for (let tx = startTileX; tx <= endTileX; tx++) {
         const bx = Math.floor(tx / 4);
         const subX = ((tx % 4) + 4) % 4;
+        const stepX = Math.floor(tx / 2);
+        const stepY = Math.floor(ty / 2);
+        const isCut =
+          this.cutTrees &&
+          this.cutTrees.has(`${zone.constName}:${stepX},${stepY}`);
         const blockId = this.getBlockAt(zone, bx, by);
-        const tileId = bst[blockId * 16 + subY * 4 + subX] || 0;
+        const tileId = isCut
+          ? zone.tileset === "GYM"
+            ? 0x11
+            : 0x2c
+          : bst[blockId * 16 + subY * 4 + subX] || 0;
         const screenX = tx * 8 - camX;
         this.drawTile8x8(buf, W, H, screenX, screenY, ts, tileId, pal);
+      }
+    }
+
+    // Dark cave shadow in Rock Tunnel when HM05 FLASH has not been used
+    if (
+      (zone.constName === "ROCK_TUNNEL_1F" ||
+        zone.constName === "ROCK_TUNNEL_B1F") &&
+      !this.flashIlluminated
+    ) {
+      const darkColor = pal[3];
+      for (let py = 0; py < H; py++) {
+        const dy = py - 68;
+        for (let px = 0; px < W; px++) {
+          const dx = px - 72;
+          const distSq = dx * dx + dy * dy;
+          if (distSq > 784) {
+            const off = (py * W + px) * 4;
+            buf[off] = darkColor[0];
+            buf[off + 1] = darkColor[1];
+            buf[off + 2] = darkColor[2];
+          }
+        }
       }
     }
 
