@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101a20" />
+  <title>Rocket: Neon Syndicate</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="app" class="shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Neon Syndicate home"><span class="brand-mark">R</span><span>NEON<span class="brand-accent"> SYNDICATE</span></span></a>
+      <div class="top-meta"><span class="chip"><i class="dot"></i><b id="rank-label">ROOKIE</b></span><span class="chip day-chip">DAY <b id="day-label">01</b></span><span class="credits"><span class="coin">¢</span><b id="credit-label">000</b></span></div>
+      <button class="icon-button" id="sound-btn" title="Toggle sound" aria-label="Toggle sound">♪</button>
+    </header>
+    <section class="game-layout">
+      <aside class="sidebar">
+        <div class="profile"><div class="avatar" aria-hidden="true"><span>R</span></div><div><small>FIELD OPERATIVE</small><strong id="player-name">ROOKIE</strong></div><button id="rename-btn" class="tiny-button" title="Rename operative">✎</button></div>
+        <nav class="main-nav" aria-label="Main menu">
+          <button class="nav-button active" data-view="base"><span>▦</span> Base <kbd>1</kbd></button>
+          <button class="nav-button" data-view="field"><span>⌖</span> Field Ops <kbd>2</kbd></button>
+          <button class="nav-button" data-view="corner"><span>▤</span> Game Corner <kbd>3</kbd></button>
+          <button class="nav-button" data-view="lab"><span>⚗</span> Daycare / Lab <kbd>4</kbd></button>
+          <button class="nav-button" data-view="league"><span>♜</span> League <kbd>5</kbd></button>
+        </nav>
+        <div class="side-divider"></div>
+        <div class="side-section-title">YOUR SQUAD <span id="squad-count">0/6</span></div>
+        <div id="squad-list" class="squad-list"></div>
+        <div class="sidebar-bottom"><div class="morale-line"><span>BASE MORALE</span><b id="morale-label">64%</b></div><div class="meter"><i id="morale-meter"></i></div><button id="save-btn" class="save-button">↻ &nbsp; SAVE GAME</button><div class="autosave">PROGRESS SAVES AUTOMATICALLY</div></div>
+      </aside>
+      <section class="content">
+        <div class="breadcrumb"><span>ROCKET HQ</span><span>/</span><b id="crumb-current">OPERATIONS FLOOR</b><span class="live-tag"><i></i> LIVE</span></div>
+        <div id="view-root"></div>
+      </section>
+    </section>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="modal-root"></div>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
