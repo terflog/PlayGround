@@ -24,6 +24,7 @@ const state = {
   searchQuery: "",
   townMapFilterCoords: null,
   visitedZones: new Set(["PALLET_TOWN"]),
+  seenPokemon: new Set(),
   caughtPokemon: new Set(),
   defeatedTrainers: new Set(),
   events: {
@@ -571,6 +572,53 @@ function resolveTrainerSpriteKey(trainerClass, trainerSprite, npcSprite) {
   return sprMap[npcSprite] || null;
 }
 
+const KANTO_DEX_ORDER = [
+  "BULBASAUR", "IVYSAUR", "VENUSAUR", "CHARMANDER", "CHARMELEON", "CHARIZARD",
+  "SQUIRTLE", "WARTORTLE", "BLASTOISE", "CATERPIE", "METAPOD", "BUTTERFREE",
+  "WEEDLE", "KAKUNA", "BEEDRILL", "PIDGEY", "PIDGEOTTO", "PIDGEOT",
+  "RATTATA", "RATICATE", "SPEAROW", "FEAROW", "EKANS", "ARBOK",
+  "PIKACHU", "RAICHU", "SANDSHREW", "SANDSLASH", "NIDORAN_F", "NIDORINA",
+  "NIDOQUEEN", "NIDORAN_M", "NIDORINO", "NIDOKING", "CLEFAIRY", "CLEFABLE",
+  "VULPIX", "NINETALES", "JIGGLYPUFF", "WIGGLYTUFF", "ZUBAT", "GOLBAT",
+  "ODDISH", "GLOOM", "VILEPLUME", "PARAS", "PARASECT", "VENONAT",
+  "VENOMOTH", "DIGLETT", "DUGTRIO", "MEOWTH", "PERSIAN", "PSYDUCK",
+  "GOLDUCK", "MANKEY", "PRIMEAPE", "GROWLITHE", "ARCANINE", "POLIWAG",
+  "POLIWHIRL", "POLIWRATH", "ABRA", "KADABRA", "ALAKAZAM", "MACHOP",
+  "MACHOKE", "MACHAMP", "BELLSPROUT", "WEEPINBELL", "VICTREEBEL", "TENTACOOL",
+  "TENTACRUEL", "GEODUDE", "GRAVELER", "GOLEM", "PONYTA", "RAPIDASH",
+  "SLOWPOKE", "SLOWBRO", "MAGNEMITE", "MAGNETON", "FARFETCH_D", "DODUO",
+  "DODRIO", "SEEL", "DEWGONG", "GRIMER", "MUK", "SHELLDER",
+  "CLOYSTER", "GASTLY", "HAUNTER", "GENGAR", "ONIX", "DROWZEE",
+  "HYPNO", "KRABBY", "KINGLER", "VOLTORB", "ELECTRODE", "EXEGGCUTE",
+  "EXEGGUTOR", "CUBONE", "MAROWAK", "HITMONLEE", "HITMONCHAN", "LICKITUNG",
+  "KOFFING", "WEEZING", "RHYHORN", "RHYDON", "CHANSEY", "TANGELA",
+  "KANGASKHAN", "HORSEA", "SEADRA", "GOLDEEN", "SEAKING", "STARYU",
+  "STARMIE", "MR_MIME", "SCYTHER", "JYNX", "ELECTABUZZ", "MAGMAR",
+  "Pinsir".toUpperCase(), "TAUROS", "MAGIKARP", "GYARADOS", "LAPRAS", "DITTO",
+  "EEVEE", "VAPOREON", "JOLTEON", "FLAREON", "PORYGON", "OMANYTE",
+  "OMASTAR", "KABUTO", "KABUTOPS", "AERODACTYL", "SNORLAX", "ARTICUNO",
+  "ZAPDOS", "MOLTRES", "DRATINI", "DRAGONAIR", "DRAGONITE", "MEWTWO", "MEW"
+];
+
+function getOrderedPokedexEntries() {
+  const statsMap = POKEYELLOW_DATA.battle?.pokemonStats || {};
+  return KANTO_DEX_ORDER.map((sp, idx) => {
+    const st = statsMap[sp] ||
+      statsMap[sp.replace("_", "")] || {
+        species: sp,
+        hp: 50,
+        atk: 50,
+        def: 50,
+        spd: 50,
+        spc: 50,
+        types: ["NORMAL"],
+        evolutions: [],
+        baseMoves: ["TACKLE"],
+      };
+    return { ...st, species: st.species || sp, dexNum: idx + 1 };
+  });
+}
+
 const KANTO_GYM_BADGES = [
   { id: "BOULDER", name: "BOULDERBADGE", leader: "BROCK", zone: "PEWTER_GYM" },
   { id: "CASCADE", name: "CASCADEBADGE", leader: "MISTY", zone: "CERULEAN_GYM" },
@@ -595,6 +643,11 @@ export function getEarnedBadges() {
 
 function getTrainerBattleEntry(npc, zone) {
   if (!npc || npc.kind === "item" || !npc.battle) return null;
+  // Cannot battle any trainer before receiving a Pokémon!
+  if (state.party.length === 0 || !state.events.gotStarterPikachu) return null;
+  // Rival Blue in Oak's Lab only battles when Red walks south to exit the lab
+  if (zone.constName === "OAKS_LAB" && npc.name === "OAKSLAB_RIVAL") return null;
+
   const b = npc.battle;
   const isGenuineTrainer =
     Boolean(b.isWild) ||
@@ -1645,7 +1698,7 @@ function checkInGameGiftOrEvent(npc, zone) {
       return `\n\nYou came from PALLET TOWN? Here, please deliver OAK's PARCEL to PROF. OAK!\n\nRED got OAK's PARCEL!`;
     }
   }
-  if (zone.constName === "OAKS_LAB" && upName.includes("OAK")) {
+  if (zone.constName === "OAKS_LAB" && npc.sprite === "SPRITE_OAK") {
     if (state.events.gotOaksParcel && !state.events.gotPokedex) {
       state.events.gotPokedex = true;
       state.bag = state.bag.filter((it) => it.id !== "OAKS_PARCEL");
@@ -1657,8 +1710,7 @@ function checkInGameGiftOrEvent(npc, zone) {
       giveBagItem("POKE_BALL", 5);
       return `\n\nOAK: Oh! That's the custom POKé BALL I ordered! Thank you, RED!\n\nRED delivered OAK's PARCEL and received a POKéDEX and 5 POKé BALLs!`;
     }
-    giveBagItem("POKE_BALL", 5);
-    return `\n\nPROF. OAK gave RED 5 POKé BALLs!`;
+    return "";
   }
   if (npc.sprite === "SPRITE_CLERK") {
     giveBagItem("POKE_BALL", 5);
@@ -2051,6 +2103,8 @@ export function awardStarterPikachuInLab() {
     state.party.unshift(buildMonInstance("PIKACHU", 5));
   }
   state.caughtPokemon.add("PIKACHU");
+  state.seenPokemon.add("PIKACHU");
+  state.seenPokemon.add("EEVEE");
   const eeveeBall = state.npcs.find((n) => n.name === "OAKSLAB_EEVEE_POKE_BALL");
   if (eeveeBall) eeveeBall.collected = true;
   const oak1 = state.npcs.find((n) => n.name === "OAKSLAB_OAK1");
@@ -2448,6 +2502,9 @@ export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
     state.currentZone.constName.startsWith("SAFARI_ZONE");
 
   const firstFoe = enemyParty[0];
+  for (const em of enemyParty) {
+    if (em?.species) state.seenPokemon.add(em.species);
+  }
   const pMon = state.party[activePlayerIdx];
 
   // Open directly in MAIN_MENU (DisplayBattleMenu in engine/battle/core.asm) with intro banner text
@@ -4319,22 +4376,245 @@ export function toggleStartMenu() {
   state.startMenu.open = !state.startMenu.open;
   state.startMenu.subView = null;
   state.startMenu.selectedDexSpecies = null;
+  state.startMenu.partyActionOpen = false;
+  state.startMenu.partyActionCursor = 0;
+  state.startMenu.partyStatsOpen = false;
+  state.startMenu.partySwitchIdx = null;
   audio.playSfx("blip");
   renderStartMenu();
+}
+
+function getPartyActionItems(mon) {
+  const hmSet = new Set(["CUT", "FLY", "SURF", "STRENGTH", "FLASH"]);
+  const fieldMoves = (mon?.moves || [])
+    .filter((m) => hmSet.has(m.id))
+    .map((m) => ({ type: "HM", id: m.id, label: m.name }));
+  return [
+    ...fieldMoves,
+    { type: "STATS", label: "STATS" },
+    { type: "SWITCH", label: "SWITCH" },
+    { type: "CANCEL", label: "CANCEL" },
+  ];
+}
+
+function useBagItemInStartMenu(itemIndex) {
+  const sm = state.startMenu;
+  if (itemIndex >= state.bag.length) {
+    audio.playSfx("blip");
+    sm.subView = null;
+    renderStartMenu();
+    return;
+  }
+  const item = state.bag[itemIndex];
+  if (!item) return;
+  if (item.kind === "hm" && item.moveId) {
+    if (state.party.length === 0) {
+      audio.playSfx("bump");
+      return;
+    }
+    teachHmMove(item.moveId, state.party[0]);
+    useFieldMove(item.moveId);
+    return;
+  }
+  if (item.kind === "flute") {
+    sm.open = false;
+    sm.subView = null;
+    renderStartMenu();
+    audio.playSfx("pika");
+    openDialogue("POKé FLUTE", "RED played the POKé FLUTE! Now, that's a catchy tune!");
+    return;
+  }
+  if (state.party.length === 0) {
+    audio.playSfx("bump");
+    return;
+  }
+  const lead = state.party[0];
+  if (item.kind === "heal") {
+    item.qty = Math.max(1, item.qty - 1);
+    lead.hp = Math.min(lead.maxHp, lead.hp + item.hp);
+    if (item.cure) lead.status = "OK";
+    modifyPikachuHappiness("USEDITEM");
+    audio.playSfx("warp");
+    renderStartMenu();
+  } else if (item.kind === "candy") {
+    item.qty = Math.max(1, item.qty - 1);
+    const msgs = [];
+    levelUpPokemon(lead, msgs);
+    audio.playSfx("warp");
+    renderStartMenu();
+  } else if (item.kind === "stone") {
+    if (lead.species === "PIKACHU" && item.id === "THUNDER_STONE") {
+      audio.playSfx("pika");
+    } else {
+      const base = POKEYELLOW_DATA.battle?.pokemonStats?.[lead.species];
+      const matchEvo = (base?.evolutions || []).find(
+        (ev) => ev.method === "ITEM" && ev.item === item.id
+      );
+      if (matchEvo) {
+        item.qty = Math.max(1, item.qty - 1);
+        evolvePokemon(lead, matchEvo.target, []);
+        audio.playSfx("warp");
+      } else {
+        audio.playSfx("bump");
+      }
+    }
+    renderStartMenu();
+  } else {
+    audio.playSfx("blip");
+  }
 }
 
 export function handleStartMenuInput(input) {
   const sm = state.startMenu;
   if (!sm.open) return;
 
-  if (sm.subView) {
-    if (input === "B" || input === "START") {
-      audio.playSfx("blip");
-      if (sm.selectedDexSpecies) {
+  if (sm.subView === "POKEDEX") {
+    const allStats = getOrderedPokedexEntries();
+    const count = allStats.length;
+    if (sm.selectedDexSpecies) {
+      if (input === "A" || input === "B" || input === "START") {
+        audio.playSfx("blip");
         sm.selectedDexSpecies = null;
+        renderStartMenu();
+      }
+      return;
+    }
+    if (input === "UP") {
+      sm.subCursor = (sm.subCursor - 1 + count) % count;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "DOWN") {
+      sm.subCursor = (sm.subCursor + 1) % count;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "A") {
+      const chosen = allStats[sm.subCursor];
+      if (chosen) {
+        audio.playSfx("blip");
+        sm.selectedDexSpecies = chosen.species;
+        renderStartMenu();
+      }
+    } else if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      sm.subView = null;
+      renderStartMenu();
+    }
+    return;
+  }
+
+  if (sm.subView === "POKEMON") {
+    const count = state.party.length;
+    if (count === 0) {
+      if (input === "A" || input === "B" || input === "START") {
+        audio.playSfx("blip");
+        sm.subView = null;
+        renderStartMenu();
+      }
+      return;
+    }
+    if (sm.partyStatsOpen) {
+      if (input === "A" || input === "B" || input === "START") {
+        audio.playSfx("blip");
+        sm.partyStatsOpen = false;
+        renderStartMenu();
+      }
+      return;
+    }
+    if (sm.partyActionOpen) {
+      const mon = state.party[sm.subCursor] || state.party[0];
+      const acts = getPartyActionItems(mon);
+      if (input === "UP") {
+        sm.partyActionCursor = (sm.partyActionCursor - 1 + acts.length) % acts.length;
+        audio.playSfx("blip");
+        renderStartMenu();
+      } else if (input === "DOWN") {
+        sm.partyActionCursor = (sm.partyActionCursor + 1) % acts.length;
+        audio.playSfx("blip");
+        renderStartMenu();
+      } else if (input === "B") {
+        audio.playSfx("blip");
+        sm.partyActionOpen = false;
+        renderStartMenu();
+      } else if (input === "A") {
+        const act = acts[sm.partyActionCursor];
+        audio.playSfx("blip");
+        if (!act || act.type === "CANCEL") {
+          sm.partyActionOpen = false;
+          renderStartMenu();
+        } else if (act.type === "STATS") {
+          sm.partyStatsOpen = true;
+          renderStartMenu();
+        } else if (act.type === "SWITCH") {
+          sm.partyActionOpen = false;
+          sm.partySwitchIdx = sm.subCursor;
+          renderStartMenu();
+        } else if (act.type === "HM") {
+          sm.partyActionOpen = false;
+          useFieldMove(act.id, { teachIfMissing: false });
+        }
+      }
+      return;
+    }
+    if (input === "UP") {
+      sm.subCursor = (sm.subCursor - 1 + count) % count;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "DOWN") {
+      sm.subCursor = (sm.subCursor + 1) % count;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      if (sm.partySwitchIdx !== null) {
+        sm.partySwitchIdx = null;
       } else {
         sm.subView = null;
       }
+      renderStartMenu();
+    } else if (input === "A") {
+      audio.playSfx("blip");
+      if (sm.partySwitchIdx !== null) {
+        const fromIdx = sm.partySwitchIdx;
+        const toIdx = sm.subCursor;
+        const tmp = state.party[fromIdx];
+        state.party[fromIdx] = state.party[toIdx];
+        state.party[toIdx] = tmp;
+        sm.partySwitchIdx = null;
+        saveProgress();
+        renderStartMenu();
+      } else {
+        sm.partyActionOpen = true;
+        sm.partyActionCursor = 0;
+        renderStartMenu();
+      }
+    }
+    return;
+  }
+
+  if (sm.subView === "ITEM") {
+    const totalRows = state.bag.length + 1; // +1 for CANCEL
+    if (input === "UP") {
+      sm.subCursor = Math.max(0, sm.subCursor - 1);
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "DOWN") {
+      sm.subCursor = Math.min(totalRows - 1, sm.subCursor + 1);
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      sm.subView = null;
+      renderStartMenu();
+    } else if (input === "A") {
+      useBagItemInStartMenu(sm.subCursor);
+    }
+    return;
+  }
+
+  if (sm.subView) {
+    if (input === "B" || input === "START" || input === "A") {
+      audio.playSfx("blip");
+      sm.subView = null;
       renderStartMenu();
     }
     return;
@@ -4366,6 +4646,9 @@ export function handleStartMenuInput(input) {
       sm.subView = chosen;
       sm.subCursor = 0;
       sm.selectedDexSpecies = null;
+      sm.partyActionOpen = false;
+      sm.partyStatsOpen = false;
+      sm.partySwitchIdx = null;
       renderStartMenu();
     }
   }
@@ -4401,181 +4684,334 @@ export function renderStartMenu() {
   subBody.innerHTML = "";
 
   if (sm.subView === "POKEDEX") {
-    subTitle.textContent = `POKéDEX — OWN: ${state.caughtPokemon.size}/151`;
-    const allStats = Object.values(POKEYELLOW_DATA.battle?.pokemonStats || {});
+    if (subTitle) subTitle.textContent = `POKéDEX — OWN: ${state.caughtPokemon.size}/151`;
+    const allStats = getOrderedPokedexEntries();
     if (sm.selectedDexSpecies) {
+      // ShowPokedexDataInternal (engine/menus/pokedex.asm): Authentic Gen I 2-half Data Screen
       const sp = sm.selectedDexSpecies;
-      const base = POKEYELLOW_DATA.battle.pokemonStats[sp];
+      const entry = allStats.find((s) => s.species === sp) || allStats[0];
+      const dexIdx = entry.dexNum;
+      const base = POKEYELLOW_DATA.battle.pokemonStats[sp] || entry;
       const evoStr =
         (base.evolutions || [])
           .map((e) =>
             e.method === "LEVEL"
-              ? `LV.${e.level} → ${e.target}`
+              ? `LV.${e.level}→${e.target}`
               : e.method === "ITEM"
-              ? `${e.item.replace("_STONE", "")} → ${e.target}`
-              : `TRADE → ${e.target}`
+              ? `${e.item.replace("_STONE", "")}→${e.target}`
+              : `TRADE→${e.target}`
           )
-          .join(", ") || "None";
-      subBody.innerHTML = `
-        <div class="stats-top-grid">
-          <canvas id="start-dex-canvas" width="40" height="40" style="width:52px;height:52px"></canvas>
-          <div>
-            <div><strong>${sp.replace(/_/g, " ")}</strong></div>
-            <div>TYPE: ${base.types.join(" / ")}</div>
-            <div>BASE HP:${base.hp} ATK:${base.atk} DEF:${base.def} SPD:${base.spd} SPC:${base.spc}</div>
+          .join(", ") || "NONE";
+      const wrap = document.createElement("div");
+      wrap.className = "gb-pokedex-data";
+      wrap.innerHTML = `
+        <div class="gb-dex-data-top">
+          <div class="gb-dex-sprite-col">
+            <canvas id="start-dex-canvas" width="56" height="56" style="width:56px;height:56px"></canvas>
+            <span>No.${String(Math.max(1, dexIdx)).padStart(3, "0")}</span>
+          </div>
+          <div class="gb-dex-info-col">
+            <div>${sp.replace(/_/g, " ")}</div>
+            <div>${base.types.join("/")}</div>
+            <div>HT &nbsp;&nbsp;${base.hp > 65 ? `4'07"` : `1'08"`}</div>
+            <div>WT &nbsp;&nbsp;${(base.hp * 0.4 + 6).toFixed(1)}lb</div>
           </div>
         </div>
-        <div><strong>EVOLUTIONS:</strong> ${evoStr}</div>
-        <div><strong>BASE MOVES:</strong> ${(base.baseMoves || []).join(", ")}</div>
+        <div class="gb-dex-divider"></div>
+        <div class="gb-dex-data-bottom">
+          <div>HP:${base.hp} ATK:${base.atk} DEF:${base.def} SPD:${base.spd} SPC:${base.spc}</div>
+          <div>EVO: ${evoStr}</div>
+          <div>MOVES: ${(base.baseMoves || []).slice(0, 3).join(", ")}</div>
+          <span class="gb-prompt-arrow">▼</span>
+        </div>
       `;
+      wrap.onclick = () => {
+        audio.playSfx("blip");
+        sm.selectedDexSpecies = null;
+        renderStartMenu();
+      };
+      subBody.appendChild(wrap);
       const c = document.getElementById("start-dex-canvas");
       const spr = engine.pokemonSprites[sp] || engine.pokemonSprites.PIKACHU;
       engine.render2BitGraphicToCanvas(c, spr, "PAL_YELLOWMON");
       return;
     }
 
+    // ShowPokedexMenu (engine/menus/pokedex.asm): CONTENTS list on left, SEEN/OWN + DATA/CRY/AREA/QUIT on right
+    const dexMenu = document.createElement("div");
+    dexMenu.className = "gb-pokedex-menu";
+    const leftCol = document.createElement("div");
+    leftCol.className = "gb-pokedex-left";
+    leftCol.innerHTML = `<div class="gb-pokedex-title">CONTENTS</div>`;
+    const listWrap = document.createElement("div");
+    listWrap.className = "gb-pokedex-list";
+
     allStats.forEach((st, idx) => {
       const owned = state.caughtPokemon.has(st.species);
+      const isSelected = idx === sm.subCursor;
       const row = document.createElement("button");
       row.type = "button";
-      row.className = "sub-list-row";
-      row.innerHTML = `<span>#${String(idx + 1).padStart(3, "0")} ${
-        owned ? "◓" : " "
-      } ${st.species.replace(/_/g, " ")}</span><span>${st.types.join("/")}</span>`;
+      row.className = `gb-dex-row ${isSelected ? "active" : ""}`;
+      row.innerHTML = `
+        <div class="gb-dex-num">${String(idx + 1).padStart(3, "0")}</div>
+        <div class="gb-dex-name-line">
+          <span class="bcursor">${isSelected ? "▶" : " "}</span>
+          <span style="width:11px;display:inline-block">${owned ? "◓" : " "}</span>
+          <span>${st.species.replace(/_/g, " ")}</span>
+        </div>
+      `;
       row.onclick = () => {
         audio.playSfx("blip");
+        sm.subCursor = idx;
         sm.selectedDexSpecies = st.species;
         renderStartMenu();
       };
-      subBody.appendChild(row);
+      listWrap.appendChild(row);
     });
+    leftCol.appendChild(listWrap);
+
+    const rightCol = document.createElement("div");
+    rightCol.className = "gb-pokedex-right";
+    const seenCount = Math.max(state.caughtPokemon.size, state.seenPokemon.size);
+    rightCol.innerHTML = `
+      <div class="gb-pokedex-counts">
+        <div>SEEN<div class="gb-pokedex-count-num">${Math.min(151, seenCount)}</div></div>
+        <div>OWN<div class="gb-pokedex-count-num">${state.caughtPokemon.size}</div></div>
+      </div>
+      <div class="gb-pokedex-cmds">
+        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="DATA">▶DATA</button>
+        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="CRY"> CRY</button>
+        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="AREA"> AREA</button>
+        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="QUIT"> QUIT</button>
+      </div>
+    `;
+    rightCol.querySelectorAll("[data-dex-cmd]").forEach((btn) => {
+      btn.onclick = () => {
+        const cmd = btn.dataset.dexCmd;
+        if (cmd === "DATA") {
+          const cur = allStats[sm.subCursor];
+          if (cur) {
+            audio.playSfx("blip");
+            sm.selectedDexSpecies = cur.species;
+            renderStartMenu();
+          }
+        } else if (cmd === "CRY") {
+          audio.playSfx("pika");
+        } else if (cmd === "AREA") {
+          audio.playSfx("blip");
+        } else if (cmd === "QUIT") {
+          audio.playSfx("blip");
+          sm.subView = null;
+          renderStartMenu();
+        }
+      };
+    });
+
+    dexMenu.appendChild(leftCol);
+    dexMenu.appendChild(rightCol);
+    subBody.appendChild(dexMenu);
+    const activeRow = listWrap.querySelector(".gb-dex-row.active");
+    if (activeRow && typeof activeRow.scrollIntoView === "function") {
+      activeRow.scrollIntoView({ block: "nearest" });
+    }
   } else if (sm.subView === "POKEMON") {
-    initDefaultParty();
-    subTitle.textContent = `PARTY POKéMON (${state.party.length}/6)`;
-    const hmSet = new Set(["CUT", "FLY", "SURF", "STRENGTH", "FLASH"]);
-    state.party.forEach((mon, idx) => {
-      const base = POKEYELLOW_DATA.battle?.pokemonStats?.[mon.species];
-      const evoStr =
-        (base?.evolutions || [])
-          .map((e) =>
-            e.method === "LEVEL"
-              ? `Lv.${e.level}→${e.target}`
-              : `${e.item?.replace("_STONE", "") || "TRADE"}→${e.target}`
-          )
-          .join(", ") || "Final";
-      const row = document.createElement("div");
-      row.className = "sub-list-row";
-      row.style.flexDirection = "column";
-      row.style.alignItems = "stretch";
-      row.style.gap = "3px";
-      row.innerHTML = `
-        <div style="display:flex;justify-content:space-between">
-          <strong>${idx === 0 ? "★ " : ""}${mon.nickname} :L${mon.level}</strong>
-          <span>HP ${mon.hp}/${mon.maxHp} (${mon.status})</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:#334155">
-          <span>Moves: ${mon.moves.map((m) => m.name).join(", ")}</span>
-          <span>Evo: ${evoStr}</span>
+    if (subTitle) subTitle.textContent = `PARTY POKéMON (${state.party.length}/6)`;
+    // Authentic Gen I DisplayPartyMenu (engine/menus/party_menu.asm)
+    const partyScreen = document.createElement("div");
+    partyScreen.className = "battle-party-screen";
+    partyScreen.style.position = "relative";
+    partyScreen.style.width = "100%";
+    partyScreen.style.height = "100%";
+
+    const pList = document.createElement("div");
+    pList.className = "battle-party-list";
+
+    if (state.party.length === 0) {
+      const emptyMsg = document.createElement("div");
+      emptyMsg.style.padding = "12px 8px";
+      emptyMsg.textContent = "RED has no POKéMON yet!";
+      pList.appendChild(emptyMsg);
+    } else {
+      state.party.forEach((mon, idx) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = `bparty-row ${idx === sm.subCursor ? "selected" : ""}`;
+        const pct = Math.max(0, Math.round((mon.hp / Math.max(1, mon.maxHp)) * 100));
+        const barColor =
+          pct > 50 ? "#22c55e" : pct > 20 ? "#eab308" : "#ef4444";
+        const curChar =
+          idx === sm.subCursor
+            ? sm.partyActionOpen
+              ? "▷"
+              : "▶"
+            : idx === sm.partySwitchIdx
+            ? "▷"
+            : " ";
+        const iconChar = mon.species === "PIKACHU" ? "⚡" : "◓";
+        row.innerHTML = `
+          <span class="bcursor">${curChar}</span>
+          <span class="bparty-icon">${iconChar}</span>
+          <div class="bparty-main">
+            <div class="bparty-top">
+              <span>${mon.nickname}</span>
+              <span>${mon.hp <= 0 ? "FNT" : mon.status !== "OK" ? mon.status : `:L${mon.level}`}</span>
+            </div>
+            <div class="bparty-hp-wrap">
+              <span class="hp-tag">HP:</span>
+              <div class="hp-track"><div class="hp-fill" style="width:${pct}%;background:${barColor}"></div></div>
+            </div>
+          </div>
+          <span class="bparty-nums">${String(mon.hp).padStart(2, " ")}/${String(mon.maxHp).padStart(2, " ")}</span>
+        `;
+        row.onclick = () => {
+          audio.playSfx("blip");
+          if (sm.partySwitchIdx !== null) {
+            const fromIdx = sm.partySwitchIdx;
+            const tmp = state.party[fromIdx];
+            state.party[fromIdx] = state.party[idx];
+            state.party[idx] = tmp;
+            sm.partySwitchIdx = null;
+            sm.subCursor = idx;
+            saveProgress();
+            renderStartMenu();
+          } else {
+            sm.subCursor = idx;
+            sm.partyActionOpen = true;
+            sm.partyActionCursor = 0;
+            renderStartMenu();
+          }
+        };
+        pList.appendChild(row);
+      });
+    }
+
+    const footer = document.createElement("div");
+    footer.className = "gb-poke-box battle-party-footer";
+    footer.innerHTML = `<span>${
+      sm.partySwitchIdx !== null ? "Move POKéMON where?" : "Choose a POKéMON."
+    }</span>`;
+
+    partyScreen.appendChild(pList);
+    partyScreen.appendChild(footer);
+
+    // Bottom-right Party Action Submenu (HM moves + STATS / SWITCH / CANCEL)
+    if (sm.partyActionOpen && state.party[sm.subCursor]) {
+      const selMon = state.party[sm.subCursor];
+      const acts = getPartyActionItems(selMon);
+      const subMenu = document.createElement("div");
+      subMenu.className = "gb-poke-box battle-party-sub-menu";
+      acts.forEach((act, aIdx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "bmenu-item";
+        btn.innerHTML = `<span class="bcursor">${
+          aIdx === sm.partyActionCursor ? "▶" : " "
+        }</span>${act.label}`;
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          sm.partyActionCursor = aIdx;
+          handleStartMenuInput("A");
+        };
+        subMenu.appendChild(btn);
+      });
+      partyScreen.appendChild(subMenu);
+    }
+
+    // Authentic Gen I StatusScreen Modal
+    if (sm.partyStatsOpen && state.party[sm.subCursor]) {
+      const sMon = state.party[sm.subCursor];
+      const allStats = getOrderedPokedexEntries();
+      const dexNum = (allStats.find((s) => s.species === sMon.species)?.dexNum) || 25;
+      const statsModal = document.createElement("div");
+      statsModal.className = "gb-poke-box battle-stats-modal";
+      statsModal.innerHTML = `
+        <div class="battle-stats-content">
+          <div class="stats-top-grid">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <canvas id="start-party-stats-canvas" width="56" height="56" style="width:48px;height:48px"></canvas>
+              <span>No.${String(Math.max(1, dexNum)).padStart(3, "0")}</span>
+            </div>
+            <div>
+              <div><strong>${sMon.nickname}</strong> &nbsp;:L${sMon.level}</div>
+              <div>HP: ${sMon.hp}/${sMon.maxHp} &nbsp;${sMon.status}</div>
+              <div>TYPE1/ ${sMon.types.join("/")}</div>
+              <div>OT/ RED</div>
+            </div>
+          </div>
+          <div class="stats-mid-grid">
+            <div>ATTACK &nbsp;${sMon.atk}<br/>DEFENSE ${sMon.def}</div>
+            <div>SPEED &nbsp;&nbsp;${sMon.spd}<br/>SPECIAL ${sMon.spc}</div>
+          </div>
+          <div class="stats-moves-box">
+            ${sMon.moves
+              .map(
+                (mv) =>
+                  `<div style="display:flex;justify-content:space-between"><span>${mv.name}</span><span>PP ${mv.pp}/${mv.maxPp}</span></div>`
+              )
+              .join("")}
+          </div>
         </div>
       `;
-      const fieldMoves = (mon.moves || []).filter((m) => hmSet.has(m.id));
-      if (fieldMoves.length > 0) {
-        const fmWrap = document.createElement("div");
-        fmWrap.style.display = "flex";
-        fmWrap.style.gap = "4px";
-        fmWrap.style.marginTop = "2px";
-        fieldMoves.forEach((fm) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "gb-floor-btn";
-          btn.textContent = `USE ${fm.name}`;
-          btn.onclick = (e) => {
-            e.stopPropagation();
-            useFieldMove(fm.id, { teachIfMissing: false });
-          };
-          fmWrap.appendChild(btn);
-        });
-        row.appendChild(fmWrap);
-      }
-      row.onclick = () => {
-        if (idx > 0) {
-          // Swap party lead (SwitchPartyMon)
-          audio.playSfx("blip");
-          const tmp = state.party[0];
-          state.party[0] = state.party[idx];
-          state.party[idx] = tmp;
-          renderStartMenu();
-        }
+      statsModal.onclick = () => {
+        audio.playSfx("blip");
+        sm.partyStatsOpen = false;
+        renderStartMenu();
       };
-      subBody.appendChild(row);
-    });
+      partyScreen.appendChild(statsModal);
+      setTimeout(() => {
+        const stCanvas = document.getElementById("start-party-stats-canvas");
+        const spr =
+          engine.pokemonSprites[sMon.species] || engine.pokemonSprites.PIKACHU;
+        engine.render2BitGraphicToCanvas(stCanvas, spr, "PAL_YELLOWMON");
+      }, 0);
+    }
+
+    subBody.appendChild(partyScreen);
   } else if (sm.subView === "ITEM") {
-    subTitle.textContent = `ITEM BAG`;
+    if (subTitle) subTitle.textContent = `ITEM BAG`;
+    const bagWrap = document.createElement("div");
+    bagWrap.style.padding = "8px 10px";
+    bagWrap.style.display = "flex";
+    bagWrap.style.flexDirection = "column";
+    bagWrap.style.gap = "3px";
+    bagWrap.style.height = "100%";
+    bagWrap.style.overflowY = "auto";
+
     if (state.bag.length === 0) {
       const emptyEl = document.createElement("div");
-      emptyEl.style.padding = "8px 4px";
-      emptyEl.style.color = "#475569";
+      emptyEl.style.padding = "4px 2px";
       emptyEl.textContent = "No items in BAG.";
-      subBody.appendChild(emptyEl);
-      return;
+      bagWrap.appendChild(emptyEl);
     }
-    state.bag.forEach((item) => {
+    state.bag.forEach((item, idx) => {
       const row = document.createElement("button");
       row.type = "button";
-      row.className = "sub-list-row";
-      row.innerHTML = `<span>${item.name}</span><span>${
-        item.kind === "hm" ? "HM" : `×${item.qty}`
+      row.className = "bbag-row";
+      row.innerHTML = `<span class="bbag-left"><span class="bcursor">${
+        idx === sm.subCursor ? "▶" : " "
+      }</span><span>${item.name}</span></span><span class="bbag-qty">${
+        item.kind === "hm" ? "HM" : `×${String(item.qty).padStart(2, " ")}`
       }</span>`;
       row.onclick = () => {
-        initDefaultParty();
-        const lead = state.party[0];
-        if (item.kind === "hm" && item.moveId) {
-          teachHmMove(item.moveId, lead);
-          useFieldMove(item.moveId);
-          return;
-        }
-        if (item.kind === "heal") {
-          item.qty = Math.max(1, item.qty - 1);
-          lead.hp = Math.min(lead.maxHp, lead.hp + item.hp);
-          if (item.cure) lead.status = "OK";
-          modifyPikachuHappiness("USEDITEM");
-          audio.playSfx("warp");
-          subTitle.textContent = `Healed ${lead.nickname}!`;
-          renderStartMenu();
-        } else if (item.kind === "candy") {
-          item.qty = Math.max(1, item.qty - 1);
-          const msgs = [];
-          levelUpPokemon(lead, msgs);
-          audio.playSfx("warp");
-          subTitle.textContent = msgs[msgs.length - 1]?.replace(/\n/g, " ") || `${lead.nickname} Lv.${lead.level}!`;
-        } else if (item.kind === "stone") {
-          if (lead.species === "PIKACHU" && item.id === "THUNDER_STONE") {
-            audio.playSfx("pika");
-            subTitle.textContent = `PIKACHU refused to evolve!`;
-          } else {
-            const base = POKEYELLOW_DATA.battle?.pokemonStats?.[lead.species];
-            const matchEvo = (base?.evolutions || []).find(
-              (ev) => ev.method === "ITEM" && ev.item === item.id
-            );
-            if (matchEvo) {
-              item.qty = Math.max(1, item.qty - 1);
-              evolvePokemon(lead, matchEvo.target, []);
-              audio.playSfx("warp");
-              subTitle.textContent = `Evolved into ${lead.nickname}!`;
-            } else {
-              audio.playSfx("bump");
-              subTitle.textContent = `No effect on ${lead.nickname}!`;
-            }
-          }
-        } else {
-          audio.playSfx("blip");
-          subTitle.textContent = `${item.name}: Ready for battle/field use!`;
-        }
+        sm.subCursor = idx;
+        useBagItemInStartMenu(idx);
       };
-      subBody.appendChild(row);
+      bagWrap.appendChild(row);
     });
+    const cancelIdx = state.bag.length;
+    const cancelRow = document.createElement("button");
+    cancelRow.type = "button";
+    cancelRow.className = "bbag-row";
+    cancelRow.innerHTML = `<span class="bbag-left"><span class="bcursor">${
+      sm.subCursor === cancelIdx ? "▶" : " "
+    }</span><span>CANCEL</span></span><span></span>`;
+    cancelRow.onclick = () => {
+      useBagItemInStartMenu(cancelIdx);
+    };
+    bagWrap.appendChild(cancelRow);
+    subBody.appendChild(bagWrap);
   } else if (sm.subView === "RED") {
-    subTitle.textContent = `TRAINER CARD — RED`;
+    if (subTitle) subTitle.textContent = `TRAINER CARD — RED`;
     const earnedIds = new Set(getEarnedBadges().map((b) => b.id));
     const badgeLine1 = KANTO_GYM_BADGES.slice(0, 4)
       .map((b) => `${earnedIds.has(b.id) ? "●" : "○"} ${b.id}`)
@@ -4583,38 +5019,53 @@ export function renderStartMenu() {
     const badgeLine2 = KANTO_GYM_BADGES.slice(4, 8)
       .map((b) => `${earnedIds.has(b.id) ? "●" : "○"} ${b.id}`)
       .join(" ");
-    subBody.innerHTML = `
+    const cardWrap = document.createElement("div");
+    cardWrap.style.padding = "8px 10px";
+    cardWrap.style.display = "flex";
+    cardWrap.style.flexDirection = "column";
+    cardWrap.style.gap = "5px";
+    cardWrap.innerHTML = `
       <div class="stats-top-grid">
         <canvas id="start-red-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
         <div>
           <div><strong>NAME/</strong> RED</div>
           <div><strong>MONEY/</strong> ¥${3000 + state.defeatedTrainers.size * 350}</div>
-          <div><strong>PIKACHU FRIENDSHIP/</strong> ${state.pikachu.friendship} / 255</div>
+          <div><strong>PIKA ♥/</strong> ${state.pikachu.friendship}/255</div>
         </div>
       </div>
-      <div><strong>KANTO ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
-      <div><strong>POKéDEX OWNED:</strong> ${state.caughtPokemon.size} / 151</div>
-      <div><strong>TRAINERS DEFEATED:</strong> ${state.defeatedTrainers.size}</div>
+      <div><strong>ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
+      <div><strong>POKéDEX OWN:</strong> ${state.caughtPokemon.size} / 151</div>
       <div><strong>BADGES (${earnedIds.size}/8):</strong><br/>${badgeLine1}<br/>${badgeLine2}</div>
     `;
+    subBody.appendChild(cardWrap);
     const rc = document.getElementById("start-red-canvas");
     const spr = engine.trainerSprites.BROCK || engine.pokemonSprites.PIKACHU;
     engine.render2BitGraphicToCanvas(rc, spr, "PAL_REDMON");
   } else if (sm.subView === "SAVE") {
-    subTitle.textContent = `SAVE GAME (sMainData)`;
+    if (subTitle) subTitle.textContent = `SAVE GAME (sMainData)`;
     saveProgress();
-    subBody.innerHTML = `
+    const saveWrap = document.createElement("div");
+    saveWrap.style.padding = "8px 10px";
+    saveWrap.style.display = "flex";
+    saveWrap.style.flexDirection = "column";
+    saveWrap.style.gap = "4px";
+    saveWrap.innerHTML = `
       <div><strong>PLAYER:</strong> RED</div>
-      <div><strong>CURRENT ZONE:</strong> ${state.currentZone.displayName}</div>
-      <div><strong>POKéDEX:</strong> ${state.caughtPokemon.size} Caught</div>
-      <div><strong>ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
-      <div style="margin-top:6px;padding:6px;border:2px solid #111827;background:#fef08a">
+      <div><strong>BADGES:</strong> ${getEarnedBadges().length}</div>
+      <div><strong>POKéDEX:</strong> ${state.caughtPokemon.size}</div>
+      <div class="gb-poke-box" style="margin-top:8px;padding:6px 8px">
         Saving... Don't turn off the power!<br/>
         <strong>RED saved the game!</strong>
       </div>
     `;
+    subBody.appendChild(saveWrap);
   } else if (sm.subView === "OPTION") {
-    subTitle.textContent = `OPTION`;
+    if (subTitle) subTitle.textContent = `OPTION`;
+    const optWrap = document.createElement("div");
+    optWrap.style.padding = "8px 10px";
+    optWrap.style.display = "flex";
+    optWrap.style.flexDirection = "column";
+    optWrap.style.gap = "5px";
     const palRow = document.createElement("button");
     palRow.type = "button";
     palRow.className = "sub-list-row";
@@ -4651,9 +5102,10 @@ export function renderStartMenu() {
       audio.playSfx("blip");
       renderStartMenu();
     };
-    subBody.appendChild(palRow);
-    subBody.appendChild(bgmRow);
-    subBody.appendChild(wildRow);
+    optWrap.appendChild(palRow);
+    optWrap.appendChild(bgmRow);
+    optWrap.appendChild(wildRow);
+    subBody.appendChild(optWrap);
   }
 }
 
@@ -5330,7 +5782,12 @@ function setupControlsAndEvents() {
   });
 
   // Dialogue & Authentic Gen I Battle Menu buttons
-  document.getElementById("dialogue-next-btn")?.addEventListener("click", () => {
+  document.getElementById("dialogue-textbox")?.addEventListener("click", (e) => {
+    if (e.target.closest("#dialogue-battle-btn")) return;
+    advanceDialogue();
+  });
+  document.getElementById("dialogue-next-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
     advanceDialogue();
   });
   document.getElementById("dialogue-close-btn")?.addEventListener("click", () => {
@@ -5485,6 +5942,7 @@ window.POKEYELLOW = {
   triggerNpcDialogue,
   toggleStartMenu,
   handleStartMenuInput,
+  renderStartMenu,
   healParty,
   useFieldMove,
   teachHmMove,
