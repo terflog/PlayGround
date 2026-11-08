@@ -349,12 +349,45 @@ export function healParty() {
   syncPikachuOverworldState();
 }
 
+export function syncBikeButtonUI() {
+  const btn = document.getElementById("btn-toggle-bike");
+  if (btn) {
+    btn.classList.toggle("active", state.player.mode === "bike");
+  }
+}
+
+export function toggleBicycle() {
+  if (state.dialogue || state.battle || state.startMenu.open) return false;
+  const zone = state.currentZone;
+  if (zone) {
+    const curTile = engine.getCollisionTileAtStep(zone, state.player.x, state.player.y);
+    if (state.player.mode === "surf" && isWaterTile(zone, curTile)) {
+      audio.playSfx("bump");
+      return false;
+    }
+  }
+  state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
+  if (state.player.mode === "walk") {
+    state.pikachu.spawnDelayed = false;
+    state.pikachu.x = state.player.x;
+    state.pikachu.y = state.player.y;
+    state.pikachu.renderX = state.player.x;
+    state.pikachu.renderY = state.player.y;
+  }
+  audio.playSfx("blip");
+  syncPikachuOverworldState();
+  syncBikeButtonUI();
+  return state.player.mode === "bike";
+}
+
 function saveProgress() {
   try {
     const payload = {
       visitedZones: Array.from(state.visitedZones),
       caughtPokemon: Array.from(state.caughtPokemon),
       defeatedTrainers: Array.from(state.defeatedTrainers),
+      pikachuFriendship: state.pikachu.friendship,
+      events: { ...state.events },
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -368,14 +401,36 @@ function loadProgress() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return;
     if (Array.isArray(data.visitedZones)) {
-      data.visitedZones.forEach((z) => state.visitedZones.add(z));
+      data.visitedZones.forEach((z) => {
+        if (typeof z === "string" && engine.zonesByConst[z]?.isCanonical220) {
+          state.visitedZones.add(z);
+        }
+      });
     }
+    state.visitedZones.add("PALLET_TOWN");
     if (Array.isArray(data.caughtPokemon)) {
-      data.caughtPokemon.forEach((p) => state.caughtPokemon.add(p));
+      data.caughtPokemon.forEach((p) => {
+        if (typeof p === "string" && p.trim()) {
+          state.caughtPokemon.add(p.trim().toUpperCase());
+        }
+      });
     }
     if (Array.isArray(data.defeatedTrainers)) {
-      data.defeatedTrainers.forEach((t) => state.defeatedTrainers.add(t));
+      data.defeatedTrainers.forEach((t) => {
+        if (typeof t === "string" && t.trim()) {
+          state.defeatedTrainers.add(t);
+        }
+      });
+    }
+    if (typeof data.pikachuFriendship === "number" && Number.isFinite(data.pikachuFriendship)) {
+      state.pikachu.friendship = Math.max(0, Math.min(255, Math.round(data.pikachuFriendship)));
+    }
+    if (data.events && typeof data.events === "object") {
+      state.events.enteredBluesHouse = Boolean(data.events.enteredBluesHouse);
+      state.events.gotTownMap = Boolean(data.events.gotTownMap);
+      state.events.daisyWalking = Boolean(data.events.daisyWalking);
     }
   } catch {
     // Ignore malformed saved state
@@ -554,6 +609,11 @@ function initZoneNpcs(zone) {
   });
 }
 
+function isAtlasModalOpen() {
+  const modal = document.getElementById("atlas-modal");
+  return Boolean(modal && !modal.classList.contains("hidden"));
+}
+
 export function loadZone(target, options = {}) {
   let zone = null;
   if (typeof target === "object" && target !== null) {
@@ -590,28 +650,58 @@ export function loadZone(target, options = {}) {
     }
   }
 
+  // If entering an elevator from one of its building floors, remember that floor as default exit!
+  if (ELEVATOR_FLOORS[zone.constName]) {
+    if (options.resetParent) {
+      delete state.selectedElevatorDest[zone.constName];
+    } else if (state.currentZone) {
+      const matchingFloor = ELEVATOR_FLOORS[zone.constName].find(
+        (f) => f.destConst === state.currentZone.constName
+      );
+      if (matchingFloor) {
+        state.selectedElevatorDest[zone.constName] = matchingFloor;
+      }
+    }
+  }
+
   state.currentZone = zone;
-  state.visitedZones.add(zone.constName);
+  if (zone.isCanonical220) {
+    state.visitedZones.add(zone.constName);
+  }
   saveProgress();
   state.npcs = initZoneNpcs(zone);
+
+  // Cleanly close any open modals/menus when transitioning zones so overlays never get stuck
   state.dialogue = null;
+  state.battle = null;
+  if (state.startMenu) {
+    state.startMenu.open = false;
+    state.startMenu.subView = null;
+    state.startMenu.selectedDexSpecies = null;
+  }
+  renderDialogueModal();
+  renderBattleModal();
+  renderStartMenu();
 
   const spawn =
     options.x !== undefined && options.y !== undefined
       ? { x: options.x, y: options.y, dir: options.dir || state.player.dir }
       : findDefaultSpawn(zone, options.warpIndex ?? null);
 
-  state.player.x = spawn.x;
-  state.player.y = spawn.y;
-  state.player.renderX = spawn.x;
-  state.player.renderY = spawn.y;
+  const clampedX = Math.max(0, Math.min(zone.width * 2 - 1, Number(spawn.x) || 0));
+  const clampedY = Math.max(0, Math.min(zone.height * 2 - 1, Number(spawn.y) || 0));
+
+  state.player.x = clampedX;
+  state.player.y = clampedY;
+  state.player.renderX = clampedX;
+  state.player.renderY = clampedY;
   state.player.dir = spawn.dir || "DOWN";
   state.player.walking = false;
   state.player.moveAnim = null;
   if (zone.romId >= 0x25 && state.player.mode === "bike") {
     state.player.mode = "walk";
   }
-  const spawnTile = engine.getCollisionTileAtStep(zone, spawn.x, spawn.y);
+  const spawnTile = engine.getCollisionTileAtStep(zone, clampedX, clampedY);
   if (isWaterTile(zone, spawnTile)) {
     state.player.mode = "surf";
   } else if (state.player.mode === "surf") {
@@ -626,12 +716,12 @@ export function loadZone(target, options = {}) {
     RIGHT: [-1, 0],
   };
   const [bx, by] = behindOffsets[state.player.dir] || [0, -1];
-  const px = Math.max(0, Math.min(zone.width * 2 - 1, spawn.x + bx));
-  const py = Math.max(0, Math.min(zone.height * 2 - 1, spawn.y + by));
+  const px = Math.max(0, Math.min(zone.width * 2 - 1, clampedX + bx));
+  const py = Math.max(0, Math.min(zone.height * 2 - 1, clampedY + by));
   const pikaTile = engine.getCollisionTileAtStep(zone, px, py);
   const pikaOnWater = isWaterTile(zone, pikaTile);
-  state.pikachu.x = pikaOnWater ? spawn.x : px;
-  state.pikachu.y = pikaOnWater ? spawn.y : py;
+  state.pikachu.x = pikaOnWater ? clampedX : px;
+  state.pikachu.y = pikaOnWater ? clampedY : py;
   state.pikachu.renderX = state.pikachu.x;
   state.pikachu.renderY = state.pikachu.y;
   state.pikachu.dir = state.player.dir;
@@ -639,6 +729,7 @@ export function loadZone(target, options = {}) {
   state.pikachu.moveAnim = null;
   state.pikachu.spawnDelayed = false;
   syncPikachuOverworldState();
+  syncBikeButtonUI();
 
   audio.playTrack(zone.music);
   updateUIForCurrentZone();
@@ -655,33 +746,73 @@ function triggerEmote(emoteKey, durationMs = 1500) {
 }
 
 function resolveWarpDestination(zone, warp) {
+  if (!zone || !warp) {
+    return { destConst: "PALLET_TOWN", destWarpIdx: 0 };
+  }
   let destConst = warp.destConst;
-  let destWarpIdx = warp.destWarpIndex;
-  if (destConst === "LAST_MAP") {
+  let destWarpIdx = warp.destWarpIndex ?? 0;
+
+  // Check if we are exiting an elevator that had a floor chosen (or default to 1st floor)
+  if (ELEVATOR_FLOORS[zone.constName]) {
+    const chosen =
+      state.selectedElevatorDest[zone.constName] ||
+      (!engine.zonesByConst[destConst] ? ELEVATOR_FLOORS[zone.constName][0] : null);
+    if (chosen) {
+      destConst = chosen.destConst;
+      destWarpIdx = chosen.warpIndex;
+    }
+  }
+
+  if (destConst === "LAST_MAP" || !engine.zonesByConst[destConst]) {
     if (
       state.lastOutdoorMap &&
       engine.zonesByConst[state.lastOutdoorMap.mapConst]
     ) {
       destConst = state.lastOutdoorMap.mapConst;
-    } else if (zone.defaultParent) {
+      const outdoorTarget = engine.zonesByConst[destConst];
+      if (
+        outdoorTarget &&
+        outdoorTarget.warps &&
+        destWarpIdx >= outdoorTarget.warps.length
+      ) {
+        destWarpIdx = state.lastOutdoorMap.warpIndex ?? 0;
+      }
+    } else if (zone.defaultParent && engine.zonesByConst[zone.defaultParent.mapConst]) {
       destConst = zone.defaultParent.mapConst;
+      const parentTarget = engine.zonesByConst[destConst];
+      if (
+        parentTarget &&
+        parentTarget.warps &&
+        destWarpIdx >= parentTarget.warps.length
+      ) {
+        destWarpIdx = zone.defaultParent.warpIndex ?? 0;
+      }
     } else {
       destConst = "PALLET_TOWN";
+      destWarpIdx = 0;
     }
   }
-  // Check if we are exiting an elevator that had a floor chosen
-  if (
-    ELEVATOR_FLOORS[zone.constName] &&
-    state.selectedElevatorDest[zone.constName]
-  ) {
-    const chosen = state.selectedElevatorDest[zone.constName];
-    destConst = chosen.destConst;
-    destWarpIdx = chosen.warpIndex;
+
+  const resolvedZone = engine.zonesByConst[destConst];
+  if (resolvedZone && Array.isArray(resolvedZone.warps) && resolvedZone.warps.length > 0) {
+    if (destWarpIdx < 0 || destWarpIdx >= resolvedZone.warps.length) {
+      destWarpIdx = Math.max(
+        0,
+        Math.min(
+          resolvedZone.warps.length - 1,
+          zone.defaultParent?.warpIndex ?? 0
+        )
+      );
+    }
+  } else {
+    destWarpIdx = 0;
   }
+
   return { destConst, destWarpIdx };
 }
 
 function checkWarpAtStep(zone, sx, sy) {
+  if (!zone || !Array.isArray(zone.warps)) return null;
   for (let i = 0; i < zone.warps.length; i++) {
     const w = zone.warps[i];
     if (w.x === sx && w.y === sy) {
@@ -692,6 +823,7 @@ function checkWarpAtStep(zone, sx, sy) {
 }
 
 function isWaterTile(zone, tileId) {
+  if (!zone) return false;
   return (
     (zone.tileset === "OVERWORLD" ||
       zone.tileset === "FOREST" ||
@@ -703,7 +835,7 @@ function isWaterTile(zone, tileId) {
 }
 
 function attemptStep(dir) {
-  if (state.dialogue || state.battle) return;
+  if (state.dialogue || state.battle || state.startMenu.open || isAtlasModalOpen()) return;
   if (state.player.moveAnim) return;
 
   const zone = state.currentZone;
@@ -1042,13 +1174,14 @@ function checkInGameGiftOrEvent(npc, zone) {
 
 // Interact with what is in front of Red (A button / Space / Enter)
 export function interactInFront() {
-  if (state.battle) return;
+  if (state.battle || state.startMenu.open || isAtlasModalOpen()) return;
   if (state.dialogue) {
     advanceDialogue();
     return;
   }
 
   const zone = state.currentZone;
+  if (!zone) return;
   const dx =
     state.player.dir === "LEFT" ? -1 : state.player.dir === "RIGHT" ? 1 : 0;
   const dy =
@@ -1211,13 +1344,19 @@ function openElevatorMenu(elevatorConst) {
 }
 
 export function openDialogue(title, rawText, extra = {}) {
+  if (state.startMenu && state.startMenu.open) {
+    state.startMenu.open = false;
+    state.startMenu.subView = null;
+    state.startMenu.selectedDexSpecies = null;
+    renderStartMenu();
+  }
   const pages = String(rawText || "")
     .split(/\n\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
   if (pages.length === 0) pages.push("...");
   state.dialogue = {
-    title,
+    title: String(title || "POKéMON YELLOW"),
     pages,
     pageIndex: 0,
     ...extra,
@@ -1295,6 +1434,18 @@ function calcGen1Damage(attacker, defender, move) {
 
 export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
   initDefaultParty();
+  // Cleanly close any open dialogue or start menu when entering battle
+  if (state.dialogue) {
+    state.dialogue = null;
+    renderDialogueModal();
+  }
+  if (state.startMenu && state.startMenu.open) {
+    state.startMenu.open = false;
+    state.startMenu.subView = null;
+    state.startMenu.selectedDexSpecies = null;
+    renderStartMenu();
+  }
+
   // Ensure at least one party Pokémon is conscious
   if (state.party.every((m) => m.hp <= 0)) {
     healParty();
@@ -1310,13 +1461,15 @@ export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
   } else {
     let level = 5;
     let species = "PIDGEY";
-    if (Array.isArray(poolOrEntry) && Array.isArray(poolOrEntry[0])) {
+    if (Array.isArray(poolOrEntry) && poolOrEntry.length > 0 && Array.isArray(poolOrEntry[0])) {
       const pick = poolOrEntry[Math.floor(Math.random() * poolOrEntry.length)];
-      level = pick[0];
-      species = pick[1];
-    } else if (Array.isArray(poolOrEntry)) {
-      level = poolOrEntry[0];
-      species = poolOrEntry[1];
+      if (Array.isArray(pick) && pick.length >= 2) {
+        level = pick[0] || 5;
+        species = pick[1] || "PIDGEY";
+      }
+    } else if (Array.isArray(poolOrEntry) && poolOrEntry.length >= 2) {
+      level = poolOrEntry[0] || 5;
+      species = poolOrEntry[1] || "PIDGEY";
     }
     enemyParty = [buildMonInstance(species, level)];
   }
@@ -1776,23 +1929,48 @@ function handlePlayerFainted(b, msgs) {
 function executePlayerMove(moveIndex) {
   const b = state.battle;
   if (!b || b.finished) return;
-  const pMon = state.party[b.activePlayerIdx];
-  const foe = b.enemyParty[b.activeEnemyIdx];
-  const move = pMon.moves[moveIndex];
-  if (!move) return;
+  const pMon = state.party[b.activePlayerIdx] || state.party[0];
+  const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
+  if (!pMon || !foe) return;
 
-  if (move.pp <= 0) {
-    audio.playSfx("bump");
-    queueBattleMessages([`No PP left for\nthis move!`], "FIGHT_MENU");
-    return;
+  const hasAnyPp = Array.isArray(pMon.moves) && pMon.moves.some((m) => m && m.pp > 0);
+  let move = pMon.moves[moveIndex];
+  let isStruggle = false;
+
+  if (!hasAnyPp) {
+    move = {
+      id: "STRUGGLE",
+      name: "STRUGGLE",
+      type: "NORMAL",
+      power: 50,
+      accuracy: 100,
+      pp: 1,
+      maxPp: 1,
+      effect: "RECOIL_EFFECT",
+    };
+    isStruggle = true;
+  } else {
+    if (!move) return;
+    if (move.pp <= 0) {
+      audio.playSfx("bump");
+      queueBattleMessages([`No PP left for\nthis move!`], "FIGHT_MENU");
+      return;
+    }
+    b.moveCursor = moveIndex;
   }
 
-  b.moveCursor = moveIndex;
   audio.playSfx("thunder");
 
   const msgs = [];
+  if (isStruggle) {
+    msgs.push(`${pMon.nickname} has no\nmoves left!`);
+  }
+  const enemyMoves =
+    Array.isArray(foe.moves) && foe.moves.length > 0
+      ? foe.moves
+      : [getMoveObj("TACKLE")];
   const enemyMove =
-    foe.moves[Math.floor(Math.random() * foe.moves.length)] || getMoveObj("TACKLE");
+    enemyMoves[Math.floor(Math.random() * enemyMoves.length)] || getMoveObj("TACKLE");
 
   const playerPriority = move.id === "QUICK_ATTACK" ? 1 : 0;
   const enemyPriority = enemyMove.id === "QUICK_ATTACK" ? 1 : 0;
@@ -1800,11 +1978,25 @@ function executePlayerMove(moveIndex) {
     playerPriority > enemyPriority ||
     (playerPriority === enemyPriority && pMon.spd >= foe.spd);
 
-  if (playerFirst) {
+  const runPlayerTurn = () => {
+    const foeHpBefore = foe.hp;
     msgs.push(...performMoveAttack(pMon, foe, move, false));
+    if (isStruggle && foeHpBefore > foe.hp) {
+      const recoil = Math.max(1, Math.floor((foeHpBefore - foe.hp) / 2));
+      pMon.hp = Math.max(0, pMon.hp - recoil);
+      msgs.push(`${pMon.nickname}'s hit\nwith recoil!`);
+    }
     syncBattleTopLevelProps(b);
+  };
+
+  if (playerFirst) {
+    runPlayerTurn();
     if (foe.hp <= 0) {
       handleEnemyFainted(b, msgs);
+      return;
+    }
+    if (pMon.hp <= 0) {
+      handlePlayerFainted(b, msgs);
       return;
     }
     msgs.push(...performMoveAttack(foe, pMon, enemyMove, true));
@@ -1820,10 +2012,13 @@ function executePlayerMove(moveIndex) {
       handlePlayerFainted(b, msgs);
       return;
     }
-    msgs.push(...performMoveAttack(pMon, foe, move, false));
-    syncBattleTopLevelProps(b);
+    runPlayerTurn();
     if (foe.hp <= 0) {
       handleEnemyFainted(b, msgs);
+      return;
+    }
+    if (pMon.hp <= 0) {
+      handlePlayerFainted(b, msgs);
       return;
     }
   }
@@ -2001,16 +2196,22 @@ function executePartySwitch(targetPartyIdx) {
   audio.playSfx("warp");
 
   const msgs = [];
-  if (!wasForced && prevMon.hp > 0) {
+  if (!wasForced && prevMon && prevMon.hp > 0) {
     msgs.push(`${prevMon.nickname} enough!\nCome back!`);
   }
   msgs.push(`Go! ${chosen.nickname}!`);
 
   if (!wasForced) {
-    const foe = b.enemyParty[b.activeEnemyIdx];
-    const enemyMove =
-      foe.moves[Math.floor(Math.random() * foe.moves.length)] || getMoveObj("TACKLE");
-    msgs.push(...performMoveAttack(foe, chosen, enemyMove, true));
+    const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
+    if (foe) {
+      const enemyMoves =
+        Array.isArray(foe.moves) && foe.moves.length > 0
+          ? foe.moves
+          : [getMoveObj("TACKLE")];
+      const enemyMove =
+        enemyMoves[Math.floor(Math.random() * enemyMoves.length)] || getMoveObj("TACKLE");
+      msgs.push(...performMoveAttack(foe, chosen, enemyMove, true));
+    }
     syncBattleTopLevelProps(b);
     if (chosen.hp <= 0) {
       handlePlayerFainted(b, msgs);
@@ -2026,8 +2227,18 @@ function executePartySwitch(targetPartyIdx) {
 function executeSafariAction(safariIdx) {
   const b = state.battle;
   if (!b) return;
-  const foe = b.enemyParty[b.activeEnemyIdx];
+  const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
+  if (!foe) return;
   if (safariIdx === 0) {
+    if (b.safariBalls <= 0) {
+      audio.playSfx("bump");
+      b.finished = true;
+      queueBattleMessages(
+        [`PA: Ding-dong!\nYou are out of SAFARI BALLs!`],
+        "MAIN_MENU"
+      );
+      return;
+    }
     // Throw SAFARI BALL
     b.safariBalls = Math.max(0, b.safariBalls - 1);
     audio.playSfx("warp");
@@ -2366,6 +2577,32 @@ function renderDialogueModal() {
   }
 }
 
+function updateBattleEvolutionFrame(now = performance.now()) {
+  const b = state.battle;
+  const evoStage = document.getElementById("battle-evo-stage");
+  if (!evoStage) return;
+  if (b && b.menuState === "EVOLVING" && b.evolution) {
+    evoStage.classList.remove("hidden");
+    const evo = b.evolution;
+    const elapsed = Math.max(0, now - evo.startTime);
+    const t = Math.min(1, elapsed / evo.duration);
+    // Accelerating back-and-forth swap (Evolution_BackAndForthAnim in engine/movie/evolution.asm:49-59)
+    const periodMs = Math.max(70, 260 - t * 180);
+    const showNew = t > 0.15 && Math.floor(elapsed / periodMs) % 2 === 1;
+    evoStage.classList.toggle("evo-flash-silhouette", t > 0.15 && t < 0.92);
+    const evoCanvas = document.getElementById("battle-evo-canvas");
+    const sprKey = showNew ? evo.newSpecies : evo.oldSpecies;
+    if (evo._lastRenderedKey !== sprKey) {
+      evo._lastRenderedKey = sprKey;
+      const spr = engine.pokemonSprites[sprKey] || engine.pokemonSprites.PIKACHU;
+      engine.render2BitGraphicToCanvas(evoCanvas, spr, "PAL_YELLOWMON");
+    }
+  } else {
+    evoStage.classList.add("hidden");
+    evoStage.classList.remove("evo-flash-silhouette");
+  }
+}
+
 function renderBattleModal() {
   const modal = document.getElementById("battle-overlay");
   if (!modal) return;
@@ -2379,6 +2616,7 @@ function renderBattleModal() {
 
   const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
   const pMon = state.party[b.activePlayerIdx] || state.party[0];
+  if (!foe || !pMon) return;
 
   // 1. Enemy HUD (DrawEnemyHUDAndHPBar & SetupEnemyPartyPokeballs)
   document.getElementById("battle-foe-name").textContent = foe.nickname;
@@ -2603,26 +2841,7 @@ function renderBattleModal() {
   }
 
   // 8b. EvolveMon Stage (0,0..19,11): Back-and-forth sprite animation (engine/movie/evolution.asm)
-  const evoStage = document.getElementById("battle-evo-stage");
-  if (evoStage) {
-    if (b.menuState === "EVOLVING" && b.evolution) {
-      evoStage.classList.remove("hidden");
-      const evo = b.evolution;
-      const elapsed = performance.now() - evo.startTime;
-      const t = Math.min(1, elapsed / evo.duration);
-      // Accelerating back-and-forth swap (Evolution_BackAndForthAnim in engine/movie/evolution.asm:49-59)
-      const periodMs = Math.max(70, 260 - t * 180);
-      const showNew = t > 0.15 && Math.floor(elapsed / periodMs) % 2 === 1;
-      evoStage.classList.toggle("evo-flash-silhouette", t > 0.15 && t < 0.92);
-      const evoCanvas = document.getElementById("battle-evo-canvas");
-      const sprKey = showNew ? evo.newSpecies : evo.oldSpecies;
-      const spr = engine.pokemonSprites[sprKey] || engine.pokemonSprites.PIKACHU;
-      engine.render2BitGraphicToCanvas(evoCanvas, spr, "PAL_YELLOWMON");
-    } else {
-      evoStage.classList.add("hidden");
-      evoStage.classList.remove("evo-flash-silhouette");
-    }
-  }
+  updateBattleEvolutionFrame();
 
   // 8. DisplayPartyMenu (0,0..19,17) + SWITCH_STATS_CANCEL_MENU_TEMPLATE + StatusScreen
   const partyScreen = document.getElementById("battle-party-screen");
@@ -3060,7 +3279,8 @@ const START_MENU_SECTIONS = [
 ];
 
 export function toggleStartMenu() {
-  if (state.battle || state.dialogue) return;
+  if (state.battle || state.dialogue || isAtlasModalOpen()) return;
+  heldDirs.clear();
   state.startMenu.open = !state.startMenu.open;
   state.startMenu.subView = null;
   state.startMenu.selectedDexSpecies = null;
@@ -3080,6 +3300,29 @@ export function handleStartMenuInput(input) {
       } else {
         sm.subView = null;
       }
+      renderStartMenu();
+      return;
+    }
+    const subBody = document.getElementById("start-sub-body");
+    const rows = subBody ? Array.from(subBody.querySelectorAll(".sub-list-row")) : [];
+    if (rows.length > 0) {
+      if (input === "UP") {
+        sm.subCursor = (sm.subCursor - 1 + rows.length) % rows.length;
+        audio.playSfx("blip");
+        rows.forEach((r, i) => r.classList.toggle("selected", i === sm.subCursor));
+        rows[sm.subCursor]?.scrollIntoView({ block: "nearest" });
+      } else if (input === "DOWN") {
+        sm.subCursor = (sm.subCursor + 1) % rows.length;
+        audio.playSfx("blip");
+        rows.forEach((r, i) => r.classList.toggle("selected", i === sm.subCursor));
+        rows[sm.subCursor]?.scrollIntoView({ block: "nearest" });
+      } else if (input === "A") {
+        const targetRow = rows[sm.subCursor] || rows[0];
+        if (targetRow) targetRow.click();
+      }
+    } else if (input === "A" && sm.selectedDexSpecies) {
+      audio.playSfx("blip");
+      sm.selectedDexSpecies = null;
       renderStartMenu();
     }
     return;
@@ -3358,17 +3601,29 @@ export function renderStartMenu() {
     subBody.appendChild(bgmRow);
     subBody.appendChild(wildRow);
   }
+
+  // Highlight active submenu row for keyboard / D-pad navigation
+  const allSubRows = Array.from(subBody.querySelectorAll(".sub-list-row"));
+  if (allSubRows.length > 0) {
+    sm.subCursor = Math.max(0, Math.min(allSubRows.length - 1, sm.subCursor || 0));
+    allSubRows.forEach((row, rIdx) => {
+      row.classList.toggle("selected", rIdx === sm.subCursor);
+    });
+  }
 }
 
 // 220-Zone Visual Atlas Modal
 function openVisualAtlasModal() {
+  heldDirs.clear();
   const modal = document.getElementById("atlas-modal");
+  if (!modal) return;
   modal.classList.remove("hidden");
   renderAtlasGrid();
 }
 
 function renderAtlasGrid() {
   const grid = document.getElementById("atlas-grid");
+  if (!grid) return;
   const q = (document.getElementById("atlas-search-input")?.value || "")
     .trim()
     .toLowerCase();
@@ -3394,22 +3649,32 @@ function renderAtlasGrid() {
     );
   });
 
-  document.getElementById("atlas-count-label").textContent = `Showing ${zones.length} Loadable Zone Segments`;
+  const countLabel = document.getElementById("atlas-count-label");
+  if (countLabel) {
+    countLabel.textContent = `Showing ${zones.length} Loadable Zone Segments`;
+  }
   grid.innerHTML = "";
+  const frag = document.createDocumentFragment();
 
   zones.forEach((z) => {
     const card = document.createElement("div");
     card.className = `atlas-card ${
       z.constName === state.currentZone.constName ? "active" : ""
     }`;
-    const thumbCanvas = document.createElement("canvas");
-    thumbCanvas.className = "atlas-thumb-canvas";
-    engine.renderFullZone(thumbCanvas, z, {
-      showBorder: false,
-      showEntities: false,
-      showWarps: false,
-      showGrid: false,
-    });
+
+    // Cache rendered zone canvas element per zone + paletteMode so filtering/re-opening the Atlas is instant and leak-free
+    if (!z._cachedThumbCanvas || z._cachedThumbPalette !== engine.paletteMode) {
+      const c = z._cachedThumbCanvas || document.createElement("canvas");
+      c.className = "atlas-thumb-canvas";
+      engine.renderFullZone(c, z, {
+        showBorder: false,
+        showEntities: false,
+        showWarps: false,
+        showGrid: false,
+      });
+      z._cachedThumbCanvas = c;
+      z._cachedThumbPalette = engine.paletteMode;
+    }
 
     const info = document.createElement("div");
     info.className = "atlas-card-info";
@@ -3422,14 +3687,15 @@ function renderAtlasGrid() {
       <div class="atlas-card-sub">${z.constName} • ${z.width}×${z.height} blk</div>
     `;
 
-    card.appendChild(thumbCanvas);
+    card.appendChild(z._cachedThumbCanvas);
     card.appendChild(info);
     card.onclick = () => {
-      document.getElementById("atlas-modal").classList.add("hidden");
+      document.getElementById("atlas-modal")?.classList.add("hidden");
       loadZone(z, { resetParent: true });
     };
-    grid.appendChild(card);
+    frag.appendChild(card);
   });
+  grid.appendChild(frag);
 }
 
 // Main 60fps loop
@@ -3437,162 +3703,176 @@ let lastAnimTick = 0;
 let lastNpcTick = 0;
 const heldDirs = new Set();
 
-function gameLoop(now) {
-  // 1. Update water & flower tile animation counter every 280ms (matching ~20 Game Boy frames)
-  if (now - lastAnimTick > 280) {
-    lastAnimTick = now;
-    engine.animCounter = (engine.animCounter + 1) & 7;
-    if (state.dialogue && state.dialogue.pikachuMood) {
-      renderDialogueModal();
-    }
-  }
-
-  // 1b. Update active EvolveMon animation (engine/movie/evolution.asm:49-65)
-  if (state.battle && state.battle.menuState === "EVOLVING" && state.battle.evolution) {
-    const evo = state.battle.evolution;
-    if (now - evo.startTime >= evo.duration) {
-      completeEvolutionAnimation();
-    } else {
-      renderBattleModal();
-    }
-  }
-
-  // 2. Update Player smooth step interpolation
-  if (state.player.moveAnim) {
-    const anim = state.player.moveAnim;
-    const t = Math.min(1, (now - anim.startTime) / anim.duration);
-    state.player.renderX = anim.fromX + (anim.toX - anim.fromX) * t;
-    let jumpArc = 0;
-    if (anim.isLedgeJump) {
-      jumpArc = -Math.sin(t * Math.PI) * 0.75;
-    }
-    state.player.renderY = anim.fromY + (anim.toY - anim.fromY) * t + jumpArc;
-
-    if (state.pikachu.moveAnim) {
-      const pa = state.pikachu.moveAnim;
-      state.pikachu.renderX = pa.fromX + (pa.toX - pa.fromX) * t;
-      state.pikachu.renderY = pa.fromY + (pa.toY - pa.fromY) * t;
+function gameLoop(now = performance.now()) {
+  try {
+    // 1. Update water & flower tile animation counter every 280ms (matching ~20 Game Boy frames)
+    if (now - lastAnimTick > 280) {
+      lastAnimTick = now;
+      engine.animCounter = (engine.animCounter + 1) & 7;
+      if (state.dialogue && state.dialogue.pikachuMood) {
+        renderDialogueModal();
+      }
     }
 
-    if (t >= 1) {
-      state.player.x = anim.toX;
-      state.player.y = anim.toY;
-      state.player.renderX = anim.toX;
-      state.player.renderY = anim.toY;
-      state.player.walking = false;
-      state.player.moveAnim = null;
+    // 1b. Update active EvolveMon animation (engine/movie/evolution.asm:49-65)
+    if (state.battle && state.battle.menuState === "EVOLVING" && state.battle.evolution) {
+      const evo = state.battle.evolution;
+      if (now - evo.startTime >= evo.duration) {
+        completeEvolutionAnimation();
+      } else {
+        updateBattleEvolutionFrame(now);
+      }
+    }
+
+    const modalOpen =
+      Boolean(state.dialogue) ||
+      Boolean(state.battle) ||
+      Boolean(state.startMenu && state.startMenu.open) ||
+      isAtlasModalOpen();
+
+    // 2. Update Player smooth step interpolation
+    if (state.player.moveAnim) {
+      const anim = state.player.moveAnim;
+      const dur = Math.max(16, Number(anim.duration) || 165);
+      const t = Math.max(0, Math.min(1, (now - anim.startTime) / dur));
+      state.player.renderX = anim.fromX + (anim.toX - anim.fromX) * t;
+      let jumpArc = 0;
+      if (anim.isLedgeJump) {
+        jumpArc = -Math.sin(t * Math.PI) * 0.75;
+      }
+      state.player.renderY = anim.fromY + (anim.toY - anim.fromY) * t + jumpArc;
 
       if (state.pikachu.moveAnim) {
-        state.pikachu.x = state.pikachu.moveAnim.toX;
-        state.pikachu.y = state.pikachu.moveAnim.toY;
-        state.pikachu.renderX = state.pikachu.x;
-        state.pikachu.renderY = state.pikachu.y;
-        state.pikachu.walking = false;
-        state.pikachu.moveAnim = null;
+        const pa = state.pikachu.moveAnim;
+        state.pikachu.renderX = pa.fromX + (pa.toX - pa.fromX) * t;
+        state.pikachu.renderY = pa.fromY + (pa.toY - pa.fromY) * t;
       }
 
-      onPlayerStepCompleted();
-    }
-  } else if (heldDirs.size > 0 && !state.dialogue && !state.battle) {
-    const lastDir = Array.from(heldDirs).pop();
-    attemptStep(lastDir);
-  }
+      if (t >= 1) {
+        state.player.x = anim.toX;
+        state.player.y = anim.toY;
+        state.player.renderX = anim.toX;
+        state.player.renderY = anim.toY;
+        state.player.walking = false;
+        state.player.moveAnim = null;
 
-  // 3. Fluid 60fps NPC movement & idle turning (matches engine/overworld/movement.asm UpdateNPCSprite)
-  const zone = state.currentZone;
-  const ts = engine.tilesetsByConst[zone.tileset];
-  for (const npc of state.npcs) {
-    if (!npc.defaultVisible && !state.showHiddenObjects) continue;
-    if (npc.collected) continue;
+        if (state.pikachu.moveAnim) {
+          state.pikachu.x = state.pikachu.moveAnim.toX;
+          state.pikachu.y = state.pikachu.moveAnim.toY;
+          state.pikachu.renderX = state.pikachu.x;
+          state.pikachu.renderY = state.pikachu.y;
+          state.pikachu.walking = false;
+          state.pikachu.moveAnim = null;
+        }
 
-    // 3a. Interpolate active 16-frame step animation (UpdateSpriteInWalkingAnimation)
-    if (npc.moveAnim) {
-      const na = npc.moveAnim;
-      const nt = Math.min(1, (now - na.startTime) / na.duration);
-      npc.renderX = na.fromX + (na.toX - na.fromX) * nt;
-      npc.renderY = na.fromY + (na.toY - na.fromY) * nt;
-      npc.isWalking = nt > 0.12 && nt < 0.88;
-      if (nt >= 1) {
-        npc.renderX = npc.x;
-        npc.renderY = npc.y;
-        npc.isWalking = false;
-        npc.moveAnim = null;
+        onPlayerStepCompleted();
       }
-      continue;
+    } else if (heldDirs.size > 0 && !modalOpen) {
+      const lastDir = Array.from(heldDirs).pop();
+      attemptStep(lastDir);
     }
 
-    // 3b. Per-NPC random movement delay timer (SPRITESTATEDATA2_MOVEMENTDELAY)
-    if (state.dialogue || state.battle) continue;
-    if (now < (npc.nextMoveTime || 0)) continue;
-    npc.nextMoveTime = now + 650 + Math.random() * 1450;
+    // 3. Fluid 60fps NPC movement & idle turning (matches engine/overworld/movement.asm UpdateNPCSprite)
+    const zone = state.currentZone;
+    const ts = zone ? engine.tilesetsByConst[zone.tileset] : null;
+    if (zone && ts) {
+      for (const npc of state.npcs) {
+        if (!npc.defaultVisible && !state.showHiddenObjects) continue;
+        if (npc.collected) continue;
 
-    if (npc.movement === "WALK") {
-      const dirs =
-        npc.dir === "UP_DOWN"
-          ? ["UP", "DOWN"]
-          : npc.dir === "LEFT_RIGHT"
-          ? ["LEFT", "RIGHT"]
-          : ["DOWN", "UP", "LEFT", "RIGHT"];
-      const d = dirs[Math.floor(Math.random() * dirs.length)];
-      npc.facing = d;
-      const dx = d === "LEFT" ? -1 : d === "RIGHT" ? 1 : 0;
-      const dy = d === "UP" ? -1 : d === "DOWN" ? 1 : 0;
-      const nx = npc.x + dx;
-      const ny = npc.y + dy;
+        // 3a. Interpolate active 16-frame step animation (UpdateSpriteInWalkingAnimation)
+        if (npc.moveAnim) {
+          const na = npc.moveAnim;
+          const dur = Math.max(16, Number(na.duration) || 265);
+          const nt = Math.max(0, Math.min(1, (now - na.startTime) / dur));
+          npc.renderX = na.fromX + (na.toX - na.fromX) * nt;
+          npc.renderY = na.fromY + (na.toY - na.fromY) * nt;
+          npc.isWalking = nt > 0.12 && nt < 0.88;
+          if (nt >= 1) {
+            npc.renderX = npc.x;
+            npc.renderY = npc.y;
+            npc.isWalking = false;
+            npc.moveAnim = null;
+          }
+          continue;
+        }
 
-      if (
-        Math.abs(nx - npc.originX) <= 2 &&
-        Math.abs(ny - npc.originY) <= 2 &&
-        nx >= 0 &&
-        nx < zone.width * 2 &&
-        ny >= 0 &&
-        ny < zone.height * 2 &&
-        !(nx === state.player.x && ny === state.player.y) &&
-        !(state.pikachu.visible && nx === state.pikachu.x && ny === state.pikachu.y) &&
-        !state.npcs.some(
-          (other) =>
-            other !== npc &&
-            !other.collected &&
-            (other.defaultVisible || state.showHiddenObjects) &&
-            other.x === nx &&
-            other.y === ny
-        ) &&
-        engine.isStepPassable(zone, npc.x, npc.y, nx, ny)
-      ) {
-        const destTile = engine.getCollisionTileAtStep(zone, nx, ny);
-        if (!ts.doorSet.has(destTile) && !ts.warpSet.has(destTile)) {
-          const fromX = npc.x;
-          const fromY = npc.y;
-          npc.x = nx;
-          npc.y = ny;
-          npc.stepParity = !npc.stepParity;
-          npc.isWalking = true;
-          npc.moveAnim = {
-            fromX,
-            fromY,
-            toX: nx,
-            toY: ny,
-            startTime: now,
-            duration: 265, // 16 Game Boy frames at 60fps
-          };
+        // 3b. Per-NPC random movement delay timer (SPRITESTATEDATA2_MOVEMENTDELAY)
+        if (modalOpen) continue;
+        if (now < (npc.nextMoveTime || 0)) continue;
+        npc.nextMoveTime = now + 650 + Math.random() * 1450;
+
+        if (npc.movement === "WALK") {
+          const dirs =
+            npc.dir === "UP_DOWN"
+              ? ["UP", "DOWN"]
+              : npc.dir === "LEFT_RIGHT"
+              ? ["LEFT", "RIGHT"]
+              : ["DOWN", "UP", "LEFT", "RIGHT"];
+          const d = dirs[Math.floor(Math.random() * dirs.length)];
+          npc.facing = d;
+          const dx = d === "LEFT" ? -1 : d === "RIGHT" ? 1 : 0;
+          const dy = d === "UP" ? -1 : d === "DOWN" ? 1 : 0;
+          const nx = npc.x + dx;
+          const ny = npc.y + dy;
+
+          if (
+            Math.abs(nx - npc.originX) <= 2 &&
+            Math.abs(ny - npc.originY) <= 2 &&
+            nx >= 0 &&
+            nx < zone.width * 2 &&
+            ny >= 0 &&
+            ny < zone.height * 2 &&
+            !(nx === state.player.x && ny === state.player.y) &&
+            !(state.pikachu.visible && nx === state.pikachu.x && ny === state.pikachu.y) &&
+            !state.npcs.some(
+              (other) =>
+                other !== npc &&
+                !other.collected &&
+                (other.defaultVisible || state.showHiddenObjects) &&
+                other.x === nx &&
+                other.y === ny
+            ) &&
+            engine.isStepPassable(zone, npc.x, npc.y, nx, ny)
+          ) {
+            const destTile = engine.getCollisionTileAtStep(zone, nx, ny);
+            if (!ts.doorSet.has(destTile) && !ts.warpSet.has(destTile)) {
+              const fromX = npc.x;
+              const fromY = npc.y;
+              npc.x = nx;
+              npc.y = ny;
+              npc.stepParity = !npc.stepParity;
+              npc.isWalking = true;
+              npc.moveAnim = {
+                fromX,
+                fromY,
+                toX: nx,
+                toY: ny,
+                startTime: now,
+                duration: 265, // 16 Game Boy frames at 60fps
+              };
+            }
+          }
+        } else if (
+          npc.movement === "STAY" &&
+          (npc.dir === "ANY_DIR" || npc.dir === "UP_DOWN" || npc.dir === "LEFT_RIGHT")
+        ) {
+          // ChangeFacingDirection in engine/overworld/movement.asm:144, 245
+          const dirs =
+            npc.dir === "UP_DOWN"
+              ? ["UP", "DOWN"]
+              : npc.dir === "LEFT_RIGHT"
+              ? ["LEFT", "RIGHT"]
+              : ["DOWN", "UP", "LEFT", "RIGHT"];
+          npc.facing = dirs[Math.floor(Math.random() * dirs.length)];
         }
       }
-    } else if (
-      npc.movement === "STAY" &&
-      (npc.dir === "ANY_DIR" || npc.dir === "UP_DOWN" || npc.dir === "LEFT_RIGHT")
-    ) {
-      // ChangeFacingDirection in engine/overworld/movement.asm:144, 245
-      const dirs =
-        npc.dir === "UP_DOWN"
-          ? ["UP", "DOWN"]
-          : npc.dir === "LEFT_RIGHT"
-          ? ["LEFT", "RIGHT"]
-          : ["DOWN", "UP", "LEFT", "RIGHT"];
-      npc.facing = dirs[Math.floor(Math.random() * dirs.length)];
     }
-  }
 
-  renderAllCanvases();
+    renderAllCanvases();
+  } catch (err) {
+    console.error("Game loop frame error recovered:", err);
+  }
   requestAnimationFrame(gameLoop);
 }
 
@@ -3615,8 +3895,20 @@ function setupControlsAndEvents() {
       (document.activeElement.tagName === "INPUT" ||
         document.activeElement.tagName === "SELECT")
     ) {
+      if (e.code === "Escape" && isAtlasModalOpen()) {
+        document.getElementById("atlas-modal")?.classList.add("hidden");
+      }
       return;
     }
+
+    if (isAtlasModalOpen()) {
+      if (e.code === "Escape") {
+        e.preventDefault();
+        document.getElementById("atlas-modal")?.classList.add("hidden");
+      }
+      return;
+    }
+
     if (state.battle) {
       if (keyToDir[e.code]) {
         e.preventDefault();
@@ -3697,6 +3989,16 @@ function setupControlsAndEvents() {
     }
   });
 
+  window.addEventListener("blur", () => {
+    heldDirs.clear();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      heldDirs.clear();
+    }
+  });
+
   // On-screen D-pad & A/B buttons
   document.querySelectorAll("[data-dpad]").forEach((btn) => {
     const dir = btn.dataset.dpad;
@@ -3719,6 +4021,7 @@ function setupControlsAndEvents() {
     btn.addEventListener("mouseleave", endHold);
     btn.addEventListener("touchstart", startHold, { passive: false });
     btn.addEventListener("touchend", endHold);
+    btn.addEventListener("touchcancel", endHold);
   });
 
   document.getElementById("btn-gb-a")?.addEventListener("click", () => {
@@ -3739,15 +4042,7 @@ function setupControlsAndEvents() {
     } else if (state.startMenu.open) {
       handleStartMenuInput("B");
     } else {
-      state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
-      if (state.player.mode === "walk") {
-        state.pikachu.spawnDelayed = false;
-        state.pikachu.x = state.player.x;
-        state.pikachu.y = state.player.y;
-        state.pikachu.renderX = state.player.x;
-        state.pikachu.renderY = state.player.y;
-      }
-      syncPikachuOverworldState();
+      toggleBicycle();
     }
   });
   document.getElementById("btn-gb-start")?.addEventListener("click", () => {
@@ -3815,6 +4110,7 @@ function setupControlsAndEvents() {
     state.pikachu.renderY = state.pikachu.y;
     state.pikachu.spawnDelayed = false;
     syncPikachuOverworldState();
+    syncBikeButtonUI();
     updateCoordinatesUI();
   });
 
@@ -3875,17 +4171,8 @@ function setupControlsAndEvents() {
     state.showBorder = !state.showBorder;
     e.currentTarget.classList.toggle("active", state.showBorder);
   });
-  document.getElementById("btn-toggle-bike")?.addEventListener("click", (e) => {
-    state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
-    if (state.player.mode === "walk") {
-      state.pikachu.spawnDelayed = false;
-      state.pikachu.x = state.player.x;
-      state.pikachu.y = state.player.y;
-      state.pikachu.renderX = state.player.x;
-      state.pikachu.renderY = state.player.y;
-    }
-    syncPikachuOverworldState();
-    e.currentTarget.classList.toggle("active", state.player.mode === "bike");
+  document.getElementById("btn-toggle-bike")?.addEventListener("click", () => {
+    toggleBicycle();
   });
   document.getElementById("btn-check-pikachu")?.addEventListener("click", () => {
     openPikachuInteraction();
@@ -4079,6 +4366,7 @@ window.POKEYELLOW = {
   triggerNpcDialogue,
   toggleStartMenu,
   handleStartMenuInput,
+  toggleBicycle,
   healParty,
 };
 

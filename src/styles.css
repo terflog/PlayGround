@@ -1188,7 +1188,8 @@ canvas {
   justify-content: space-between;
 }
 
-.sub-list-row:hover {
+.sub-list-row:hover,
+.sub-list-row.selected {
   background: rgba(250, 204, 21, 0.32);
   border-color: #111827;
 }

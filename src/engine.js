@@ -1,24 +1,33 @@
 // Authentic Pokémon Yellow (pret/pokeyellow) Rendering & Overworld Simulation Engine
 
 export function unpack2Bit(b64, width, height) {
-  const bin = atob(b64);
-  const out = new Uint8Array(width * height);
-  let idx = 0;
-  for (let i = 0; i < bin.length; i++) {
-    const byte = bin.charCodeAt(i);
-    if (idx < out.length) out[idx++] = (byte >> 6) & 3;
-    if (idx < out.length) out[idx++] = (byte >> 4) & 3;
-    if (idx < out.length) out[idx++] = (byte >> 2) & 3;
-    if (idx < out.length) out[idx++] = byte & 3;
-  }
+  const total = Math.max(0, (Number(width) || 0) * (Number(height) || 0));
+  const out = new Uint8Array(total);
+  if (!b64 || typeof b64 !== "string") return out;
+  try {
+    const bin = atob(b64);
+    let idx = 0;
+    for (let i = 0; i < bin.length; i++) {
+      const byte = bin.charCodeAt(i);
+      if (idx < out.length) out[idx++] = (byte >> 6) & 3;
+      if (idx < out.length) out[idx++] = (byte >> 4) & 3;
+      if (idx < out.length) out[idx++] = (byte >> 2) & 3;
+      if (idx < out.length) out[idx++] = byte & 3;
+    }
+  } catch {}
   return out;
 }
 
 export function unpackBytes(b64) {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+  if (!b64 || typeof b64 !== "string") return new Uint8Array(0);
+  try {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return new Uint8Array(0);
+  }
 }
 
 export class PokeYellowEngine {
@@ -232,70 +241,85 @@ export class PokeYellowEngine {
     return [215, 130, 55];
   }
 
+  getOrCreateImageData(canvas, ctx, w, h) {
+    if (
+      !canvas._cachedImageData ||
+      canvas._cachedImageData.width !== w ||
+      canvas._cachedImageData.height !== h
+    ) {
+      canvas._cachedImageData = ctx.createImageData(w, h);
+    }
+    return canvas._cachedImageData;
+  }
+
   // Get block ID at (bx, by) in a zone, including connected neighbor zones in the 3-block border!
   getBlockAt(zone, bx, by) {
+    if (!zone || !zone.blockBytes) return 0;
     if (bx >= 0 && bx < zone.width && by >= 0 && by < zone.height) {
-      return zone.blockBytes[by * zone.width + bx];
+      return zone.blockBytes[by * zone.width + bx] ?? zone.borderBlock ?? 0;
     }
     const conns = zone.connections || {};
     // Check North connection (by in -3..-1)
     if (by < 0 && by >= -3 && conns.north) {
       const target = this.zonesByConst[conns.north.targetConst];
-      if (target) {
+      if (target && target.blockBytes) {
         const tx = bx - conns.north.offset;
         const ty = target.height + by;
         if (tx >= 0 && tx < target.width && ty >= 0 && ty < target.height) {
-          return target.blockBytes[ty * target.width + tx];
+          return target.blockBytes[ty * target.width + tx] ?? zone.borderBlock ?? 0;
         }
       }
     }
     // Check South connection (by in height..height+2)
     if (by >= zone.height && by < zone.height + 3 && conns.south) {
       const target = this.zonesByConst[conns.south.targetConst];
-      if (target) {
+      if (target && target.blockBytes) {
         const tx = bx - conns.south.offset;
         const ty = by - zone.height;
         if (tx >= 0 && tx < target.width && ty >= 0 && ty < target.height) {
-          return target.blockBytes[ty * target.width + tx];
+          return target.blockBytes[ty * target.width + tx] ?? zone.borderBlock ?? 0;
         }
       }
     }
     // Check West connection (bx in -3..-1)
     if (bx < 0 && bx >= -3 && conns.west) {
       const target = this.zonesByConst[conns.west.targetConst];
-      if (target) {
+      if (target && target.blockBytes) {
         const tx = target.width + bx;
         const ty = by - conns.west.offset;
         if (tx >= 0 && tx < target.width && ty >= 0 && ty < target.height) {
-          return target.blockBytes[ty * target.width + tx];
+          return target.blockBytes[ty * target.width + tx] ?? zone.borderBlock ?? 0;
         }
       }
     }
     // Check East connection (bx in width..width+2)
     if (bx >= zone.width && bx < zone.width + 3 && conns.east) {
       const target = this.zonesByConst[conns.east.targetConst];
-      if (target) {
+      if (target && target.blockBytes) {
         const tx = bx - zone.width;
         const ty = by - conns.east.offset;
         if (tx >= 0 && tx < target.width && ty >= 0 && ty < target.height) {
-          return target.blockBytes[ty * target.width + tx];
+          return target.blockBytes[ty * target.width + tx] ?? zone.borderBlock ?? 0;
         }
       }
     }
-    return zone.borderBlock;
+    return zone.borderBlock ?? 0;
   }
 
   // Get 8x8 tile ID at 8x8 tile coordinate (tx, ty) in zone
   getTileIdAt8x8(zone, tx, ty) {
+    if (!zone) return 0;
+    const ts = this.tilesetsByConst[zone.tileset];
+    if (!ts) return 0;
+    const bst = this.bstData[ts.bstKey];
+    if (!bst) return 0;
     const bx = Math.floor(tx / 4);
     const by = Math.floor(ty / 4);
     const subX = ((tx % 4) + 4) % 4;
     const subY = ((ty % 4) + 4) % 4;
     const blockId = this.getBlockAt(zone, bx, by);
-    const ts = this.tilesetsByConst[zone.tileset];
-    const bst = this.bstData[ts.bstKey];
     const offset = blockId * 16 + subY * 4 + subX;
-    return offset < bst.length ? bst[offset] : 0;
+    return offset >= 0 && offset < bst.length ? bst[offset] : 0;
   }
 
   // In Pokémon Gen I (engine/overworld/player_state.asm _GetTileAndCoordsInFrontOfPlayer),
@@ -306,14 +330,16 @@ export class PokeYellowEngine {
   }
 
   isStepPassable(zone, fromStepX, fromStepY, toStepX, toStepY) {
+    if (!zone) return false;
     const ts = this.tilesetsByConst[zone.tileset];
+    if (!ts || !ts.passableSet) return false;
     const targetTile = this.getCollisionTileAtStep(zone, toStepX, toStepY);
     if (!ts.passableSet.has(targetTile)) {
       return false;
     }
     // Check elevation pair collisions (data/tilesets/pair_collision_tile_ids.asm)
     const fromTile = this.getCollisionTileAtStep(zone, fromStepX, fromStepY);
-    for (const [tsName, t1, t2] of this.data.tilesets.pairCollisions) {
+    for (const [tsName, t1, t2] of this.data.tilesets.pairCollisions || []) {
       if (tsName === zone.tileset) {
         if (
           (fromTile === t1 && targetTile === t2) ||
@@ -328,13 +354,13 @@ export class PokeYellowEngine {
 
   // Check if moving in `dir` ("DOWN" | "LEFT" | "RIGHT") from (stepX, stepY) triggers a ledge hop
   canJumpLedge(zone, stepX, stepY, dir) {
-    if (zone.tileset !== "OVERWORLD") return false;
+    if (!zone || zone.tileset !== "OVERWORLD") return false;
     const standTile = this.getCollisionTileAtStep(zone, stepX, stepY);
     const dx = dir === "LEFT" ? -1 : dir === "RIGHT" ? 1 : 0;
     const dy = dir === "DOWN" ? 1 : 0;
     if (dx === 0 && dy === 0) return false;
     const frontTile = this.getCollisionTileAtStep(zone, stepX + dx, stepY + dy);
-    for (const l of this.data.tilesets.ledges) {
+    for (const l of this.data.tilesets.ledges || []) {
       if (l.dir === dir && l.standTile === standTile && l.ledgeTile === frontTile) {
         return true;
       }
@@ -353,8 +379,9 @@ export class PokeYellowEngine {
     tileId,
     pal
   ) {
+    if (!ts || !pal) return;
     const sheet = this.gfxSheets[ts.gfxKey];
-    if (!sheet) return;
+    if (!sheet || !sheet.pixels) return;
 
     // Check flower animation on tile $03 (home/vcopy.asm)
     if (tileId === 0x03 && ts.anim === "WATER_FLOWER") {
@@ -364,14 +391,38 @@ export class PokeYellowEngine {
         fIdx = c < 2 ? 0 : c === 2 ? 1 : 2;
       }
       const fPixels = this.flowerFrames[fIdx];
+      if (fPixels) {
+        for (let py = 0; py < 8; py++) {
+          const dy = destY + py;
+          if (dy < 0 || dy >= bufH) continue;
+          for (let px = 0; px < 8; px++) {
+            const dx = destX + px;
+            if (dx < 0 || dx >= bufW) continue;
+            const val = fPixels[py * 8 + px] & 3;
+            const c = pal[3 - val] || pal[0];
+            const off = (dy * bufW + dx) * 4;
+            buf[off] = c[0];
+            buf[off + 1] = c[1];
+            buf[off + 2] = c[2];
+            buf[off + 3] = 255;
+          }
+        }
+        return;
+      }
+    }
+
+    const tileCol = tileId & 0x0f;
+    const tileRow = tileId >> 4;
+    const srcX0 = tileCol * 8;
+    const srcY0 = tileRow * 8;
+    if (srcY0 + 8 > sheet.height) {
+      const c = pal[0] || [250, 250, 250];
       for (let py = 0; py < 8; py++) {
         const dy = destY + py;
         if (dy < 0 || dy >= bufH) continue;
         for (let px = 0; px < 8; px++) {
           const dx = destX + px;
           if (dx < 0 || dx >= bufW) continue;
-          const val = fPixels[py * 8 + px];
-          const c = pal[3 - val];
           const off = (dy * bufW + dx) * 4;
           buf[off] = c[0];
           buf[off + 1] = c[1];
@@ -381,12 +432,6 @@ export class PokeYellowEngine {
       }
       return;
     }
-
-    const tileCol = tileId & 0x0f;
-    const tileRow = tileId >> 4;
-    const srcX0 = tileCol * 8;
-    const srcY0 = tileRow * 8;
-    if (srcY0 + 8 > sheet.height) return;
 
     // Check water ripple shift on tile $14
     let waterShift = 0;
@@ -407,8 +452,8 @@ export class PokeYellowEngine {
         const dx = destX + px;
         if (dx < 0 || dx >= bufW) continue;
         const sx = srcX0 + ((px + waterShift) & 7);
-        const val = sheet.pixels[sy * sheet.width + sx];
-        const c = pal[3 - val];
+        const val = sheet.pixels[sy * sheet.width + sx] & 3;
+        const c = pal[3 - val] || pal[0];
         const off = (dy * bufW + dx) * 4;
         buf[off] = c[0];
         buf[off + 1] = c[1];
@@ -436,7 +481,7 @@ export class PokeYellowEngine {
     stepY = 0
   ) {
     const sheet = this.spriteSheets[spriteKey] || this.spriteSheets.red;
-    if (!sheet) return;
+    if (!sheet || !sheet.pixels || !pal) return;
 
     let frameIdx = 0;
     let flipX = false;
@@ -468,6 +513,7 @@ export class PokeYellowEngine {
     }
 
     const srcY0 = frameIdx * 16;
+    if (srcY0 + 16 > sheet.height) return;
     const accent = this.getSpriteAccentColor(spriteKey, this.paletteMode, pal);
 
     for (let py = 0; py < 16; py++) {
@@ -479,11 +525,12 @@ export class PokeYellowEngine {
         const sx = flipX ? 15 - px : px;
         const val = sheet.pixels[(srcY0 + py) * sheet.width + sx];
         // In Game Boy OAM (rOBP0): val 3 is transparent, val 2 is white (pal[0]), val 1 is accent/gray (pal[1]), val 0 is black (pal[3])
-        if (val === 3) continue;
+        if (val === undefined || val === 3) continue;
         // Authentic tall-grass masking on bottom half of sprite
         if (underGrass && py >= 8 && ((px + py) & 1) === 0) continue;
 
         const c = val === 2 ? pal[0] : val === 1 ? accent : pal[3];
+        if (!c) continue;
         const off = (dy * bufW + dx) * 4;
         buf[off] = c[0];
         buf[off + 1] = c[1];
@@ -499,6 +546,7 @@ export class PokeYellowEngine {
     zone,
     options = {}
   ) {
+    if (!canvas || !zone) return;
     const {
       showBorder = false,
       showEntities = true,
@@ -522,11 +570,14 @@ export class PokeYellowEngine {
     }
 
     const ctx = canvas.getContext("2d");
-    const imgData = ctx.createImageData(pxW, pxH);
+    if (!ctx) return;
+    const imgData = this.getOrCreateImageData(canvas, ctx, pxW, pxH);
     const buf = imgData.data;
 
     const ts = this.tilesetsByConst[zone.tileset];
+    if (!ts) return;
     const bst = this.bstData[ts.bstKey];
+    if (!bst) return;
     const pal = this.getPaletteColors(zone.palette);
 
     for (let by = -borderBlocks; by < zone.height + borderBlocks; by++) {
@@ -556,7 +607,7 @@ export class PokeYellowEngine {
 
     if (showEntities) {
       // Draw zone objects (NPCs, items, trainers)
-      const list = npcStates || zone.objects;
+      const list = npcStates || zone.objects || [];
       for (const obj of list) {
         if (!obj.defaultVisible && !showHiddenObjects) continue;
         if (obj.collected) continue;
@@ -690,7 +741,7 @@ export class PokeYellowEngine {
       ctx.font = "bold 8px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      zone.warps.forEach((w, idx) => {
+      (zone.warps || []).forEach((w, idx) => {
         const wx = originPx + w.x * 16;
         const wy = originPx + w.y * 16;
         ctx.fillStyle = "rgba(37, 99, 235, 0.88)";
@@ -701,7 +752,7 @@ export class PokeYellowEngine {
         ctx.fillStyle = "#ffffff";
         ctx.fillText(`W${idx + 1}`, wx + 8, wy + 8);
       });
-      zone.signs.forEach((s, idx) => {
+      (zone.signs || []).forEach((s, idx) => {
         const sx = originPx + s.x * 16;
         const sy = originPx + s.y * 16;
         ctx.fillStyle = "rgba(217, 119, 6, 0.88)";
@@ -726,6 +777,7 @@ export class PokeYellowEngine {
     showHiddenObjects = false,
     activeEmote = null
   ) {
+    if (!canvas || !zone || !playerState) return;
     const W = 160;
     const H = 144;
     if (canvas.width !== W || canvas.height !== H) {
@@ -733,11 +785,14 @@ export class PokeYellowEngine {
       canvas.height = H;
     }
     const ctx = canvas.getContext("2d");
-    const imgData = ctx.createImageData(W, H);
+    if (!ctx) return;
+    const imgData = this.getOrCreateImageData(canvas, ctx, W, H);
     const buf = imgData.data;
 
     const ts = this.tilesetsByConst[zone.tileset];
+    if (!ts) return;
     const bst = this.bstData[ts.bstKey];
+    if (!bst) return;
     const pal = this.getPaletteColors(zone.palette);
 
     // In Pokémon Yellow, player is rendered at screen (64, 60) [tile (8, 8) minus 4px vertical sprite offset]
@@ -764,7 +819,7 @@ export class PokeYellowEngine {
     }
 
     // Draw NPCs
-    const list = npcStates || zone.objects;
+    const list = npcStates || zone.objects || [];
     for (const obj of list) {
       if (!obj.defaultVisible && !showHiddenObjects) continue;
       if (obj.collected) continue;
@@ -872,7 +927,7 @@ export class PokeYellowEngine {
   }
 
   drawRaw2BitSprite(buf, bufW, bufH, destX, destY, spriteObj, pal, opaqueBg = true) {
-    if (!spriteObj) return;
+    if (!spriteObj || !spriteObj.pixels || !pal) return;
     for (let py = 0; py < spriteObj.height; py++) {
       const dy = destY + py;
       if (dy < 0 || dy >= bufH) continue;
@@ -880,8 +935,8 @@ export class PokeYellowEngine {
         const dx = destX + px;
         if (dx < 0 || dx >= bufW) continue;
         const val = spriteObj.pixels[py * spriteObj.width + px];
-        if (!opaqueBg && val === 3) continue;
-        const c = pal[3 - val];
+        if (val === undefined || (!opaqueBg && val === 3)) continue;
+        const c = pal[3 - (val & 3)] || pal[0];
         const off = (dy * bufW + dx) * 4;
         buf[off] = c[0];
         buf[off + 1] = c[1];
@@ -892,11 +947,14 @@ export class PokeYellowEngine {
   }
 
   render2BitGraphicToCanvas(canvas, spriteObj, palName = "PAL_YELLOWMON") {
-    if (!spriteObj) return;
-    canvas.width = spriteObj.width;
-    canvas.height = spriteObj.height;
+    if (!canvas || !spriteObj || !spriteObj.pixels) return;
+    if (canvas.width !== spriteObj.width || canvas.height !== spriteObj.height) {
+      canvas.width = spriteObj.width;
+      canvas.height = spriteObj.height;
+    }
     const ctx = canvas.getContext("2d");
-    const imgData = ctx.createImageData(spriteObj.width, spriteObj.height);
+    if (!ctx) return;
+    const imgData = this.getOrCreateImageData(canvas, ctx, spriteObj.width, spriteObj.height);
     const pal = this.getPaletteColors(palName);
     this.drawRaw2BitSprite(
       imgData.data,
