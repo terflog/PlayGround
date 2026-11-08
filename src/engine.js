@@ -568,6 +568,12 @@ export class PokeYellowEngine {
           (obj.dir === "UP" || obj.dir === "DOWN" || obj.dir === "LEFT" || obj.dir === "RIGHT"
             ? obj.dir
             : "DOWN");
+        const onGrass =
+          this.getCollisionTileAtStep(
+            zone,
+            Math.round(obj.renderX ?? obj.x),
+            Math.round(obj.renderY ?? obj.y)
+          ) === ts.grassTile;
         this.drawSprite16x16(
           buf,
           pxW,
@@ -578,12 +584,17 @@ export class PokeYellowEngine {
           dir,
           Boolean(obj.isWalking),
           Boolean(obj.stepParity),
-          pal
+          pal,
+          onGrass
         );
       }
 
-      // Draw following Pikachu & Player if in this zone
-      if (pikachuState && pikachuState.visible) {
+      // Draw following Pikachu & Player if in this zone (ShouldPikachuSpawn: only when walking!)
+      if (
+        pikachuState &&
+        pikachuState.visible &&
+        (!playerState || playerState.mode === "walk")
+      ) {
         const px = originPx + Math.round(pikachuState.renderX * 16);
         const py = originPx + Math.round(pikachuState.renderY * 16) - 4;
         const onGrass =
@@ -620,7 +631,7 @@ export class PokeYellowEngine {
           playerState.mode === "bike"
             ? "red_bike"
             : playerState.mode === "surf"
-            ? "surfing_pikachu"
+            ? playerState.surfSprite || "seel"
             : "red";
         this.drawSprite16x16(
           buf,
@@ -766,6 +777,12 @@ export class PokeYellowEngine {
         (obj.dir === "UP" || obj.dir === "DOWN" || obj.dir === "LEFT" || obj.dir === "RIGHT"
           ? obj.dir
           : "DOWN");
+      const onGrass =
+        this.getCollisionTileAtStep(
+          zone,
+          Math.round(obj.renderX ?? obj.x),
+          Math.round(obj.renderY ?? obj.y)
+        ) === ts.grassTile;
       this.drawSprite16x16(
         buf,
         W,
@@ -776,12 +793,17 @@ export class PokeYellowEngine {
         dir,
         Boolean(obj.isWalking),
         Boolean(obj.stepParity),
-        pal
+        pal,
+        onGrass
       );
     }
 
-    // Draw Pikachu follower
-    if (pikachuState && pikachuState.visible) {
+    // Draw Pikachu follower (ShouldPikachuSpawn: only when wWalkBikeSurfState == 0 / walking)
+    if (
+      pikachuState &&
+      pikachuState.visible &&
+      playerState.mode === "walk"
+    ) {
       const px = Math.round(pikachuState.renderX * 16) - camX;
       const py = Math.round(pikachuState.renderY * 16) - camY - 4;
       const onGrass =
@@ -830,7 +852,7 @@ export class PokeYellowEngine {
       playerState.mode === "bike"
         ? "red_bike"
         : playerState.mode === "surf"
-        ? "surfing_pikachu"
+        ? playerState.surfSprite || "seel"
         : "red";
     this.drawSprite16x16(
       buf,

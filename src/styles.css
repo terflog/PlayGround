@@ -1033,6 +1033,50 @@ canvas {
   font-weight: 900;
 }
 
+/* EvolveMon Centered Animation Stage (engine/movie/evolution.asm: hlcoord 0,0 lb bc,12,20 + hlcoord 7,2) */
+.battle-evo-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 84px;
+  background: #faf6ff;
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.battle-evo-stage.evo-flash-silhouette {
+  background: #f1f5f9;
+}
+
+#battle-evo-canvas {
+  width: 84px;
+  height: 84px;
+  display: block;
+  border: 2px solid #111827;
+  background: #ffffff;
+}
+
+.evo-cancel-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border: 2px solid #111827;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.evo-cancel-btn:hover {
+  background: #dc2626;
+}
+
 /* DisplayPartyMenu (0,0..19,17): Full-Screen Party Menu */
 .battle-party-screen {
   position: absolute;
