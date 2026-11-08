@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokémon Yellow Version — All 220 Loadable Zone Segments</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="brand-group">
+          <div class="pikachu-crest" title="Pokémon Yellow: Special Pikachu Edition">⚡</div>
+          <div>
+            <div class="brand-title-row">
+              <h1 class="brand-title">POKéMON YELLOW VERSION</h1>
+              <span class="edition-pill">SPECIAL PIKACHU EDITION</span>
+              <span class="count-pill">220 UNIQUE LOADABLE ZONE SEGMENTS</span>
+            </div>
+            <p class="brand-sub">
+              Authentic <code>pret/pokeyellow</code> Disassembly Engine • 25 Tilesets • 79 Overworld Sprites • Full Warp &amp; Border Connection Graph
+            </p>
+          </div>
+        </div>
+
+        <div class="header-controls">
+          <div class="seg-group" role="group" aria-label="Viewport Mode">
+            <button type="button" class="seg-btn active" data-view-mode="split">Split View</button>
+            <button type="button" class="seg-btn" data-view-mode="zone">Full Zone Map</button>
+            <button type="button" class="seg-btn" data-view-mode="gb">Game Boy 160×144</button>
+          </div>
+
+          <label class="select-wrap" title="Hardware Color Palette">
+            <span>Palette:</span>
+            <select id="palette-select">
+              <option value="reference" selected>Reference Classic (Pallet)</option>
+              <option value="sgb">Super Game Boy (SGB)</option>
+              <option value="cgb">Game Boy Color (CGB)</option>
+              <option value="dmg">Original DMG Olive</option>
+            </select>
+          </label>
+
+          <button type="button" id="btn-open-atlas" class="action-btn accent-btn">
+            🗺️ 220-Zone Visual Atlas
+          </button>
+          <button type="button" id="btn-audio-toggle" class="action-btn">
+            🔇 BGM: OFF
+          </button>
+        </div>
+      </header>
+
+      <!-- Active Zone Telemetry Banner -->
+      <section class="zone-banner">
+        <div class="zone-nav-left">
+          <button type="button" id="btn-prev-zone" class="nav-step-btn" title="Previous Zone ([)">
+            ◀ Prev
+          </button>
+          <span id="active-zone-badge" class="active-zone-badge">ZONE #001 / 220</span>
+          <button type="button" id="btn-next-zone" class="nav-step-btn" title="Next Zone (])">
+            Next ▶
+          </button>
+        </div>
+
+        <div class="zone-banner-center">
+          <h2 id="active-zone-title" class="active-zone-title">Pallet Town</h2>
+          <span id="active-zone-subtitle" class="active-zone-subtitle">
+            PALLET_TOWN (ROM 0x00) • PALLET TOWN • 10×9 Blocks (320×288 px) • Tileset: OVERWORLD
+          </span>
+        </div>
+
+        <div class="zone-banner-right">
+          <span id="hud-player-pos" class="hud-pill">Step (5, 6) • Block (2, 3) • Tile $00</span>
+          <span id="visited-counter" class="hud-pill gold-pill">1 / 220 Visited</span>
+        </div>
+      </section>
+
+      <!-- Main Workspace -->
+      <main class="workspace">
+        <!-- Left/Center Stage: Full Zone Reference Map + Playable Game Boy Viewport -->
+        <section id="main-stage" class="main-stage" data-view-mode="split">
+          <!-- Card 1: Full Zone Segment Renderer (Reference Mode) -->
+          <div class="viewport-card zone-map-card">
+            <div class="card-header">
+              <div>
+                <span class="card-kicker">FULL ZONE SEGMENT RENDERER (1:1 PIXEL ACCURATE)</span>
+                <span class="card-hint">Click any door/stair to warp or any tile to move Red &amp; Pikachu</span>
+              </div>
+              <div class="toolbar-pills">
+                <button type="button" id="btn-toggle-entities" class="pill-btn" title="Overlay Red, Pikachu, and NPCs on the Full Zone Map">
+                  👤 Live Sprites
+                </button>
+                <button type="button" id="btn-toggle-warps" class="pill-btn" title="Highlight Door/Stair Warps (W1..Wn) and Signs (S1..Sn)">
+                  🚪 Warps &amp; Signs
+                </button>
+                <button type="button" id="btn-toggle-grid" class="pill-btn" title="Show 16×16 Step Passability &amp; Tall Grass Collision Grid">
+                  🧱 Collision Grid
+                </button>
+                <button type="button" id="btn-toggle-border" class="pill-btn" title="Render 32×32 Connected Neighbor Map Border Strip">
+                  🧭 Connected Border
+                </button>
+              </div>
+            </div>
+
+            <div class="canvas-stage full-zone-stage">
+              <canvas id="full-zone-canvas" width="320" height="288"></canvas>
+            </div>
+          </div>
+
+          <!-- Card 2: Playable Game Boy Yellow Viewport (160×144) -->
+          <div class="viewport-card gb-viewport-card">
+            <div class="card-header">
+              <div>
+                <span class="card-kicker">LIVE PLAYABLE OVERWORLD (160×144 NATIVE GB)</span>
+                <span class="card-hint">WASD / Arrows: Walk • Z / Space / Enter: Talk &amp; Check Pikachu</span>
+              </div>
+              <div class="toolbar-pills">
+                <button type="button" id="btn-check-pikachu" class="pill-btn pika-btn">
+                  ⚡ Check Pikachu ♥
+                </button>
+                <button type="button" id="btn-toggle-bike" class="pill-btn">
+                  🚲 Bicycle
+                </button>
+              </div>
+            </div>
+
+            <div class="gb-console-body">
+              <div class="gb-screen-bezel">
+                <div class="gb-bezel-top">
+                  <span class="gb-power-led">● BATTERY</span>
+                  <span class="gb-bezel-label">GAME BOY COLOR • POKéMON YELLOW</span>
+                </div>
+
+                <div class="gb-lcd-wrap">
+                  <canvas id="gb-screen-canvas" width="160" height="144"></canvas>
+
+                  <!-- Authentic Game Boy Dialogue / Pikachu Mood Overlay -->
+                  <div id="dialogue-overlay" class="gb-overlay hidden">
+                    <div class="gb-textbox">
+                      <div class="gb-textbox-header">
+                        <span id="dialogue-title">PALLET TOWN</span>
+                        <button type="button" id="dialogue-close-btn" class="gb-mini-close">✕</button>
+                      </div>
+                      <div class="gb-textbox-body">
+                        <div id="dialogue-pika-box" class="dialogue-pika-box hidden">
+                          <canvas id="dialogue-pika-canvas" width="40" height="40"></canvas>
+                        </div>
+                        <p id="dialogue-text" class="gb-dialogue-text"></p>
+                      </div>
+                      <div id="dialogue-elevator-options" class="gb-elevator-list hidden"></div>
+                      <div class="gb-textbox-footer">
+                        <button type="button" id="dialogue-next-btn" class="gb-next-btn">
+                          CONTINUE ▼ (SPACE / A)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Authentic Game Boy Wild Pokémon Battle Overlay -->
+                  <div id="battle-overlay" class="gb-overlay battle-modal hidden">
+                    <div class="gb-battle-screen">
+                      <div class="battle-top-row">
+                        <div class="battle-hud foe-hud">
+                          <div class="battle-hud-line">
+                            <strong id="battle-foe-name">PIDGEY</strong>
+                            <span id="battle-foe-lv">:L3</span>
+                          </div>
+                          <div class="hp-bar-Row">
+                            <span class="hp-tag">HP:</span>
+                            <div class="hp-track">
+                              <div id="battle-foe-hp-fill" class="hp-fill" style="width: 100%"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="battle-sprite-box foe-sprite-box">
+                          <canvas id="battle-foe-canvas" width="40" height="40"></canvas>
+                        </div>
+                      </div>
+
+                      <div class="battle-mid-row">
+                        <div class="battle-sprite-box player-sprite-box">
+                          <canvas id="battle-player-canvas" width="32" height="32"></canvas>
+                        </div>
+                        <div class="battle-hud player-hud">
+                          <div class="battle-hud-line">
+                            <strong>PIKACHU</strong>
+                            <span>:L25</span>
+                          </div>
+                          <div class="hp-bar-Row">
+                            <span class="hp-tag">HP:</span>
+                            <div class="hp-track">
+                              <div id="battle-player-hp-fill" class="hp-fill" style="width: 100%"></div>
+                            </div>
+                          </div>
+                          <div id="battle-player-hp-nums" class="hp-nums">68/68</div>
+                        </div>
+                      </div>
+
+                      <div class="battle-bottom-box">
+                        <p id="battle-log-text" class="battle-log-text">Wild PIDGEY appeared!</p>
+                        <div class="battle-actions">
+                          <button type="button" class="battle-btn" data-battle-act="thunderbolt">⚡ THUNDERBOLT</button>
+                          <button type="button" class="battle-btn" data-battle-act="quickattack">💨 QUICK ATTACK</button>
+                          <button type="button" class="battle-btn" data-battle-act="ball">🔴 POKé BALL</button>
+                          <button type="button" class="battle-btn" data-battle-act="run">🏃 RUN / CLOSE</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Interactive Handheld Controls -->
+              <div class="gb-controls-bar">
+                <div class="dpad-grid" aria-label="Directional Pad">
+                  <span></span>
+                  <button type="button" class="dpad-btn" data-dpad="UP" aria-label="Move Up">▲</button>
+                  <span></span>
+                  <button type="button" class="dpad-btn" data-dpad="LEFT" aria-label="Move Left">◀</button>
+                  <span class="dpad-center"></span>
+                  <button type="button" class="dpad-btn" data-dpad="RIGHT" aria-label="Move Right">▶</button>
+                  <span></span>
+                  <button type="button" class="dpad-btn" data-dpad="DOWN" aria-label="Move Down">▼</button>
+                  <span></span>
+                </div>
+
+                <div class="meta-btns">
+                  <button type="button" id="btn-gb-select" class="gb-pill-btn">SELECT (PIKA)</button>
+                  <button type="button" id="btn-gb-start" class="gb-pill-btn">START (ATLAS)</button>
+                </div>
+
+                <div class="ab-btns">
+                  <button type="button" id="btn-gb-b" class="ab-btn b-btn" title="Cancel / Toggle Bike (X)">B</button>
+                  <button type="button" id="btn-gb-a" class="ab-btn a-btn" title="Interact / Talk / Read Sign (Z / Space)">A</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Zone Connections, Warps, NPCs, & Wild Encounters Inspector -->
+            <div class="inspector-grid">
+              <div class="inspector-section">
+                <div class="inspector-heading">🧭 Border Connections &amp; Door/Stair Warps</div>
+                <div id="inspector-connections" class="chip-list"></div>
+                <div id="inspector-warps" class="chip-list"></div>
+              </div>
+              <div class="inspector-section">
+                <div class="inspector-heading">💬 Signs, NPCs &amp; Wild Encounters (Click to Trigger)</div>
+                <div id="inspector-entities" class="chip-list"></div>
+                <div id="inspector-wild" class="chip-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right Sidebar: All 220 Unique Loadable Zone Segments Browser & Kanto Town Map -->
+        <aside class="sidebar">
+          <div class="sidebar-top">
+            <div class="sidebar-title-row">
+              <h3>220 ZONE SEGMENTS DIRECTORY</h3>
+              <span id="zone-filter-count" class="filter-count">220 shown</span>
+            </div>
+
+            <input
+              type="search"
+              id="zone-search-input"
+              class="zone-search-input"
+              placeholder="Search #001–#220, name, ROM hex (0x00), tileset..."
+            />
+
+            <div class="cat-tabs">
+              <button type="button" class="cat-tab active" data-cat-filter="canonical220">All 220</button>
+              <button type="button" class="cat-tab" data-cat-filter="town">Cities (11)</button>
+              <button type="button" class="cat-tab" data-cat-filter="route">Routes (25)</button>
+              <button type="button" class="cat-tab" data-cat-filter="indoor">Indoor (96)</button>
+              <button type="button" class="cat-tab" data-cat-filter="dungeon">Dungeons (88)</button>
+              <button type="button" class="cat-tab" data-cat-filter="all224" title="Includes Link Cable &amp; Unused Copy ROM headers">+4 ROM (224)</button>
+            </div>
+          </div>
+
+          <div id="zone-list" class="zone-list" role="listbox" aria-label="220 Loadable Zone Segments"></div>
+
+          <!-- Interactive Kanto Town Map Footer -->
+          <div class="town-map-panel">
+            <div class="town-map-header">
+              <span>KANTO WORLD GRID (CLICK TO JUMP)</span>
+              <span class="tm-legend">
+                <i class="dot town-dot"></i>City
+                <i class="dot route-dot"></i>Route
+                <i class="dot dungeon-dot"></i>Dungeon
+              </span>
+            </div>
+            <canvas id="kanto-town-map-canvas" width="224" height="128"></canvas>
+          </div>
+        </aside>
+      </main>
+
+      <!-- Full-Screen 220-Zone Visual Atlas Modal -->
+      <div id="atlas-modal" class="atlas-modal hidden" role="dialog" aria-label="220-Zone Visual Atlas">
+        <div class="atlas-dialog">
+          <div class="atlas-header">
+            <div>
+              <h2>POKéMON YELLOW — COMPLETE 220-ZONE VISUAL ATLAS</h2>
+              <p id="atlas-count-label">Showing 220 Loadable Zone Segments</p>
+            </div>
+            <div class="atlas-controls">
+              <input
+                type="search"
+                id="atlas-search-input"
+                class="zone-search-input"
+                placeholder="Filter zones by name or #number..."
+              />
+              <select id="atlas-cat-select" class="atlas-select">
+                <option value="canonical220">All 220 Canonical Zones</option>
+                <option value="town">Cities &amp; Towns (11)</option>
+                <option value="route">Routes (25)</option>
+                <option value="indoor">Buildings &amp; Interiors (96)</option>
+                <option value="dungeon">Dungeons &amp; Caves (88)</option>
+                <option value="all224">All 224 ROM Headers (+4 Special)</option>
+              </select>
+              <button type="button" id="btn-close-atlas" class="action-btn">✕ Close Atlas</button>
+            </div>
+          </div>
+          <div id="atlas-grid" class="atlas-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

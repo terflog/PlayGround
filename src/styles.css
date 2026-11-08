@@ -1,0 +1,1206 @@
+:root {
+  --bg-deep: #0b101b;
+  --bg-panel: #131b2e;
+  --bg-card: #19233a;
+  --bg-elevated: #212f4d;
+  --border-subtle: rgba(148, 163, 184, 0.18);
+  --border-gold: rgba(250, 204, 21, 0.55);
+  --pika-yellow: #facc15;
+  --pika-amber: #f59e0b;
+  --pika-red: #ef4444;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-deep);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Top Header */
+.top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, #121a2d 0%, #1c2541 55%, #141d33 100%);
+  border-bottom: 2px solid var(--border-gold);
+  flex-shrink: 0;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pikachu-crest {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fde047, #f59e0b);
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.45);
+}
+
+.brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.brand-title {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--pika-yellow);
+}
+
+.edition-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  color: #fca5a5;
+  letter-spacing: 0.05em;
+}
+
+.count-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.16);
+  border: 1px solid var(--border-gold);
+  color: #fef08a;
+  letter-spacing: 0.04em;
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.brand-sub code {
+  color: #e2e8f0;
+  font-family: var(--font-mono);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seg-group {
+  display: inline-flex;
+  background: #0d1424;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.seg-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.seg-btn.active {
+  background: var(--pika-yellow);
+  color: #0f172a;
+}
+
+.select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: #0d1424;
+  border: 1px solid var(--border-subtle);
+  padding: 4px 8px;
+  border-radius: 7px;
+}
+
+.select-wrap select {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+}
+
+.select-wrap select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.action-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.action-btn.accent-btn {
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #0f172a;
+  border-color: #fde047;
+}
+
+.action-btn.active {
+  border-color: var(--pika-yellow);
+  color: var(--pika-yellow);
+}
+
+/* Active Zone Banner */
+.zone-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 16px;
+  background: #101729;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.zone-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-step-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nav-step-btn:hover {
+  border-color: var(--pika-yellow);
+  color: var(--pika-yellow);
+}
+
+.active-zone-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(250, 204, 21, 0.16);
+  border: 1px solid var(--border-gold);
+  color: var(--pika-yellow);
+}
+
+.zone-banner-center {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.active-zone-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.active-zone-subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.zone-banner-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: #cbd5e1;
+}
+
+.hud-pill.gold-pill {
+  border-color: var(--border-gold);
+  color: #fde047;
+}
+
+/* Main Workspace */
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(350px, 0.92fr);
+  gap: 10px;
+  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-stage[data-view-mode="zone"] {
+  grid-template-columns: 1fr;
+}
+.main-stage[data-view-mode="zone"] .gb-viewport-card {
+  display: none;
+}
+
+.main-stage[data-view-mode="gb"] {
+  grid-template-columns: 1fr;
+}
+.main-stage[data-view-mode="gb"] .zone-map-card {
+  display: none;
+}
+
+.viewport-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.card-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--pika-yellow);
+}
+
+.card-hint {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.toolbar-pills {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.pill-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pill-btn.active {
+  background: rgba(250, 204, 21, 0.2);
+  border-color: var(--pika-yellow);
+  color: #fef08a;
+}
+
+.pill-btn.pika-btn {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(250, 204, 21, 0.65);
+  color: #fde047;
+}
+
+.canvas-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  min-height: 0;
+  overflow: auto;
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+}
+
+#full-zone-canvas {
+  width: min(100%, 480px);
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+  object-fit: contain;
+  border: 3px solid #f8fafc;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+  cursor: crosshair;
+  background: #faf4ff;
+}
+
+/* Game Boy Console & LCD Viewport */
+.gb-console-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  gap: 10px;
+  background: radial-gradient(circle at center, #1f2b46 0%, #111827 100%);
+  flex: 1;
+  min-height: 0;
+}
+
+.gb-screen-bezel {
+  background: #262936;
+  border: 3px solid #facc15;
+  border-radius: 12px 12px 22px 12px;
+  padding: 8px 12px 10px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gb-bezel-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 800;
+  color: #94a3b8;
+  margin-bottom: 5px;
+  letter-spacing: 0.05em;
+}
+
+.gb-power-led {
+  color: #ef4444;
+}
+
+.gb-lcd-wrap {
+  position: relative;
+  width: 320px;
+  height: 288px;
+  border: 2px solid #0f172a;
+  background: #f8f4ff;
+  overflow: hidden;
+}
+
+#gb-screen-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Authentic Game Boy Overlays (Dialogue & Battle) */
+.gb-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+   flex-direction: column;
+  justify-content: flex-end;
+  background: rgba(15, 23, 42, 0.28);
+  padding: 6px;
+}
+
+.gb-textbox {
+  background: #fcfcfc;
+  color: #111827;
+  border: 3px double #111827;
+  border-radius: 4px;
+  padding: 7px 9px;
+  font-family: var(--font-mono);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.gb-textbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 800;
+  color: #1e293b;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 3px;
+  margin-bottom: 5px;
+}
+
+.gb-mini-close {
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #475569;
+}
+
+.gb-textbox-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+}
+
+.dialogue-pika-box {
+  flex-shrink: 0;
+  border: 2px solid #111827;
+  background: #ffffff;
+  padding: 2px;
+}
+
+#dialogue-pika-canvas {
+  width: 48px;
+  height: 48px;
+  display: block;
+}
+
+.gb-dialogue-text {
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: pre-line;
+}
+
+.gb-elevator-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 76px;
+  overflow-y: auto;
+}
+
+.gb-floor-btn {
+  background: #e2e8f0;
+  border: 1px solid #1e293b;
+  color: #0f172a;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.gb-floor-btn:hover {
+  background: #facc15;
+}
+
+.gb-textbox-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 5px;
+}
+
+.gb-next-btn {
+  background: #111827;
+  color: #facc15;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* Wild Battle Modal */
+.gb-overlay.battle-modal {
+  background: #faf8ff;
+  justify-content: space-between;
+  padding: 6px;
+}
+
+.gb-battle-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #111827;
+  font-family: var(--font-mono);
+}
+
+.battle-top-row,
+.battle-mid-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px;
+}
+
+.battle-hud {
+  background: #ffffff;
+  border: 2px solid #111827;
+  padding: 4px 7px;
+  width: 155px;
+}
+
+.battle-hud-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.hp-bar-Row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.hp-tag {
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.hp-track {
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border: 1px solid #111827;
+}
+
+.hp-fill {
+  height: 100%;
+  background: #22c55e;
+  transition: width 0.2s ease;
+}
+
+.hp-nums {
+  font-size: 9px;
+  text-align: right;
+  margin-top: 2px;
+  font-weight: 700;
+}
+
+#battle-foe-canvas {
+  width: 64px;
+  height: 64px;
+}
+
+#battle-player-canvas {
+  width: 56px;
+  height: 56px;
+}
+
+.battle-bottom-box {
+  border: 3px double #111827;
+  background: #ffffff;
+  padding: 5px 7px;
+}
+
+.battle-log-text {
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 5px;
+  min-height: 24px;
+}
+
+.battle-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.battle-btn {
+  background: #f1f5f9;
+  border: 1px solid #0f172a;
+  color: #0f172a;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 5px;
+  cursor: pointer;
+}
+
+.battle-btn:hover {
+  background: #fde047;
+}
+
+/* Handheld Controls Bar */
+.gb-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 340px;
+  gap: 10px;
+}
+
+.dpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 26px);
+  grid-template-rows: repeat(3, 24px);
+  gap: 2px;
+}
+
+.dpad-btn {
+  background: #334155;
+  border: 1px solid #64748b;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dpad-btn:active {
+  background: var(--pika-yellow);
+  color: #0f172a;
+}
+
+.dpad-center {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+.meta-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gb-pill-btn {
+  background: #334155;
+  border: 1px solid #64748b;
+  color: #e2e8f0;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ab-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ab-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  font-weight: 900;
+  font-size: 13px;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.a-btn {
+  background: #dc2626;
+}
+
+.b-btn {
+  background: #2563eb;
+}
+
+/* Inspector Grid under Game Boy Viewport */
+.inspector-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #0e1525;
+  border-top: 1px solid var(--border-subtle);
+  max-height: 145px;
+  overflow-y: auto;
+}
+
+.inspector-heading {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--pika-yellow);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.conn-chip,
+.warp-chip,
+.entity-chip,
+.wild-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: #e2e8f0;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.conn-chip:hover,
+.warp-chip:hover,
+.entity-chip:hover,
+.wild-chip:hover {
+  border-color: var(--pika-yellow);
+  color: #fef08a;
+}
+
+.conn-dir,
+.warp-idx {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  color: #60a5fa;
+}
+
+.wild-chip {
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #86efac;
+}
+
+.muted-note {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Right Sidebar: 220 Zone Directory & Kanto Town Map */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: #101728;
+  border-left: 1px solid var(--border-subtle);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar-top {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sidebar-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-title-row h3 {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--pika-yellow);
+  letter-spacing: 0.04em;
+}
+
+.filter-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.zone-search-input {
+  width: 100%;
+  background: #090e1a;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-size: 11px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  outline: none;
+}
+
+.zone-search-input:focus {
+  border-color: var(--pika-yellow);
+}
+
+.cat-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.cat-tab {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 5px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.cat-tab.active {
+  background: rgba(250, 204, 21, 0.18);
+  border-color: var(--pika-yellow);
+  color: #fef08a;
+}
+
+.zone-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zone-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+}
+
+.zone-item:hover {
+  border-color: rgba(250, 204, 21, 0.4);
+}
+
+.zone-item.active {
+  background: rgba(250, 204, 21, 0.14);
+  border-color: var(--pika-yellow);
+}
+
+.zone-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--pika-yellow);
+  flex-shrink: 0;
+}
+
+.zone-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.zone-title {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zone-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zone-tag {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.tag-town {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+}
+.tag-route {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+.tag-indoor {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+}
+.tag-dungeon {
+  background: rgba(168, 85, 247, 0.22);
+  color: #d8b4fe;
+}
+
+/* Kanto Town Map Footer */
+.town-map-panel {
+  padding: 7px 10px;
+  background: #0b1120;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.town-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.tm-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  margin-right: 2px;
+}
+.town-dot {
+  background: #f59e0b;
+}
+.route-dot {
+  background: #22c55e;
+}
+.dungeon-dot {
+  background: #a855f7;
+}
+
+#kanto-town-map-canvas {
+  width: 100%;
+  height: 112px;
+  display: block;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* 220-Zone Visual Atlas Modal */
+.atlas-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(6, 10, 19, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.atlas-dialog {
+  width: 100%;
+  max-width: 1360px;
+  height: 90vh;
+  background: var(--bg-panel);
+  border: 2px solid var(--pika-yellow);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.atlas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #0f172a;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.atlas-header h2 {
+  font-size: 15px;
+  color: var(--pika-yellow);
+}
+
+.atlas-header p {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.atlas-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-controls .zone-search-input {
+  width: 240px;
+}
+
+.atlas-select {
+  background: #090e1a;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.atlas-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 10px;
+}
+
+.atlas-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.atlas-card:hover,
+.atlas-card.active {
+  border-color: var(--pika-yellow);
+  background: rgba(250, 204, 21, 0.1);
+}
+
+.atlas-thumb-canvas {
+  width: 100%;
+  height: 120px;
+  object-fit: contain;
+  background: #0b101b;
+  border-radius: 4px;
+}
+
+.atlas-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.atlas-card-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.atlas-card-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* Responsive Mobile Layout (390×844) */
+@media (max-width: 980px) {
+  html,
+  body {
+    overflow: auto;
+  }
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .top-header,
+  .zone-banner {
+    padding: 6px 10px;
+  }
+  .brand-sub {
+    display: none;
+  }
+  .workspace {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  .main-stage {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  .gb-lcd-wrap {
+    width: 260px;
+    height: 234px;
+  }
+  .sidebar {
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    max-height: 420px;
+  }
+}
