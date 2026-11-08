@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101c2d" />
+  <title>Pocket Trails — Yellow Day</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Pocket Trails home"><span class="brand-mark">✦</span><span>POCKET <b>TRAILS</b></span></a>
+      <div class="edition"><span class="edition-dot"></span> YELLOW DAY <span class="edition-sep">/</span> A TINY MONSTER RPG</div>
+      <button id="sound-toggle" class="sound-toggle" aria-label="Toggle sound" title="Toggle sound">♫ <span>Sound on</span></button>
+    </header>
+
+    <section class="game-layout" aria-label="Pocket Trails game">
+      <div class="game-column">
+        <div class="game-frame">
+          <div class="screen-top"><span><i class="live-dot"></i> LIVE ADVENTURE</span><span id="area-label">SUNMEADOW TOWN</span></div>
+          <div class="canvas-wrap">
+            <canvas id="game" width="384" height="216" aria-label="Game screen"></canvas>
+            <div class="screen-grain"></div>
+          </div>
+          <div class="screen-bottom"><span id="status-line">A bright new day is waiting.</span><span class="pixel-heart">♥</span></div>
+        </div>
+        <div class="controls-row">
+          <div class="dpad" aria-label="Movement controls">
+            <button class="dpad-btn up" data-dir="up" aria-label="Move up">▲</button>
+            <button class="dpad-btn left" data-dir="left" aria-label="Move left">◀</button>
+            <button class="dpad-btn right" data-dir="right" aria-label="Move right">▶</button>
+            <button class="dpad-btn down" data-dir="down" aria-label="Move down">▼</button>
+            <span class="dpad-center"></span>
+          </div>
+          <div class="control-hint"><span class="keycap">WASD</span> or <span class="keycap">↑ ↓ ← →</span> to explore <span class="hint-dot">·</span> <span class="keycap">SPACE</span> talk / continue</div>
+          <button id="action-button" class="action-button"><span class="action-icon">✦</span><span id="action-label">START JOURNEY</span><span class="action-key">ENTER</span></button>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <div class="panel-kicker">YOUR LITTLE TEAM</div>
+        <div class="partner-card">
+          <div class="partner-art" aria-hidden="true"><span class="spark spark-a">✦</span><span class="spark spark-b">✦</span><div class="buddy-icon"><i class="ear e1"></i><i class="ear e2"></i><i class="cheek c1"></i><i class="cheek c2"></i><i class="eye eye1"></i><i class="eye eye2"></i><i class="mouth"></i></div></div>
+          <div class="partner-info"><div class="partner-name">VOLTkit <span>Lv.<b id="level">3</b></span></div><div class="partner-type"><i></i> SPARK TYPE</div><div class="hp-track"><div id="hp-bar" class="hp-fill"></div></div><div class="hp-text"><span>VITALITY</span><b id="hp-text">28 / 28</b></div></div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box"><span>TRAIL BUDDIES</span><b id="buddy-count">01</b><i>collected</i></div>
+          <div class="stat-box"><span>WINS</span><b id="win-count">00</b><i>good battles</i></div>
+        </div>
+        <div class="field-note"><div class="note-icon">✎</div><div><b id="note-title">FIELD NOTE #01</b><p id="field-note">Tall grass rustles with little creatures. Walk through it to meet a new friend.</p></div></div>
+        <div class="goal-box"><span class="goal-label">TODAY'S LITTLE QUEST</span><div class="goal-text"><span class="goal-check" id="goal-check">○</span><span id="goal-text">Find the trail beyond town</span></div><div class="goal-progress"><div id="goal-progress"></div></div></div>
+        <div class="side-footer"><span>✦</span> A pocket-sized adventure for curious hearts</div>
+      </aside>
+    </section>
+    <footer class="page-footer"><span>MADE FOR SLOW DAYS &amp; BIG ADVENTURES</span><span>NO RUSH. JUST WANDER. <b>✦</b></span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="game.js"></script>
+</body>
+</html>
