@@ -91,6 +91,15 @@ export class PokeYellowEngine {
       };
     }
 
+    this.trainerSprites = {};
+    for (const [k, v] of Object.entries(data.sprites.trainers || {})) {
+      this.trainerSprites[k] = {
+        width: v.width,
+        height: v.height,
+        pixels: unpack2Bit(v.data, v.width, v.height),
+      };
+    }
+
     // Index all zones
     this.allZones = data.zones.map((z) => ({
       ...z,

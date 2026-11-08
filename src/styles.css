@@ -598,14 +598,16 @@ canvas {
   color: #ffffff;
 }
 
-/* Wild Battle Modal */
+/* Authentic Generation I (pret/pokeyellow) Battle Screen & Menu System */
 .gb-overlay.battle-modal {
-  background: #faf8ff;
+  background: #faf6ff;
   justify-content: space-between;
-  padding: 6px;
+  padding: 0;
+  z-index: 20;
 }
 
 .gb-battle-screen {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
@@ -613,40 +615,140 @@ canvas {
   justify-content: space-between;
   color: #111827;
   font-family: var(--font-mono);
+  background: #faf6ff;
+  user-select: none;
 }
 
-.battle-top-row,
+.battle-exit-btn {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  z-index: 35;
+  background: rgba(17, 24, 39, 0.12);
+  border: 1px solid #111827;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 1px 4px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.battle-exit-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.battle-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 4px 8px 0 6px;
+  min-height: 76px;
+}
+
 .battle-mid-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  padding: 2px 6px;
+  padding: 0 6px 2px 10px;
+  min-height: 74px;
 }
 
 .battle-hud {
-  background: #ffffff;
-  border: 2px solid #111827;
-  padding: 4px 7px;
-  width: 155px;
+  position: relative;
+  background: transparent;
+  padding: 2px 6px 5px 6px;
+  width: 152px;
+}
+
+/* Authentic PlaceEnemyHUDTiles & PlacePlayerHUDTiles L-brackets (draw_hud_pokeball_gfx.asm) */
+.hud-lbracket {
+  position: relative;
+  height: 4px;
+  margin-top: 2px;
+  border-bottom: 2px solid #111827;
+}
+
+.foe-bracket {
+  border-left: 2px solid #111827;
+  height: 7px;
+  margin-top: -2px;
+}
+
+.foe-bracket .bracket-tri {
+  position: absolute;
+  right: -1px;
+  bottom: -4px;
+  font-size: 8px;
+  line-height: 1;
+  color: #111827;
+}
+
+.player-bracket {
+  border-right: 2px solid #111827;
+  height: 7px;
+  margin-top: -2px;
+}
+
+.player-bracket .bracket-tri {
+  position: absolute;
+  left: -1px;
+  bottom: -4px;
+  font-size: 8px;
+  line-height: 1;
+  color: #111827;
+}
+
+.battle-party-balls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+  font-weight: 900;
+}
+
+.pball-icon.alive {
+  color: #dc2626;
+}
+.pball-icon.status {
+  color: #475569;
+}
+.pball-icon.fainted {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+.pball-icon.empty {
+  color: #cbd5e1;
 }
 
 .battle-hud-line {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 900;
+  letter-spacing: 0.02em;
 }
 
 .hp-bar-Row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 3px;
+  gap: 3px;
+  margin-top: 2px;
 }
 
 .hp-tag {
   font-size: 9px;
-  font-weight: 800;
+  font-weight: 900;
+  background: #111827;
+  color: #facc15;
+  padding: 0 2px;
+  line-height: 1.1;
 }
 
 .hp-track {
@@ -659,58 +761,414 @@ canvas {
 .hp-fill {
   height: 100%;
   background: #22c55e;
-  transition: width 0.2s ease;
+  transition: width 0.18s ease;
 }
 
 .hp-nums {
-  font-size: 9px;
+  font-size: 10px;
   text-align: right;
-  margin-top: 2px;
-  font-weight: 700;
+  margin-top: 1px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
 }
 
 #battle-foe-canvas {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
+  display: block;
 }
 
 #battle-player-canvas {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
+  display: block;
 }
 
-.battle-bottom-box {
+/* Authentic Gen I Double-Bordered Text & Menu Boxes (TextBoxBorder) */
+.gb-poke-box {
+  background: #fcfaff;
   border: 3px double #111827;
-  background: #ffffff;
-  padding: 5px 7px;
+  box-shadow: inset 0 0 0 1px #111827;
+  color: #111827;
 }
 
-.battle-log-text {
-  font-size: 10px;
-  font-weight: 700;
-  margin-bottom: 5px;
-  min-height: 24px;
-}
-
-.battle-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-}
-
-.battle-btn {
-  background: #f1f5f9;
-  border: 1px solid #0f172a;
-  color: #0f172a;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 800;
-  padding: 3px 5px;
+/* MESSAGE_BOX: (0,12)..(19,17) -> Bottom 84px of 252px screen */
+.battle-bottom-box {
+  position: relative;
+  height: 84px;
+  flex-shrink: 0;
+  border: 3px double #111827;
+  box-shadow: inset 0 0 0 1px #111827;
+  background: #fcfaff;
+  padding: 7px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   cursor: pointer;
 }
 
-.battle-btn:hover {
-  background: #fde047;
+.battle-log-text {
+  font-size: 11px;
+  line-height: 1.45;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: pre-line;
+  max-width: 100%;
+}
+
+.battle-msg-prompt {
+  position: absolute;
+  right: 8px;
+  bottom: 5px;
+  font-size: 10px;
+  font-weight: 900;
+  color: #111827;
+  animation: gbPromptBlink 0.65s steps(2, start) infinite;
+}
+
+@keyframes gbPromptBlink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* BATTLE_MENU_TEMPLATE: (8,12)..(19,17) -> Right 60% of bottom message box */
+.battle-main-menu {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  bottom: -3px;
+  width: 60%;
+  padding: 8px 8px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  gap: 4px 4px;
+  z-index: 10;
+}
+
+/* SAFARI_BATTLE_MENU_TEMPLATE: (0,12)..(19,17) -> Full width of bottom message box */
+.battle-safari-menu {
+  position: absolute;
+  inset: -3px;
+  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  gap: 4px 8px;
+  z-index: 10;
+}
+
+.bmenu-item {
+  background: transparent;
+  border: none;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: left;
+  padding: 2px 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.bmenu-item:hover {
+  background: rgba(250, 204, 21, 0.35);
+}
+
+.bcursor {
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  color: #111827;
+  flex-shrink: 0;
+}
+
+.pkmn-glyph {
+  font-size: 10px;
+  letter-spacing: -0.04em;
+}
+
+/* MoveSelectionMenu (4,12..19,17) + PrintMenuItem TYPE/PP Box (0,8..10,12) */
+.battle-fight-wrap {
+  position: absolute;
+  inset: -3px;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.battle-type-pp-box {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% - 6px);
+  width: 55%;
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.25;
+  pointer-events: auto;
+  z-index: 16;
+}
+
+.battle-type-pp-box .type-row {
+  color: #111827;
+}
+
+.battle-type-pp-box .type-val {
+  padding-left: 8px;
+  color: #111827;
+}
+
+.battle-type-pp-box .pp-val {
+  text-align: right;
+  letter-spacing: 0.05em;
+}
+
+.battle-moves-box {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 80%;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 17;
+}
+
+.battle-moves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.bmove-row {
+  background: transparent;
+  border: none;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: left;
+  padding: 1px 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.bmove-row:hover {
+  background: rgba(250, 204, 21, 0.35);
+}
+
+.bmenu-back-hint {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  background: #111827;
+  color: #facc15;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* LIST_MENU_BOX (4,2..19,12): Bag Item Menu (DisplayBagMenu) */
+.battle-bag-box {
+  position: absolute;
+  top: 22px;
+  right: 0;
+  width: 80%;
+  height: 146px;
+  padding: 6px 8px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+}
+
+.battle-bag-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bbag-row {
+  background: transparent;
+  border: none;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 3px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bbag-row:hover {
+  background: rgba(250, 204, 21, 0.35);
+}
+
+.bbag-left {
+  display: inline-flex;
+  align-items: center;
+}
+
+.bbag-qty {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+/* DisplayPartyMenu (0,0..19,17): Full-Screen Party Menu */
+.battle-party-screen {
+  position: absolute;
+  inset: 0;
+  background: #faf6ff;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.battle-party-list {
+  flex: 1;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.bparty-row {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 900;
+  padding: 2px 4px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 12px 16px 1fr 42px;
+  align-items: center;
+  gap: 3px;
+  text-align: left;
+}
+
+.bparty-row:hover,
+.bparty-row.selected {
+  background: rgba(250, 204, 21, 0.28);
+  border-color: #111827;
+}
+
+.bparty-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.bparty-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bparty-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+}
+
+.bparty-hp-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.bparty-nums {
+  font-size: 9px;
+  text-align: right;
+}
+
+.battle-party-footer {
+  position: relative;
+  height: 44px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+/* SWITCH_STATS_CANCEL_MENU_TEMPLATE (11,11..19,17) */
+.battle-party-sub-menu {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 46%;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 32;
+}
+
+/* StatusScreen Modal */
+.battle-stats-modal {
+  position: absolute;
+  inset: 4px;
+  z-index: 34;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.battle-stats-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats-top-grid {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 6px;
+  align-items: center;
+  border-bottom: 2px solid #111827;
+  padding-bottom: 4px;
+}
+
+.stats-mid-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 4px;
+}
+
+.stats-moves-box {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 /* Handheld Controls Bar */

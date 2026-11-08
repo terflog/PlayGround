@@ -434,18 +434,32 @@ def parse_sprites():
 def parse_battle_database():
     """Parses moves.asm, type_matchups.asm, base_stats/*.asm, evos_moves.asm, and trainer parties.asm."""
     # 1. Moves
+    with open(f"{POKEYELLOW}/data/moves/names.asm") as f:
+        mn_txt = f.read()
+    move_display_names = [
+        clean_poke_str(m.group(1)) for m in re.finditer(r'li\s+"([^"]+)"', mn_txt)
+    ]
+
     with open(f"{POKEYELLOW}/data/moves/moves.asm") as f:
         mv_txt = f.read()
     moves = {}
-    for m in re.finditer(
-        r"move\s+([A-Z0-9_]+),\s*([A-Z0-9_]+),\s*(\d+),\s*([A-Z0-9_]+),\s*(\d+)\s*percent,\s*(\d+)",
-        mv_txt,
+    for idx, m in enumerate(
+        re.finditer(
+            r"move\s+([A-Z0-9_]+),\s*([A-Z0-9_]+),\s*(\d+),\s*([A-Z0-9_]+),\s*(\d+),\s*(\d+)",
+            mv_txt,
+        )
     ):
         mname, effect, pwr, mtype, acc, pp = m.groups()
         clean_type = mtype.replace("_TYPE", "")
+        dname = (
+            move_display_names[idx]
+            if idx < len(move_display_names)
+            else mname.replace("_M", "").replace("_", " ")
+        )
         moves[mname] = {
             "id": mname,
-            "name": mname.replace("_M", "").replace("_", " "),
+            "num": idx + 1,
+            "name": dname,
             "effect": effect,
             "power": int(pwr),
             "type": clean_type,

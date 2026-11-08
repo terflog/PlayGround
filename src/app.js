@@ -23,8 +23,19 @@ const state = {
   searchQuery: "",
   townMapFilterCoords: null,
   visitedZones: new Set(["PALLET_TOWN"]),
-  caughtPokemon: new Set(["PIKACHU"]),
+  caughtPokemon: new Set(["PIKACHU", "BULBASAUR", "CHARMANDER", "SQUIRTLE"]),
   defeatedTrainers: new Set(),
+  party: [],
+  bag: [
+    { id: "POKE_BALL", name: "POKé BALL", qty: 10, kind: "ball", mult: 1.0 },
+    { id: "GREAT_BALL", name: "GREAT BALL", qty: 5, kind: "ball", mult: 1.5 },
+    { id: "ULTRA_BALL", name: "ULTRA BALL", qty: 3, kind: "ball", mult: 2.0 },
+    { id: "MASTER_BALL", name: "MASTER BALL", qty: 1, kind: "ball", mult: 255.0 },
+    { id: "POTION", name: "POTION", qty: 5, kind: "heal", hp: 20 },
+    { id: "SUPER_POTION", name: "SUPER POTION", qty: 3, kind: "heal", hp: 50 },
+    { id: "FULL_RESTORE", name: "FULL RESTORE", qty: 2, kind: "heal", hp: 999, cure: true },
+    { id: "POKE_FLUTE", name: "POKé FLUTE", qty: 1, kind: "flute" },
+  ],
   player: {
     x: 5,
     y: 6,
@@ -119,6 +130,138 @@ const ELEVATOR_FLOORS = {
 
 const STORAGE_KEY = "pokeyellow_220_save_v1";
 
+const SPECIAL_TYPES = new Set([
+  "FIRE",
+  "WATER",
+  "GRASS",
+  "ELECTRIC",
+  "ICE",
+  "PSYCHIC",
+  "DRAGON",
+]);
+
+function getMoveObj(moveId) {
+  const mv = POKEYELLOW_DATA.battle?.moves?.[moveId];
+  if (mv) {
+    return {
+      id: mv.id,
+      name: mv.name,
+      type: mv.type,
+      power: mv.power,
+      accuracy: mv.accuracy,
+      pp: mv.pp,
+      maxPp: mv.pp,
+      effect: mv.effect,
+    };
+  }
+  return {
+    id: moveId,
+    name: String(moveId || "TACKLE").replace(/_M$/, "").replace(/_/g, " "),
+    type: "NORMAL",
+    power: 40,
+    accuracy: 100,
+    pp: 35,
+    maxPp: 35,
+    effect: "NO_ADDITIONAL_EFFECT",
+  };
+}
+
+export function buildMonInstance(speciesKey, level = 10, customMoveIds = null) {
+  const cleanKey = String(speciesKey || "PIKACHU").toUpperCase();
+  const base = POKEYELLOW_DATA.battle?.pokemonStats?.[cleanKey] ||
+    POKEYELLOW_DATA.battle?.pokemonStats?.PIKACHU || {
+      species: cleanKey,
+      hp: 45,
+      atk: 55,
+      def: 45,
+      spd: 60,
+      spc: 50,
+      types: ["NORMAL"],
+      catchRate: 190,
+      baseExp: 64,
+      baseMoves: ["TACKLE"],
+      learnset: [],
+    };
+
+  const lv = Math.max(1, Math.min(100, Number(level) || 10));
+  const maxHp = Math.floor(((base.hp + 15) * 2 * lv) / 100) + lv + 10;
+  const atk = Math.floor(((base.atk + 15) * 2 * lv) / 100) + 5;
+  const def = Math.floor(((base.def + 15) * 2 * lv) / 100) + 5;
+  const spd = Math.floor(((base.spd + 15) * 2 * lv) / 100) + 5;
+  const spc = Math.floor(((base.spc + 15) * 2 * lv) / 100) + 5;
+
+  let moveIds = [];
+  if (Array.isArray(customMoveIds) && customMoveIds.length > 0) {
+    moveIds = customMoveIds.slice(0, 4);
+  } else {
+    const known = [...(base.baseMoves || ["TACKLE"])];
+    for (const [learnLv, mId] of base.learnset || []) {
+      if (learnLv <= lv && !known.includes(mId)) {
+        known.push(mId);
+      }
+    }
+    moveIds = known.slice(-4);
+  }
+  if (moveIds.length === 0) moveIds = ["TACKLE"];
+
+  return {
+    species: cleanKey,
+    nickname: cleanKey.replace(/_/g, " "),
+    level: lv,
+    hp: maxHp,
+    maxHp,
+    atk,
+    def,
+    spd,
+    spc,
+    types: base.types || ["NORMAL"],
+    catchRate: base.catchRate ?? 120,
+    baseExp: base.baseExp ?? 64,
+    status: "OK", // "OK" | "PAR" | "PSN" | "SLP" | "BRN" | "FRZ"
+    moves: moveIds.map((mId) => getMoveObj(mId)),
+  };
+}
+
+function initDefaultParty() {
+  if (state.party.length > 0) return;
+  state.party = [
+    buildMonInstance("PIKACHU", 25, [
+      "THUNDERBOLT",
+      "QUICK_ATTACK",
+      "THUNDER_WAVE",
+      "SLAM",
+    ]),
+    buildMonInstance("BULBASAUR", 22, [
+      "RAZOR_LEAF",
+      "VINE_WHIP",
+      "SLEEP_POWDER",
+      "TACKLE",
+    ]),
+    buildMonInstance("CHARMANDER", 22, [
+      "FLAMETHROWER",
+      "EMBER",
+      "SLASH",
+      "SCRATCH",
+    ]),
+    buildMonInstance("SQUIRTLE", 22, [
+      "BUBBLEBEAM",
+      "WATER_GUN",
+      "BITE",
+      "TACKLE",
+    ]),
+  ];
+}
+
+export function healParty() {
+  for (const mon of state.party) {
+    mon.hp = mon.maxHp;
+    mon.status = "OK";
+    for (const mv of mon.moves) {
+      mv.pp = mv.maxPp;
+    }
+  }
+}
+
 function saveProgress() {
   try {
     const payload = {
@@ -133,6 +276,7 @@ function saveProgress() {
 }
 
 function loadProgress() {
+  initDefaultParty();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -151,41 +295,69 @@ function loadProgress() {
   }
 }
 
+function resolveTrainerSpriteKey(trainerClass, trainerSprite, npcSprite) {
+  if (trainerSprite && engine.trainerSprites[trainerSprite]) {
+    return trainerSprite;
+  }
+  if (trainerClass) {
+    const clean = trainerClass
+      .replace(/^OPP_/, "")
+      .replace(/^JR_TRAINER_M$/, "JR_TRAINERM")
+      .replace(/^JR_TRAINER_F$/, "JR_TRAINERF")
+      .replace(/^COOLTRAINER_M$/, "COOLTRAINERM")
+      .replace(/^COOLTRAINER_F$/, "COOLTRAINERF")
+      .replace(/^BUG_CATCHER$/, "BUGCATCHER")
+      .replace(/^BIRD_KEEPER$/, "BIRDKEEPER")
+      .replace(/^BLACK_BELT$/, "BLACKBELT")
+      .replace(/^SUPER_NERD$/, "SUPERNERD");
+    if (engine.trainerSprites[clean]) return clean;
+  }
+  const sprMap = {
+    SPRITE_OAK: "PROF_OAK",
+    SPRITE_BLUE: "RIVAL1",
+    SPRITE_GIOVANNI: "GIOVANNI",
+    SPRITE_JESSIE: "JESSIEJAMES",
+    SPRITE_JAMES: "JESSIEJAMES",
+    SPRITE_ROCKET: "ROCKET",
+    SPRITE_COOLTRAINER_M: "COOLTRAINERM",
+    SPRITE_COOLTRAINER_F: "COOLTRAINERF",
+    SPRITE_SUPER_NERD: "SUPERNERD",
+    SPRITE_GENTLEMAN: "GENTLEMAN",
+    SPRITE_SAILOR: "SAILOR",
+    SPRITE_SWIMMER: "SWIMMER",
+    SPRITE_BEAUTY: "BEAUTY",
+    SPRITE_SCIENTIST: "SCIENTIST",
+    SPRITE_CHANNELER: "CHANNELER",
+    SPRITE_HIKER: "HIKER",
+    SPRITE_BIKER: "BIKER",
+    SPRITE_FISHER: "FISHER",
+    SPRITE_YOUNGSTER: "YOUNGSTER",
+    SPRITE_GIRL: "LASS",
+    SPRITE_LORELEI: "LORELEI",
+    SPRITE_BRUNO: "BRUNO",
+    SPRITE_AGATHA: "AGATHA",
+    SPRITE_LANCE: "LANCE",
+  };
+  return sprMap[npcSprite] || null;
+}
+
 function getTrainerBattleEntry(npc, zone) {
   if (!npc || npc.kind === "item") return null;
   const key = `${zone.constName}:${npc.name}:${npc.id}`;
-  const label = `${npc.name} ${npc.sprite} ${zone.constName}`.toUpperCase();
-
-  if (label.includes("BROCK")) return { trainerName: "LEADER BROCK", species: "ONIX", level: 12, key };
-  if (label.includes("MISTY")) return { trainerName: "LEADER MISTY", species: "STARMIE", level: 21, key };
-  if (label.includes("SURGE")) return { trainerName: "LT. SURGE", species: "RAICHU", level: 28, key };
-  if (label.includes("ERIKA")) return { trainerName: "LEADER ERIKA", species: "GLOOM", level: 32, key };
-  if (label.includes("KOGA")) return { trainerName: "LEADER KOGA", species: "VENOMOTH", level: 50, key };
-  if (label.includes("SABRINA")) return { trainerName: "LEADER SABRINA", species: "ALAKAZAM", level: 50, key };
-  if (label.includes("BLAINE")) return { trainerName: "LEADER BLAINE", species: "ARCANINE", level: 54, key };
-  if (label.includes("GIOVANNI")) return { trainerName: "BOSS GIOVANNI", species: "PERSIAN", level: 53, key };
-  if (label.includes("LORELEI")) return { trainerName: "ELITE LORELEI", species: "LAPRAS", level: 56, key };
-  if (label.includes("BRUNO")) return { trainerName: "ELITE BRUNO", species: "MACHAMP", level: 58, key };
-  if (label.includes("AGATHA")) return { trainerName: "ELITE AGATHA", species: "GENGAR", level: 60, key };
-  if (label.includes("LANCE")) return { trainerName: "ELITE LANCE", species: "DRAGONITE", level: 62, key };
-  if (label.includes("BLUE") || label.includes("RIVAL")) return { trainerName: "RIVAL BLUE", species: "EEVEE", level: 25, key };
-  if (label.includes("JESSIE") || label.includes("JAMES") || label.includes("ROCKET")) {
-    return { trainerName: "TEAM ROCKET", species: "MEOWTH", level: 24, key };
-  }
-  if (label.includes("MEWTWO")) return { trainerName: null, species: "MEWTWO", level: 70, key };
-  if (label.includes("ZAPDOS")) return { trainerName: null, species: "ZAPDOS", level: 50, key };
-  if (label.includes("ARTICUNO")) return { trainerName: null, species: "ARTICUNO", level: 50, key };
-  if (label.includes("MOLTRES")) return { trainerName: null, species: "MOLTRES", level: 50, key };
-  if (label.includes("SNORLAX")) return { trainerName: null, species: "SNORLAX", level: 30, key };
-
-  if (npc.kind === "trainer") {
-    const pool = ["RATTATA", "PIDGEOTTO", "SANDSHREW", "NIDORINO", "KADABRA", "MACHOKE"];
-    const pick = pool[(npc.id + zone.zoneNumber) % pool.length];
+  if (npc.battle && Array.isArray(npc.battle.party) && npc.battle.party.length > 0) {
+    const b = npc.battle;
+    const firstMon = b.party[0];
     return {
-      trainerName: npc.name.replace(/_/g, " "),
-      species: pick,
-      level: Math.min(55, 10 + Math.floor(zone.zoneNumber / 5)),
       key,
+      isWild: Boolean(b.isWild),
+      trainerClass: b.trainerClass || null,
+      trainerName: b.isWild ? null : b.trainerName,
+      trainerSprite: resolveTrainerSpriteKey(b.trainerClass, b.trainerSprite, npc.sprite),
+      party: b.party,
+      species: firstMon[1],
+      level: firstMon[0],
+      battleText: b.battleText || "",
+      endBattleText: b.endBattleText || "Impossible! You defeated my POKéMON!",
     };
   }
   return null;
@@ -723,6 +895,9 @@ export function interactInFront() {
         if (npc.kind === "item") {
           npc.collected = true;
         }
+        if (npc.sprite === "SPRITE_NURSE" || npc.sprite === "SPRITE_MOM") {
+          healParty();
+        }
         audio.playSfx("blip");
         const trainerEntry = getTrainerBattleEntry(npc, zone);
         openDialogue(npc.name.replace(/_/g, " "), npc.text, {
@@ -784,36 +959,826 @@ function advanceDialogue() {
   }
 }
 
-export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
-  let level = 5;
-  let species = "PIDGEY";
-  if (Array.isArray(poolOrEntry) && Array.isArray(poolOrEntry[0])) {
-    // Gen 1 slot weights: 20%, 20%, 15%, 10%, 10%, 10%, 5%, 5%, 4%, 1%
-    const pick = poolOrEntry[Math.floor(Math.random() * poolOrEntry.length)];
-    level = pick[0];
-    species = pick[1];
-  } else if (Array.isArray(poolOrEntry)) {
-    level = poolOrEntry[0];
-    species = poolOrEntry[1];
+function getTypeEffectiveness(moveType, defTypes) {
+  let mult = 1.0;
+  const chart = POKEYELLOW_DATA.battle?.typeChart || [];
+  for (const dt of defTypes || []) {
+    for (const [atkT, defT, m] of chart) {
+      if (atkT === moveType && defT === dt) {
+        mult *= m;
+      }
+    }
   }
-  const maxHp = 14 + level * 3;
-  const trainerName = trainerMeta?.trainerName || null;
+  return mult;
+}
+
+function calcGen1Damage(attacker, defender, move) {
+  if (!move || move.power === 0) {
+    return { damage: 0, effectiveness: 1.0, crit: false };
+  }
+  if (move.effect === "SPECIAL_DAMAGE_EFFECT") {
+    const fixed =
+      move.id === "SONICBOOM"
+        ? 20
+        : move.id === "DRAGON_RAGE"
+        ? 40
+        : attacker.level;
+    return { damage: fixed, effectiveness: 1.0, crit: false };
+  }
+  // Gen 1 critical hit rate based on base Speed
+  const critChance = Math.min(0.25, (attacker.spd || 50) / 512);
+  const crit = Math.random() < critChance;
+  const lv = crit ? attacker.level * 2 : attacker.level;
+
+  const isSpecial = SPECIAL_TYPES.has(move.type);
+  const A = isSpecial ? attacker.spc : attacker.atk;
+  const D = Math.max(1, isSpecial ? defender.spc : defender.def);
+
+  let baseDmg = Math.floor(
+    Math.floor((Math.floor((2 * lv) / 5 + 2) * move.power * A) / D) / 50
+  ) + 2;
+
+  // STAB (Same-Type Attack Bonus)
+  if (attacker.types && attacker.types.includes(move.type)) {
+    baseDmg = Math.floor(baseDmg * 1.5);
+  }
+
+  const effectiveness = getTypeEffectiveness(move.type, defender.types);
+  if (effectiveness === 0) {
+    return { damage: 0, effectiveness: 0, crit: false };
+  }
+  baseDmg = Math.floor(baseDmg * effectiveness);
+
+  // Random variance (217..255)/255
+  const rand = 217 + Math.floor(Math.random() * 39);
+  const finalDmg = Math.max(1, Math.floor((baseDmg * rand) / 255));
+  return { damage: finalDmg, effectiveness, crit };
+}
+
+export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
+  initDefaultParty();
+  // Ensure at least one party Pokémon is conscious
+  if (state.party.every((m) => m.hp <= 0)) {
+    healParty();
+  }
+  const activePlayerIdx = Math.max(
+    0,
+    state.party.findIndex((m) => m.hp > 0)
+  );
+
+  let enemyParty = [];
+  if (trainerMeta && Array.isArray(trainerMeta.party) && trainerMeta.party.length > 0) {
+    enemyParty = trainerMeta.party.map(([lv, sp]) => buildMonInstance(sp, lv));
+  } else {
+    let level = 5;
+    let species = "PIDGEY";
+    if (Array.isArray(poolOrEntry) && Array.isArray(poolOrEntry[0])) {
+      const pick = poolOrEntry[Math.floor(Math.random() * poolOrEntry.length)];
+      level = pick[0];
+      species = pick[1];
+    } else if (Array.isArray(poolOrEntry)) {
+      level = poolOrEntry[0];
+      species = poolOrEntry[1];
+    }
+    enemyParty = [buildMonInstance(species, level)];
+  }
+
+  const isTrainer = Boolean(trainerMeta && !trainerMeta.isWild && trainerMeta.trainerName);
+  const isSafari =
+    !isTrainer &&
+    state.currentZone &&
+    state.currentZone.constName.startsWith("SAFARI_ZONE");
+
+  const firstFoe = enemyParty[0];
+  const pMon = state.party[activePlayerIdx];
+
+  // Open directly in MAIN_MENU (DisplayBattleMenu in engine/battle/core.asm) with intro banner text
+  const introLog = isTrainer
+    ? `${trainerMeta.trainerName} sent out\n${firstFoe.nickname}!`
+    : `Wild ${firstFoe.nickname}\nappeared!`;
+
   state.battle = {
-    species,
-    level,
-    hp: maxHp,
-    maxHp,
-    playerHp: 68,
-    playerMaxHp: 68,
-    trainerName,
+    isTrainer,
+    isSafari,
+    safariBalls: 30,
+    trainerName: isTrainer ? trainerMeta.trainerName : null,
+    trainerSprite: trainerMeta?.trainerSprite || null,
     trainerKey: trainerMeta?.key || null,
-    log: trainerName
-      ? `${trainerName} wants to battle! ${trainerName} sent out ${species.replace(/_/g, " ")} (Lv.${level})!`
-      : `Wild ${species.replace(/_/g, " ")} (Lv.${level}) appeared in ${state.currentZone.displayName}!`,
+    endBattleText: trainerMeta?.endBattleText || null,
+    enemyParty,
+    activeEnemyIdx: 0,
+    activePlayerIdx,
+    // Compatibility properties for HUD / tests
+    species: firstFoe.species,
+    level: firstFoe.level,
+    hp: firstFoe.hp,
+    maxHp: firstFoe.maxHp,
+    playerHp: pMon.hp,
+    playerMaxHp: pMon.maxHp,
+    // Authentic engine/battle/core.asm menu state machine:
+    // "MAIN_MENU" | "FIGHT_MENU" | "BAG_MENU" | "PARTY_MENU" | "PARTY_SUB" | "PARTY_STATS" | "MESSAGE"
+    menuState: "MAIN_MENU",
+    mainCursor: 0, // 0: FIGHT, 1: PKMN, 2: ITEM, 3: RUN
+    moveCursor: 0, // 0..3
+    moveSwapIndex: null, // SELECT key move swap index (SwapMovesInMenu)
+    bagCursor: 0,
+    partyCursor: activePlayerIdx,
+    partySubCursor: 0, // 0: SWITCH, 1: STATS, 2: CANCEL
+    forcedSwitch: false,
+    showTrainerSprite: false,
+    log: introLog,
+    messageQueue: [],
     finished: false,
   };
   audio.playSfx("thunder");
   renderBattleModal();
+}
+
+function syncBattleTopLevelProps(b) {
+  if (!b) return;
+  const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
+  const pMon = state.party[b.activePlayerIdx] || state.party[0];
+  if (foe) {
+    b.species = foe.species;
+    b.level = foe.level;
+    b.hp = foe.hp;
+    b.maxHp = foe.maxHp;
+  }
+  if (pMon) {
+    b.playerHp = pMon.hp;
+    b.playerMaxHp = pMon.maxHp;
+  }
+}
+
+function queueBattleMessages(messages, afterState = "MAIN_MENU") {
+  const b = state.battle;
+  if (!b) return;
+  const clean = messages.filter(Boolean);
+  if (clean.length === 0) {
+    b.menuState = afterState;
+    renderBattleModal();
+    return;
+  }
+  b.log = clean[0];
+  b.messageQueue = clean.slice(1);
+  b.afterMessageState = afterState;
+  b.menuState = "MESSAGE";
+  renderBattleModal();
+}
+
+function advanceBattleMessage() {
+  const b = state.battle;
+  if (!b) return;
+  if (b.messageQueue && b.messageQueue.length > 0) {
+    audio.playSfx("blip");
+    b.log = b.messageQueue.shift();
+    renderBattleModal();
+    return;
+  }
+  if (b.finished) {
+    state.battle = null;
+    renderBattleModal();
+    return;
+  }
+  if (b.forcedSwitch) {
+    b.menuState = "PARTY_MENU";
+    renderBattleModal();
+    return;
+  }
+  b.showTrainerSprite = false;
+  b.menuState = b.afterMessageState || "MAIN_MENU";
+  renderBattleModal();
+}
+
+function performMoveAttack(attacker, defender, move, isEnemyTurn = false) {
+  const msgs = [];
+  const prefix = isEnemyTurn ? `Enemy ${attacker.nickname}` : attacker.nickname;
+
+  if (attacker.status === "SLP") {
+    if (Math.random() < 0.35) {
+      attacker.status = "OK";
+      msgs.push(`${prefix}\nwoke up!`);
+    } else {
+      msgs.push(`${prefix}\nis fast asleep!`);
+      return msgs;
+    }
+  }
+  if (attacker.status === "FRZ") {
+    msgs.push(`${prefix}\nis frozen solid!`);
+    return msgs;
+  }
+  if (attacker.status === "PAR" && Math.random() < 0.25) {
+    msgs.push(`${prefix}'s\nfully paralyzed!`);
+    return msgs;
+  }
+
+  if (move.pp > 0) move.pp--;
+  msgs.push(`${prefix} used\n${move.name}!`);
+
+  // Check accuracy
+  if (Math.random() * 100 > (move.accuracy || 100)) {
+    msgs.push(`${prefix}'s\nattack missed!`);
+    return msgs;
+  }
+
+  // Status-only moves
+  if (move.power === 0) {
+    if (move.effect.includes("PARALYZE") || move.id === "THUNDER_WAVE" || move.id === "STUN_SPORE" || move.id === "GLARE") {
+      if (defender.status === "OK") {
+        defender.status = "PAR";
+        msgs.push(`${defender.nickname} was\nparalyzed! It may not attack!`);
+      } else {
+        msgs.push(`But it failed!`);
+      }
+    } else if (move.effect.includes("SLEEP") || move.id === "SLEEP_POWDER" || move.id === "SING" || move.id === "HYPNOSIS" || move.id === "SPORE") {
+      if (defender.status === "OK") {
+        defender.status = "SLP";
+        msgs.push(`${defender.nickname}\nfell asleep!`);
+      } else {
+        msgs.push(`But it failed!`);
+      }
+    } else if (move.effect.includes("POISON") || move.id === "POISONPOWDER" || move.id === "TOXIC") {
+      if (defender.status === "OK") {
+        defender.status = "PSN";
+        msgs.push(`${defender.nickname}\nwas poisoned!`);
+      } else {
+        msgs.push(`But it failed!`);
+      }
+    } else if (move.id === "RECOVER" || move.id === "SOFTBOILED" || move.id === "REST") {
+      attacker.hp = attacker.maxHp;
+      msgs.push(`${prefix}\nregained health!`);
+    } else if (move.effect.includes("DEFENSE_DOWN")) {
+      defender.def = Math.max(5, Math.floor(defender.def * 0.8));
+      msgs.push(`${defender.nickname}'s\nDEFENSE fell!`);
+    } else if (move.effect.includes("ATTACK_DOWN")) {
+      defender.atk = Math.max(5, Math.floor(defender.atk * 0.8));
+      msgs.push(`${defender.nickname}'s\nATTACK fell!`);
+    } else {
+      attacker.spd = Math.min(999, Math.floor(attacker.spd * 1.25));
+      msgs.push(`${prefix}'s\nstats rose!`);
+    }
+    return msgs;
+  }
+
+  // Damaging move
+  const { damage, effectiveness, crit } = calcGen1Damage(attacker, defender, move);
+  if (effectiveness === 0) {
+    msgs.push(`It doesn't affect\n${defender.nickname}!`);
+    return msgs;
+  }
+
+  defender.hp = Math.max(0, defender.hp - damage);
+  if (crit) {
+    msgs.push(`Critical hit!`);
+  }
+  if (effectiveness > 1) {
+    msgs.push(`It's super effective!`);
+  } else if (effectiveness < 1) {
+    msgs.push(`It's not very effective...`);
+  }
+
+  // Secondary status effects
+  if (defender.hp > 0 && defender.status === "OK") {
+    if (move.effect.includes("PARALYZE_SIDE_EFFECT") && Math.random() < 0.2) {
+      defender.status = "PAR";
+      msgs.push(`${defender.nickname} was\nparalyzed!`);
+    } else if (move.effect.includes("BURN_SIDE_EFFECT") && Math.random() < 0.2) {
+      defender.status = "BRN";
+      msgs.push(`${defender.nickname} was\nburned!`);
+    } else if (move.effect.includes("POISON_SIDE_EFFECT") && Math.random() < 0.25) {
+      defender.status = "PSN";
+      msgs.push(`${defender.nickname} was\npoisoned!`);
+    } else if (move.effect.includes("FREEZE_SIDE_EFFECT") && Math.random() < 0.1) {
+      defender.status = "FRZ";
+      msgs.push(`${defender.nickname} was\nfrozen solid!`);
+    }
+  }
+
+  // Drain moves
+  if (move.effect === "DRAIN_HP_EFFECT" && damage > 0) {
+    const healed = Math.max(1, Math.floor(damage / 2));
+    attacker.hp = Math.min(attacker.maxHp, attacker.hp + healed);
+    msgs.push(`Sucked health from\n${defender.nickname}!`);
+  }
+
+  return msgs;
+}
+
+function handleEnemyFainted(b, msgs) {
+  const foe = b.enemyParty[b.activeEnemyIdx];
+  const pMon = state.party[b.activePlayerIdx];
+  const expGain = Math.max(12, Math.floor((foe.baseExp * foe.level) / 7));
+  msgs.push(
+    `${b.isTrainer ? "Enemy " : "Wild "}${foe.nickname}\nfainted!`,
+    `${pMon.nickname} gained\n${expGain} EXP. Points!`
+  );
+
+  // Check if trainer has another conscious Pokémon
+  const nextEnemyIdx = b.enemyParty.findIndex((m, idx) => idx > b.activeEnemyIdx && m.hp > 0);
+  if (nextEnemyIdx !== -1) {
+    b.activeEnemyIdx = nextEnemyIdx;
+    const nextFoe = b.enemyParty[nextEnemyIdx];
+    syncBattleTopLevelProps(b);
+    msgs.push(`${b.trainerName} sent out\n${nextFoe.nickname}!`);
+    queueBattleMessages(msgs, "MAIN_MENU");
+  } else {
+    b.finished = true;
+    if (b.isTrainer) {
+      if (b.trainerKey) {
+        state.defeatedTrainers.add(b.trainerKey);
+        saveProgress();
+      }
+      b.showTrainerSprite = Boolean(b.trainerSprite);
+      msgs.push(`RED defeated\n${b.trainerName}!`);
+      if (b.endBattleText) {
+        msgs.push(b.endBattleText.split("\n\n")[0]);
+      }
+    }
+    syncBattleTopLevelProps(b);
+    queueBattleMessages(msgs, "MAIN_MENU");
+  }
+}
+
+function handlePlayerFainted(b, msgs) {
+  const pMon = state.party[b.activePlayerIdx];
+  msgs.push(`${pMon.nickname}\nfainted!`);
+  const nextAliveIdx = state.party.findIndex((m) => m.hp > 0);
+  if (nextAliveIdx !== -1) {
+    b.forcedSwitch = true;
+    b.partyCursor = nextAliveIdx;
+    msgs.push(`Use next POKéMON?`);
+    queueBattleMessages(msgs, "PARTY_MENU");
+  } else {
+    b.finished = true;
+    healParty();
+    msgs.push(`RED is out of\nusable POKéMON!`, `RED scurried to a\nPOKéMON CENTER!`);
+    queueBattleMessages(msgs, "MAIN_MENU");
+  }
+}
+
+function executePlayerMove(moveIndex) {
+  const b = state.battle;
+  if (!b || b.finished) return;
+  const pMon = state.party[b.activePlayerIdx];
+  const foe = b.enemyParty[b.activeEnemyIdx];
+  const move = pMon.moves[moveIndex];
+  if (!move) return;
+
+  if (move.pp <= 0) {
+    audio.playSfx("bump");
+    queueBattleMessages([`No PP left for\nthis move!`], "FIGHT_MENU");
+    return;
+  }
+
+  b.moveCursor = moveIndex;
+  audio.playSfx("thunder");
+
+  const msgs = [];
+  const enemyMove =
+    foe.moves[Math.floor(Math.random() * foe.moves.length)] || getMoveObj("TACKLE");
+
+  const playerPriority = move.id === "QUICK_ATTACK" ? 1 : 0;
+  const enemyPriority = enemyMove.id === "QUICK_ATTACK" ? 1 : 0;
+  const playerFirst =
+    playerPriority > enemyPriority ||
+    (playerPriority === enemyPriority && pMon.spd >= foe.spd);
+
+  if (playerFirst) {
+    msgs.push(...performMoveAttack(pMon, foe, move, false));
+    syncBattleTopLevelProps(b);
+    if (foe.hp <= 0) {
+      handleEnemyFainted(b, msgs);
+      return;
+    }
+    msgs.push(...performMoveAttack(foe, pMon, enemyMove, true));
+    syncBattleTopLevelProps(b);
+    if (pMon.hp <= 0) {
+      handlePlayerFainted(b, msgs);
+      return;
+    }
+  } else {
+    msgs.push(...performMoveAttack(foe, pMon, enemyMove, true));
+    syncBattleTopLevelProps(b);
+    if (pMon.hp <= 0) {
+      handlePlayerFainted(b, msgs);
+      return;
+    }
+    msgs.push(...performMoveAttack(pMon, foe, move, false));
+    syncBattleTopLevelProps(b);
+    if (foe.hp <= 0) {
+      handleEnemyFainted(b, msgs);
+      return;
+    }
+  }
+
+  queueBattleMessages(msgs, "MAIN_MENU");
+}
+
+function executeBagItem(bagIndex) {
+  const b = state.battle;
+  if (!b || b.finished) return;
+
+  // Last row in DisplayBagMenu is CANCEL
+  if (bagIndex >= state.bag.length) {
+    audio.playSfx("blip");
+    b.menuState = "MAIN_MENU";
+    renderBattleModal();
+    return;
+  }
+
+  const item = state.bag[bagIndex];
+  if (!item || item.qty <= 0) {
+    audio.playSfx("bump");
+    return;
+  }
+
+  const pMon = state.party[b.activePlayerIdx];
+  const foe = b.enemyParty[b.activeEnemyIdx];
+
+  if (item.kind === "ball") {
+    if (b.isTrainer) {
+      audio.playSfx("bump");
+      queueBattleMessages(
+        [
+          `RED used\n${item.name}!`,
+          `The trainer blocked the BALL!\nDon't be a thief!`,
+        ],
+        "MAIN_MENU"
+      );
+      return;
+    }
+    if (item.id !== "MASTER_BALL") item.qty = Math.max(1, item.qty - 1);
+    audio.playSfx("warp");
+    foe.hp = 0;
+    b.finished = true;
+    syncBattleTopLevelProps(b);
+    state.caughtPokemon.add(foe.species);
+    if (state.party.length < 6 && !state.party.some((m) => m.species === foe.species)) {
+      state.party.push(buildMonInstance(foe.species, foe.level));
+    }
+    saveProgress();
+    updateUIForCurrentZone();
+    queueBattleMessages(
+      [
+        `RED used\n${item.name}!`,
+        `All right! ${foe.nickname}\nwas caught!`,
+      ],
+      "MAIN_MENU"
+    );
+    return;
+  }
+
+  if (item.kind === "heal") {
+    item.qty = Math.max(1, item.qty - 1);
+    audio.playSfx("warp");
+    const prevHp = pMon.hp;
+    pMon.hp = Math.min(pMon.maxHp, pMon.hp + item.hp);
+    if (item.cure) pMon.status = "OK";
+    const recovered = pMon.hp - prevHp;
+    const msgs = [
+      `RED used\n${item.name}!`,
+      recovered > 0
+        ? `${pMon.nickname} recovered\nby ${recovered} HP!`
+        : `${pMon.nickname}'s HP is\nalready full!`,
+    ];
+    // Enemy gets a turn after item use
+    const enemyMove =
+      foe.moves[Math.floor(Math.random() * foe.moves.length)] || getMoveObj("TACKLE");
+    msgs.push(...performMoveAttack(foe, pMon, enemyMove, true));
+    syncBattleTopLevelProps(b);
+    if (pMon.hp <= 0) {
+      handlePlayerFainted(b, msgs);
+      return;
+    }
+    queueBattleMessages(msgs, "MAIN_MENU");
+    return;
+  }
+
+  if (item.kind === "flute") {
+    audio.playSfx("pika");
+    for (const m of state.party) {
+      if (m.status === "SLP") m.status = "OK";
+    }
+    if (foe.status === "SLP") foe.status = "OK";
+    queueBattleMessages(
+      [
+        `RED played the\nPOKé FLUTE!`,
+        `Now, that's a catchy tune!\nAll sleeping POKéMON woke up!`,
+      ],
+      "MAIN_MENU"
+    );
+  }
+}
+
+function executePartySwitch(targetPartyIdx) {
+  const b = state.battle;
+  if (!b) return;
+  const chosen = state.party[targetPartyIdx];
+  if (!chosen) return;
+
+  if (chosen.hp <= 0) {
+    audio.playSfx("bump");
+    const promptEl = document.getElementById("battle-party-prompt");
+    if (promptEl) promptEl.textContent = "There's no will to fight!";
+    return;
+  }
+  if (targetPartyIdx === b.activePlayerIdx) {
+    audio.playSfx("bump");
+    const promptEl = document.getElementById("battle-party-prompt");
+    if (promptEl) promptEl.textContent = `${chosen.nickname} is already out!`;
+    return;
+  }
+
+  const prevMon = state.party[b.activePlayerIdx];
+  const wasForced = b.forcedSwitch;
+  b.activePlayerIdx = targetPartyIdx;
+  b.forcedSwitch = false;
+  b.moveCursor = 0;
+  audio.playSfx("warp");
+
+  const msgs = [];
+  if (!wasForced && prevMon.hp > 0) {
+    msgs.push(`${prevMon.nickname} enough!\nCome back!`);
+  }
+  msgs.push(`Go! ${chosen.nickname}!`);
+
+  if (!wasForced) {
+    const foe = b.enemyParty[b.activeEnemyIdx];
+    const enemyMove =
+      foe.moves[Math.floor(Math.random() * foe.moves.length)] || getMoveObj("TACKLE");
+    msgs.push(...performMoveAttack(foe, chosen, enemyMove, true));
+    syncBattleTopLevelProps(b);
+    if (chosen.hp <= 0) {
+      handlePlayerFainted(b, msgs);
+      return;
+    }
+  } else {
+    syncBattleTopLevelProps(b);
+  }
+
+  queueBattleMessages(msgs, "MAIN_MENU");
+}
+
+function executeSafariAction(safariIdx) {
+  const b = state.battle;
+  if (!b) return;
+  const foe = b.enemyParty[b.activeEnemyIdx];
+  if (safariIdx === 0) {
+    // Throw SAFARI BALL
+    b.safariBalls = Math.max(0, b.safariBalls - 1);
+    audio.playSfx("warp");
+    foe.hp = 0;
+    b.finished = true;
+    syncBattleTopLevelProps(b);
+    state.caughtPokemon.add(foe.species);
+    if (state.party.length < 6 && !state.party.some((m) => m.species === foe.species)) {
+      state.party.push(buildMonInstance(foe.species, foe.level));
+    }
+    saveProgress();
+    updateUIForCurrentZone();
+    queueBattleMessages(
+      [
+        `RED used\nSAFARI BALL!`,
+        `All right! ${foe.nickname}\nwas caught!`,
+      ],
+      "MAIN_MENU"
+    );
+  } else if (safariIdx === 1) {
+    // BAIT
+    audio.playSfx("blip");
+    queueBattleMessages(
+      [`RED threw some BAIT!`, `Wild ${foe.nickname}\nis eating!`],
+      "MAIN_MENU"
+    );
+  } else if (safariIdx === 2) {
+    // THROW ROCK
+    audio.playSfx("thunder");
+    foe.hp = Math.max(1, Math.floor(foe.hp * 0.7));
+    syncBattleTopLevelProps(b);
+    queueBattleMessages(
+      [`RED threw a ROCK!`, `Wild ${foe.nickname}\nis angry!`],
+      "MAIN_MENU"
+    );
+  } else {
+    // RUN
+    audio.playSfx("ledge");
+    b.finished = true;
+    queueBattleMessages([`Got away safely!`], "MAIN_MENU");
+  }
+}
+
+export function executeBattleAction(action) {
+  const b = state.battle;
+  if (!b) return;
+  if (b.finished || action === "run") {
+    if (b.isTrainer && !b.finished && action === "run") {
+      audio.playSfx("bump");
+      queueBattleMessages(
+        [`No! There's no running\nfrom a trainer battle!`],
+        "MAIN_MENU"
+      );
+      return;
+    }
+    audio.playSfx("ledge");
+    state.battle = null;
+    renderBattleModal();
+    return;
+  }
+  if (action === "ball") {
+    executeBagItem(0);
+    return;
+  }
+  if (action === "thunderbolt") {
+    executePlayerMove(0);
+    return;
+  }
+  if (action === "quickattack") {
+    executePlayerMove(Math.min(1, state.party[b.activePlayerIdx].moves.length - 1));
+    return;
+  }
+}
+
+function handleBattleInput(input) {
+  const b = state.battle;
+  if (!b) return;
+
+  if (b.menuState === "MESSAGE") {
+    if (input === "A" || input === "B") {
+      advanceBattleMessage();
+    }
+    return;
+  }
+
+  if (b.menuState === "MAIN_MENU") {
+    // 2x2 Grid:
+    // 0: FIGHT (top-left)  | 1: PKMN (top-right)
+    // 2: ITEM  (bot-left)  | 3: RUN  (bot-right)
+    if (input === "RIGHT" && (b.mainCursor === 0 || b.mainCursor === 2)) {
+      b.mainCursor += 1;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "LEFT" && (b.mainCursor === 1 || b.mainCursor === 3)) {
+      b.mainCursor -= 1;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "DOWN" && (b.mainCursor === 0 || b.mainCursor === 1)) {
+      b.mainCursor += 2;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "UP" && (b.mainCursor === 2 || b.mainCursor === 3)) {
+      b.mainCursor -= 2;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "A") {
+      audio.playSfx("blip");
+      if (b.isSafari) {
+        executeSafariAction(b.mainCursor);
+        return;
+      }
+      if (b.mainCursor === 0) {
+        b.menuState = "FIGHT_MENU";
+        renderBattleModal();
+      } else if (b.mainCursor === 1) {
+        b.partyCursor = b.activePlayerIdx;
+        b.menuState = "PARTY_MENU";
+        renderBattleModal();
+      } else if (b.mainCursor === 2) {
+        b.menuState = "BAG_MENU";
+        renderBattleModal();
+      } else if (b.mainCursor === 3) {
+        if (b.isTrainer) {
+          audio.playSfx("bump");
+          queueBattleMessages(
+            [`No! There's no running\nfrom a trainer battle!`],
+            "MAIN_MENU"
+          );
+        } else {
+          audio.playSfx("ledge");
+          b.finished = true;
+          queueBattleMessages([`Got away safely!`], "MAIN_MENU");
+        }
+      }
+    }
+    return;
+  }
+
+  if (b.menuState === "FIGHT_MENU") {
+    const pMon = state.party[b.activePlayerIdx];
+    const numMoves = pMon.moves.length;
+    if (input === "UP") {
+      // Matches SelectMenuItem_CursorUp wrap-around in engine/battle/core.asm
+      b.moveCursor = (b.moveCursor - 1 + numMoves) % numMoves;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "DOWN") {
+      // Matches SelectMenuItem_CursorDown wrap-around in engine/battle/core.asm
+      b.moveCursor = (b.moveCursor + 1) % numMoves;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "SELECT") {
+      // Matches SwapMovesInMenu in engine/battle/core.asm (lines 2926-3008)
+      audio.playSfx("blip");
+      if (b.moveSwapIndex === null) {
+        b.moveSwapIndex = b.moveCursor;
+      } else {
+        const tmp = pMon.moves[b.moveSwapIndex];
+        pMon.moves[b.moveSwapIndex] = pMon.moves[b.moveCursor];
+        pMon.moves[b.moveCursor] = tmp;
+        b.moveSwapIndex = null;
+      }
+      renderBattleModal();
+    } else if (input === "B") {
+      audio.playSfx("blip");
+      b.moveSwapIndex = null;
+      b.menuState = "MAIN_MENU";
+      renderBattleModal();
+    } else if (input === "A") {
+      b.moveSwapIndex = null;
+      executePlayerMove(b.moveCursor);
+    }
+    return;
+  }
+
+  if (b.menuState === "BAG_MENU") {
+    const totalRows = state.bag.length + 1; // +1 for CANCEL
+    if (input === "UP") {
+      b.bagCursor = Math.max(0, b.bagCursor - 1);
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "DOWN") {
+      b.bagCursor = Math.min(totalRows - 1, b.bagCursor + 1);
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "B") {
+      audio.playSfx("blip");
+      b.menuState = "MAIN_MENU";
+      renderBattleModal();
+    } else if (input === "A") {
+      executeBagItem(b.bagCursor);
+    }
+    return;
+  }
+
+  if (b.menuState === "PARTY_MENU") {
+    const count = state.party.length;
+    if (input === "UP") {
+      b.partyCursor = (b.partyCursor - 1 + count) % count;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "DOWN") {
+      b.partyCursor = (b.partyCursor + 1) % count;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "B") {
+      if (!b.forcedSwitch) {
+        audio.playSfx("blip");
+        b.menuState = "MAIN_MENU";
+        renderBattleModal();
+      }
+    } else if (input === "A") {
+      audio.playSfx("blip");
+      b.partySubCursor = 0;
+      b.menuState = "PARTY_SUB";
+      renderBattleModal();
+    }
+    return;
+  }
+
+  if (b.menuState === "PARTY_SUB") {
+    if (input === "UP") {
+      b.partySubCursor = (b.partySubCursor + 2) % 3;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "DOWN") {
+      b.partySubCursor = (b.partySubCursor + 1) % 3;
+      audio.playSfx("blip");
+      renderBattleModal();
+    } else if (input === "B") {
+      audio.playSfx("blip");
+      b.menuState = "PARTY_MENU";
+      renderBattleModal();
+    } else if (input === "A") {
+      audio.playSfx("blip");
+      if (b.partySubCursor === 0) {
+        executePartySwitch(b.partyCursor);
+      } else if (b.partySubCursor === 1) {
+        b.menuState = "PARTY_STATS";
+        renderBattleModal();
+      } else {
+        b.menuState = "PARTY_MENU";
+        renderBattleModal();
+      }
+    }
+    return;
+  }
+
+  if (b.menuState === "PARTY_STATS") {
+    if (input === "A" || input === "B") {
+      audio.playSfx("blip");
+      b.menuState = "PARTY_SUB";
+      renderBattleModal();
+    }
+  }
 }
 
 // Render functions for Modals & Inspector UI
@@ -895,83 +1860,337 @@ function renderBattleModal() {
   }
   modal.classList.remove("hidden");
   const b = state.battle;
-  document.getElementById("battle-foe-name").textContent =
-    b.species.replace(/_/g, " ");
-  document.getElementById("battle-foe-lv").textContent = `:L${b.level}`;
-  const foePct = Math.max(0, Math.round((b.hp / b.maxHp) * 100));
+  syncBattleTopLevelProps(b);
+
+  const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
+  const pMon = state.party[b.activePlayerIdx] || state.party[0];
+
+  // 1. Enemy HUD (DrawEnemyHUDAndHPBar & SetupEnemyPartyPokeballs)
+  document.getElementById("battle-foe-name").textContent = foe.nickname;
+  document.getElementById("battle-foe-lv").textContent =
+    foe.status !== "OK" ? foe.status : `:L${foe.level}`;
+  const foePct = Math.max(0, Math.round((foe.hp / foe.maxHp) * 100));
   const foeBar = document.getElementById("battle-foe-hp-fill");
   foeBar.style.width = `${foePct}%`;
   foeBar.style.background =
     foePct > 50 ? "#22c55e" : foePct > 20 ? "#eab308" : "#ef4444";
 
-  const playerPct = Math.max(0, Math.round((b.playerHp / b.playerMaxHp) * 100));
-  document.getElementById("battle-player-hp-fill").style.width = `${playerPct}%`;
-  document.getElementById("battle-player-hp-nums").textContent = `${b.playerHp}/${b.playerMaxHp}`;
-  document.getElementById("battle-log-text").textContent = b.log;
+  const ballsBox = document.getElementById("battle-foe-balls");
+  if (ballsBox) {
+    if (b.isTrainer) {
+      ballsBox.classList.remove("hidden");
+      ballsBox.innerHTML = "";
+      for (let i = 0; i < 6; i++) {
+        const m = b.enemyParty[i];
+        const span = document.createElement("span");
+        if (!m) {
+          span.className = "pball-icon empty";
+          span.textContent = "·";
+        } else if (m.hp <= 0) {
+          span.className = "pball-icon fainted";
+          span.textContent = "×";
+        } else if (m.status !== "OK") {
+          span.className = "pball-icon status";
+          span.textContent = "●";
+        } else {
+          span.className = "pball-icon alive";
+          span.textContent = "●";
+        }
+        ballsBox.appendChild(span);
+      }
+    } else {
+      ballsBox.classList.add("hidden");
+    }
+  }
 
-  // Draw sprites
+  // 2. Player HUD (DrawPlayerHUDAndHPBar)
+  const pNameEl = document.getElementById("battle-player-name");
+  if (pNameEl) pNameEl.textContent = pMon.nickname;
+  const pLvEl = document.getElementById("battle-player-lv");
+  if (pLvEl) {
+    pLvEl.textContent = pMon.status !== "OK" ? pMon.status : `:L${pMon.level}`;
+  }
+  const playerPct = Math.max(0, Math.round((pMon.hp / pMon.maxHp) * 100));
+  const pBar = document.getElementById("battle-player-hp-fill");
+  pBar.style.width = `${playerPct}%`;
+  pBar.style.background =
+    playerPct > 50 ? "#22c55e" : playerPct > 20 ? "#eab308" : "#ef4444";
+  document.getElementById("battle-player-hp-nums").textContent = `${String(
+    pMon.hp
+  ).padStart(2, " ")}/${String(pMon.maxHp).padStart(2, " ")}`;
+
+  // 3. Draw Front & Back Sprites
   const foeCanvas = document.getElementById("battle-foe-canvas");
-  const foeSpr =
-    engine.pokemonSprites[b.species] || engine.pokemonSprites.PIDGEY;
-  engine.render2BitGraphicToCanvas(foeCanvas, foeSpr, state.currentZone.palette);
+  if (b.showTrainerSprite && b.trainerSprite && engine.trainerSprites[b.trainerSprite]) {
+    engine.render2BitGraphicToCanvas(
+      foeCanvas,
+      engine.trainerSprites[b.trainerSprite],
+      state.currentZone.palette
+    );
+  } else {
+    const foeSpr =
+      engine.pokemonSprites[foe.species] || engine.pokemonSprites.PIDGEY;
+    engine.render2BitGraphicToCanvas(foeCanvas, foeSpr, state.currentZone.palette);
+  }
 
   const backCanvas = document.getElementById("battle-player-canvas");
-  engine.render2BitGraphicToCanvas(
-    backCanvas,
-    engine.pokemonSprites.PIKACHU_BACK,
-    "PAL_YELLOWMON"
-  );
-}
+  const backSpr =
+    engine.pokemonSprites[`${pMon.species}_BACK`] ||
+    engine.pokemonSprites.PIKACHU_BACK;
+  engine.render2BitGraphicToCanvas(backCanvas, backSpr, "PAL_YELLOWMON");
 
-function executeBattleAction(action) {
-  const b = state.battle;
-  if (!b) return;
-  if (b.finished || action === "run") {
-    state.battle = null;
-    renderBattleModal();
-    return;
+  // 4. Bottom MESSAGE_BOX text & blinking prompt
+  const logEl = document.getElementById("battle-log-text");
+  if (logEl) {
+    logEl.textContent = b.menuState === "FIGHT_MENU" ? "" : b.log;
   }
-  if (action === "ball") {
-    if (b.trainerName) {
-      audio.playSfx("bump");
-      b.log = `${b.trainerName} blocked the POKé BALL! Don't be a thief!`;
-      renderBattleModal();
-      return;
+  const promptEl = document.getElementById("battle-msg-prompt");
+  if (promptEl) {
+    promptEl.classList.toggle("hidden", b.menuState !== "MESSAGE");
+  }
+
+  // 5. BATTLE_MENU_TEMPLATE (8,12..19,17) vs SAFARI_BATTLE_MENU_TEMPLATE (0,12..19,17)
+  const mainMenuEl = document.getElementById("battle-main-menu");
+  const safariMenuEl = document.getElementById("battle-safari-menu");
+  const showMainOverlay =
+    b.menuState === "MAIN_MENU" || b.menuState === "BAG_MENU";
+
+  if (mainMenuEl && safariMenuEl) {
+    if (showMainOverlay && !b.isSafari) {
+      mainMenuEl.classList.remove("hidden");
+      safariMenuEl.classList.add("hidden");
+      mainMenuEl.querySelectorAll("[data-bmenu-idx]").forEach((btn) => {
+        const idx = Number(btn.dataset.bmenuIdx);
+        const curSpan = btn.querySelector(".bcursor");
+        if (curSpan) {
+          // PlaceUnfilledArrowMenuCursor ('▷') when submenu is open
+          curSpan.textContent =
+            idx === b.mainCursor
+              ? b.menuState === "MAIN_MENU"
+                ? "▶"
+                : "▷"
+              : " ";
+        }
+      });
+    } else if (showMainOverlay && b.isSafari) {
+      safariMenuEl.classList.remove("hidden");
+      mainMenuEl.classList.add("hidden");
+      const ballLbl = document.getElementById("safari-ball-label");
+      if (ballLbl) ballLbl.textContent = `BALL×${String(b.safariBalls).padStart(2, " ")}`;
+      safariMenuEl.querySelectorAll("[data-smenu-idx]").forEach((btn) => {
+        const idx = Number(btn.dataset.smenuIdx);
+        const curSpan = btn.querySelector(".bcursor");
+        if (curSpan) curSpan.textContent = idx === b.mainCursor ? "▶" : " ";
+      });
+    } else {
+      mainMenuEl.classList.add("hidden");
+      safariMenuEl.classList.add("hidden");
     }
-    audio.playSfx("warp");
-    b.hp = 0;
-    b.finished = true;
-    state.caughtPokemon.add(b.species);
-    saveProgress();
-    updateUIForCurrentZone();
-    b.log = `RED threw a POKé BALL! Gotcha! ${b.species.replace(/_/g, " ")} was caught! (${state.caughtPokemon.size} species in Pokédex)`;
-    renderBattleModal();
-    return;
   }
-  const dmg =
-    action === "thunderbolt"
-      ? Math.max(8, Math.floor(b.maxHp * 0.65))
-      : Math.max(5, Math.floor(b.maxHp * 0.42));
-  audio.playSfx("thunder");
-  b.hp = Math.max(0, b.hp - dmg);
-  const moveLabel =
-    action === "thunderbolt" ? "THUNDERBOLT" : "QUICK ATTACK";
-  if (b.hp === 0) {
-    b.finished = true;
-    if (b.trainerKey) {
-      state.defeatedTrainers.add(b.trainerKey);
-      saveProgress();
+
+  // 6. MoveSelectionMenu (4,12..19,17) + PrintMenuItem TYPE/PP Box (0,8..10,12)
+  const fightWrap = document.getElementById("battle-fight-wrap");
+  if (fightWrap) {
+    if (b.menuState === "FIGHT_MENU") {
+      fightWrap.classList.remove("hidden");
+      const curMove = pMon.moves[b.moveCursor] || pMon.moves[0];
+      document.getElementById("battle-move-type").textContent = curMove.type;
+      document.getElementById("battle-move-pp").textContent = `${String(
+        curMove.pp
+      ).padStart(2, " ")}/${String(curMove.maxPp).padStart(2, " ")}`;
+
+      const movesList = document.getElementById("battle-moves-list");
+      movesList.innerHTML = "";
+      for (let i = 0; i < 4; i++) {
+        const mv = pMon.moves[i];
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "bmove-row";
+        const cursorChar =
+          i === b.moveCursor
+            ? "▶"
+            : i === b.moveSwapIndex
+            ? "▷"
+            : " ";
+        row.innerHTML = `<span class="bcursor">${cursorChar}</span><span>${
+          mv ? mv.name : "-"
+        }</span>`;
+        if (mv) {
+          row.onmouseenter = () => {
+            b.moveCursor = i;
+            document.getElementById("battle-move-type").textContent = mv.type;
+            document.getElementById("battle-move-pp").textContent = `${String(
+              mv.pp
+            ).padStart(2, " ")}/${String(mv.maxPp).padStart(2, " ")}`;
+            movesList.querySelectorAll(".bmove-row .bcursor").forEach((cEl, cIdx) => {
+              cEl.textContent =
+                cIdx === i ? "▶" : cIdx === b.moveSwapIndex ? "▷" : " ";
+            });
+          };
+          row.onclick = (e) => {
+            e.stopPropagation();
+            executePlayerMove(i);
+          };
+        } else {
+          row.disabled = true;
+        }
+        movesList.appendChild(row);
+      }
+    } else {
+      fightWrap.classList.add("hidden");
     }
-    const foeTitle = b.trainerName
-      ? `${b.trainerName}'s ${b.species.replace(/_/g, " ")}`
-      : `Wild ${b.species.replace(/_/g, " ")}`;
-    b.log = `PIKACHU used ${moveLabel}! ${foeTitle} fainted! PIKACHU gained ${b.level * 18} EXP!`;
-  } else {
-    const counterDmg = Math.max(1, Math.floor(b.level * 0.4));
-    b.playerHp = Math.max(1, b.playerHp - counterDmg);
-    b.log = `PIKACHU used ${moveLabel}! Wild ${b.species.replace(/_/g, " ")} used TACKLE (-${counterDmg} HP)!`;
   }
-  renderBattleModal();
+
+  // 7. LIST_MENU_BOX (4,2..19,12): Bag Item Menu (DisplayBagMenu)
+  const bagBox = document.getElementById("battle-bag-box");
+  if (bagBox) {
+    if (b.menuState === "BAG_MENU") {
+      bagBox.classList.remove("hidden");
+      const bagList = document.getElementById("battle-bag-list");
+      bagList.innerHTML = "";
+      state.bag.forEach((item, idx) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "bbag-row";
+        row.innerHTML = `<span class="bbag-left"><span class="bcursor">${
+          idx === b.bagCursor ? "▶" : " "
+        }</span><span>${item.name}</span></span><span class="bbag-qty">×${String(
+          item.qty
+        ).padStart(2, " ")}</span>`;
+        row.onmouseenter = () => {
+          b.bagCursor = idx;
+          bagList.querySelectorAll(".bbag-row .bcursor").forEach((cEl, cIdx) => {
+            cEl.textContent = cIdx === idx ? "▶" : " ";
+          });
+        };
+        row.onclick = (e) => {
+          e.stopPropagation();
+          executeBagItem(idx);
+        };
+        bagList.appendChild(row);
+      });
+      // CANCEL row at end of bag list
+      const cancelIdx = state.bag.length;
+      const cancelRow = document.createElement("button");
+      cancelRow.type = "button";
+      cancelRow.className = "bbag-row";
+      cancelRow.innerHTML = `<span class="bbag-left"><span class="bcursor">${
+        b.bagCursor === cancelIdx ? "▶" : " "
+      }</span><span>CANCEL</span></span><span></span>`;
+      cancelRow.onclick = (e) => {
+        e.stopPropagation();
+        executeBagItem(cancelIdx);
+      };
+      bagList.appendChild(cancelRow);
+    } else {
+      bagBox.classList.add("hidden");
+    }
+  }
+
+  // 8. DisplayPartyMenu (0,0..19,17) + SWITCH_STATS_CANCEL_MENU_TEMPLATE + StatusScreen
+  const partyScreen = document.getElementById("battle-party-screen");
+  if (partyScreen) {
+    const inParty =
+      b.menuState === "PARTY_MENU" ||
+      b.menuState === "PARTY_SUB" ||
+      b.menuState === "PARTY_STATS";
+    if (inParty) {
+      partyScreen.classList.remove("hidden");
+      const pList = document.getElementById("battle-party-list");
+      pList.innerHTML = "";
+      state.party.forEach((mon, idx) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = `bparty-row ${idx === b.partyCursor ? "selected" : ""}`;
+        const pct = Math.max(0, Math.round((mon.hp / mon.maxHp) * 100));
+        const barColor =
+          pct > 50 ? "#22c55e" : pct > 20 ? "#eab308" : "#ef4444";
+        const curChar =
+          idx === b.partyCursor
+            ? b.menuState === "PARTY_MENU"
+              ? "▶"
+              : "▷"
+            : " ";
+        const iconChar = mon.species === "PIKACHU" ? "⚡" : "◓";
+        row.innerHTML = `
+          <span class="bcursor">${curChar}</span>
+          <span class="bparty-icon">${iconChar}</span>
+          <div class="bparty-main">
+            <div class="bparty-top">
+              <span>${mon.nickname}${idx === b.activePlayerIdx ? " ★" : ""}</span>
+              <span>${mon.hp <= 0 ? "FNT" : mon.status !== "OK" ? mon.status : `:L${mon.level}`}</span>
+            </div>
+            <div class="bparty-hp-wrap">
+              <span class="hp-tag">HP:</span>
+              <div class="hp-track"><div class="hp-fill" style="width:${pct}%;background:${barColor}"></div></div>
+            </div>
+          </div>
+          <span class="bparty-nums">${mon.hp}/${mon.maxHp}</span>
+        `;
+        row.onclick = (e) => {
+          e.stopPropagation();
+          audio.playSfx("blip");
+          b.partyCursor = idx;
+          b.partySubCursor = 0;
+          b.menuState = "PARTY_SUB";
+          renderBattleModal();
+        };
+        pList.appendChild(row);
+      });
+
+      const subMenu = document.getElementById("battle-party-sub-menu");
+      if (subMenu) {
+        if (b.menuState === "PARTY_SUB") {
+          subMenu.classList.remove("hidden");
+          subMenu.querySelectorAll("[data-psub-act]").forEach((btn, sIdx) => {
+            const cEl = btn.querySelector(".bcursor");
+            if (cEl) cEl.textContent = sIdx === b.partySubCursor ? "▶" : " ";
+          });
+        } else {
+          subMenu.classList.add("hidden");
+        }
+      }
+
+      const statsModal = document.getElementById("battle-stats-modal");
+      if (statsModal) {
+        if (b.menuState === "PARTY_STATS") {
+          statsModal.classList.remove("hidden");
+          const sMon = state.party[b.partyCursor] || pMon;
+          const content = document.getElementById("battle-stats-content");
+          content.innerHTML = `
+            <div class="stats-top-grid">
+              <canvas id="party-stats-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
+              <div>
+                <div><strong>${sMon.nickname}</strong> &nbsp;:L${sMon.level}</div>
+                <div>HP: ${sMon.hp}/${sMon.maxHp} &nbsp;STATUS/${sMon.status}</div>
+                <div>TYPE/${sMon.types.join(" / ")}</div>
+              </div>
+            </div>
+            <div class="stats-mid-grid">
+              <div>ATTACK &nbsp;${sMon.atk}<br/>DEFENSE ${sMon.def}</div>
+              <div>SPEED &nbsp;&nbsp;${sMon.spd}<br/>SPECIAL ${sMon.spc}</div>
+            </div>
+            <div class="stats-moves-box">
+              ${sMon.moves
+                .map(
+                  (mv) =>
+                    `<div style="display:flex;justify-content:space-between"><span>• ${mv.name}</span><span>PP ${mv.pp}/${mv.maxPp}</span></div>`
+                )
+                .join("")}
+            </div>
+          `;
+          const stCanvas = document.getElementById("party-stats-canvas");
+          const spr =
+            engine.pokemonSprites[sMon.species] || engine.pokemonSprites.PIKACHU;
+          engine.render2BitGraphicToCanvas(stCanvas, spr, "PAL_YELLOWMON");
+        } else {
+          statsModal.classList.add("hidden");
+        }
+      }
+    } else {
+      partyScreen.classList.add("hidden");
+    }
+  }
 }
 
 function getFilteredZones() {
@@ -1476,6 +2695,31 @@ function setupControlsAndEvents() {
     ) {
       return;
     }
+    if (state.battle) {
+      if (keyToDir[e.code]) {
+        e.preventDefault();
+        handleBattleInput(keyToDir[e.code]);
+      } else if (
+        e.code === "Space" ||
+        e.code === "Enter" ||
+        e.code === "KeyZ"
+      ) {
+        e.preventDefault();
+        handleBattleInput("A");
+      } else if (e.code === "KeyX" || e.code === "Backspace") {
+        e.preventDefault();
+        handleBattleInput("B");
+      } else if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        e.preventDefault();
+        handleBattleInput("SELECT");
+      } else if (e.code === "Escape") {
+        e.preventDefault();
+        state.battle = null;
+        renderBattleModal();
+      }
+      return;
+    }
+
     if (keyToDir[e.code]) {
       e.preventDefault();
       const dir = keyToDir[e.code];
@@ -1492,9 +2736,6 @@ function setupControlsAndEvents() {
       if (state.dialogue) {
         state.dialogue = null;
         renderDialogueModal();
-      } else if (state.battle) {
-        state.battle = null;
-        renderBattleModal();
       }
     } else if (e.code === "BracketLeft") {
       stepZoneNumber(-1);
@@ -1516,6 +2757,10 @@ function setupControlsAndEvents() {
     const dir = btn.dataset.dpad;
     const startHold = (e) => {
       e.preventDefault();
+      if (state.battle) {
+        handleBattleInput(dir);
+        return;
+      }
       heldDirs.add(dir);
       attemptStep(dir);
     };
@@ -1528,15 +2773,18 @@ function setupControlsAndEvents() {
   });
 
   document.getElementById("btn-gb-a")?.addEventListener("click", () => {
-    interactInFront();
+    if (state.battle) {
+      handleBattleInput("A");
+    } else {
+      interactInFront();
+    }
   });
   document.getElementById("btn-gb-b")?.addEventListener("click", () => {
     if (state.dialogue) {
       state.dialogue = null;
       renderDialogueModal();
     } else if (state.battle) {
-      state.battle = null;
-      renderBattleModal();
+      handleBattleInput("B");
     } else {
       state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
     }
@@ -1545,7 +2793,11 @@ function setupControlsAndEvents() {
     openVisualAtlasModal();
   });
   document.getElementById("btn-gb-select")?.addEventListener("click", () => {
-    openPikachuInteraction();
+    if (state.battle) {
+      handleBattleInput("SELECT");
+    } else {
+      openPikachuInteraction();
+    }
   });
 
   // Click on Full Zone Canvas to teleport / walk or trigger warp!
@@ -1689,7 +2941,7 @@ function setupControlsAndEvents() {
     renderZoneList();
   });
 
-  // Dialogue & Battle buttons
+  // Dialogue & Authentic Gen I Battle Menu buttons
   document.getElementById("dialogue-next-btn")?.addEventListener("click", () => {
     advanceDialogue();
   });
@@ -1698,10 +2950,80 @@ function setupControlsAndEvents() {
     renderDialogueModal();
   });
 
-  document.querySelectorAll("[data-battle-act]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      executeBattleAction(btn.dataset.battleAct);
+  document.getElementById("battle-exit-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    state.battle = null;
+    renderBattleModal();
+  });
+
+  document.getElementById("battle-msg-box")?.addEventListener("click", () => {
+    if (state.battle && state.battle.menuState === "MESSAGE") {
+      advanceBattleMessage();
+    }
+  });
+
+  document.querySelectorAll("[data-bmenu-idx]").forEach((btn) => {
+    const idx = Number(btn.dataset.bmenuIdx);
+    btn.addEventListener("mouseenter", () => {
+      if (state.battle && state.battle.menuState === "MAIN_MENU") {
+        state.battle.mainCursor = idx;
+        renderBattleModal();
+      }
     });
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!state.battle) return;
+      state.battle.mainCursor = idx;
+      state.battle.menuState = "MAIN_MENU";
+      handleBattleInput("A");
+    });
+  });
+
+  document.querySelectorAll("[data-smenu-idx]").forEach((btn) => {
+    const idx = Number(btn.dataset.smenuIdx);
+    btn.addEventListener("mouseenter", () => {
+      if (state.battle && state.battle.menuState === "MAIN_MENU") {
+        state.battle.mainCursor = idx;
+        renderBattleModal();
+      }
+    });
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!state.battle) return;
+      state.battle.mainCursor = idx;
+      state.battle.menuState = "MAIN_MENU";
+      handleBattleInput("A");
+    });
+  });
+
+  document.getElementById("battle-fight-back-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handleBattleInput("B");
+  });
+
+  document.getElementById("battle-party-close-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handleBattleInput("B");
+  });
+
+  document.querySelectorAll("[data-psub-act]").forEach((btn, idx) => {
+    btn.addEventListener("mouseenter", () => {
+      if (state.battle && state.battle.menuState === "PARTY_SUB") {
+        state.battle.partySubCursor = idx;
+        renderBattleModal();
+      }
+    });
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!state.battle) return;
+      state.battle.partySubCursor = idx;
+      handleBattleInput("A");
+    });
+  });
+
+  document.getElementById("battle-stats-close-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handleBattleInput("B");
   });
 
   // Visual Atlas modal
@@ -1737,6 +3059,10 @@ window.POKEYELLOW = {
   interactInFront,
   openPikachuInteraction,
   triggerWildEncounter,
+  handleBattleInput,
+  executeBattleAction,
+  buildMonInstance,
+  healParty,
 };
 
 window.addEventListener("DOMContentLoaded", () => {
