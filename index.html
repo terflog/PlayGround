@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08090b">
+  <meta name="description" content="Team Rocket: Redline — steal Pokémon, climb the ranks, and build the biggest Rocket base in the region.">
+  <title>Team Rocket: Redline</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0b0d'/%3E%3Cpath d='M12 12h40v40H12z' fill='none' stroke='%23e44343' stroke-width='3'/%3E%3Ctext x='32' y='45' font-family='Arial Black,Arial' font-size='34' font-weight='900' fill='%23e44343' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="views.css">
+  <link rel="stylesheet" href="heist.css">
+  <link rel="stylesheet" href="modals.css">
+  <link rel="stylesheet" href="responsive.css">
+</head>
+<body>
+  <div id="intro" class="intro">
+    <div class="intro-grid" aria-hidden="true"></div>
+    <div class="intro-beam" aria-hidden="true"></div>
+    <div class="intro-shell">
+      <div class="intro-card">
+        <div class="intro-copy">
+          <div class="intro-kicker"><span class="live-dot"></span> A TEAM ROCKET STORY · ORIGINAL GAME</div>
+          <div class="intro-logo">
+            <div class="logo-mark">R</div>
+            <div>
+              <span class="logo-team">TEAM ROCKET</span>
+              <h1>REDLINE</h1>
+            </div>
+          </div>
+          <p class="intro-tag">Steal. Rank up. Build the base. Take the chair.</p>
+          <div class="intro-story">
+            <p>You are <strong>Grunt #417</strong>: a second-hand uniform, a borrowed Meowth, and a talent for being underestimated.</p>
+            <p>Giovanni has one rule — bring him Pokémon, or bring him excuses. You have never been good at excuses.</p>
+          </div>
+          <div class="intro-steps">
+            <span><b>01</b> Steal Pokémon</span>
+            <span><b>02</b> Climb ranks</span>
+            <span><b>03</b> Upgrade the base</span>
+            <span><b>04</b> Build an empire</span>
+          </div>
+          <div class="intro-actions">
+            <button id="start-btn" class="btn btn-primary btn-start" data-action="start">Start</button>
+            <div id="intro-save" class="intro-save"></div>
+          </div>
+          <p class="intro-fine">Progress saves automatically in this browser. No account. No mercy.</p>
+        </div>
+        <div class="intro-art" aria-hidden="true">
+          <div class="intro-art-glow"></div>
+          <div class="intro-art-city">
+            <span style="--h:38%;--w:9%"></span><span style="--h:56%;--w:12%"></span>
+            <span style="--h:44%;--w:7%"></span><span style="--h:72%;--w:10%"></span>
+            <span style="--h:52%;--w:8%"></span><span style="--h:88%;--w:13%"></span>
+            <span style="--h:64%;--w:9%"></span><span style="--h:40%;--w:7%"></span>
+            <span style="--h:76%;--w:11%"></span><span style="--h:58%;--w:8%"></span>
+          </div>
+          <div class="intro-art-r">
+            <span class="r-ring r-ring--1"></span>
+            <span class="r-ring r-ring--2"></span>
+            <span class="r-letter">R</span>
+            <span class="r-tag">R</span>
+          </div>
+          <div class="intro-art-label">NEON DISTRICT<br><em>ROCKET CLEARANCE</em></div>
+        </div>
+      </div>
+      <div class="intro-foot">
+        <span>REDLINE / CASE FILE 417</span>
+        <span>START AS A GRUNT · END AS THE BOSS</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app is-hidden">
+    <header class="topbar">
+      <div class="brand-wrap">
+        <div class="brand">
+          <span class="brand-r">R</span>
+          <span class="brand-team">TEAM ROCKET</span>
+          <em>//</em>
+          <strong>REDLINE</strong>
+        </div>
+        <div class="brand-sub">NEON DISTRICT · DAY <span id="day-label">01</span></div>
+      </div>
+      <div id="topres" class="topres"></div>
+      <div class="topactions">
+        <button id="sound-btn" class="icon-btn" data-action="sound" aria-label="Toggle sound"></button>
+        <button class="icon-btn" data-action="help" aria-label="How to play">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.6 2.6 0 1 1 4 2.3c-.9.6-1.5 1.1-1.5 2.2"/><path d="M12 17h.01"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="shell">
+      <aside id="sidebar" class="sidebar" aria-label="Career"></aside>
+      <main id="view" class="view" aria-live="polite"></main>
+    </div>
+
+    <button id="mobile-promo-cta" class="mobile-promo-cta" data-action="promote">
+      <span class="mp-icon">
+        <svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M6 4h12v5a6 6 0 0 1-12 0z"/><path d="M6 5H3v2a3 3 0 0 0 3 3M18 5h3v2a3 3 0 0 1-3 3"/></svg>
+      </span>
+      <span class="mp-copy"><em>PROMOTION READY</em><strong>Take the next rank</strong></span>
+      <svg class="icon mp-arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+
+    <nav class="mobile-nav" aria-label="Sections">
+      <button class="mnav-btn" data-action="tab" data-id="base" aria-label="Base">
+        <svg class="icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+        <span>BASE</span>
+        <i id="mobile-promo" class="mobile-promo"></i>
+      </button>
+      <button class="mnav-btn" data-action="tab" data-id="ops" aria-label="Operations">
+        <svg class="icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
+        <span>JOBS</span>
+      </button>
+      <button class="mnav-btn" data-action="tab" data-id="roster" aria-label="Roster">
+        <svg class="icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.8 20c.4-3.2 2.8-5.2 6.2-5.2s5.8 2 6.2 5.2"/><path d="M16 5.4a3 3 0 0 1 0 5.6M17.5 15.1c2.2.5 3.5 2.2 3.7 4.9"/></svg>
+        <span>CREW</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui-core.js"></script>
+  <script src="js/ui-views.js"></script>
+  <script src="js/ui-roster.js"></script>
+  <script src="js/ui-heist.js"></script>
+  <script src="js/ui-modals.js"></script>
+  <script src="js/ui-init.js"></script>
+</body>
+</html>

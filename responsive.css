@@ -1,0 +1,216 @@
+@media (max-width: 1260px) {
+  .mission-card { grid-template-columns: 140px minmax(0, 1fr) 176px; }
+  .mission-art { min-height: 170px; }
+  .mission-stat-grid .reward-chip em { font-size: 6px; }
+  .mission-stat-grid .reward-chip strong { font-size: 8.5px; }
+}
+
+@media (max-width: 1180px) {
+  .base-layout, .ops-layout { grid-template-columns: 1fr; }
+  .rail { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .rail .panel { height: 100%; }
+  .quick-panel, .crew-panel, .partner-card, .gear-panel { min-height: 100%; }
+  .heist-grid { grid-template-columns: minmax(0, 1.22fr) minmax(310px, .78fr); }
+  .heist-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1060px) {
+  .heist-grid { grid-template-columns: 1fr; }
+  .heist-side { grid-template-columns: 1fr 1fr; align-items: start; }
+  .action-panel, .log-panel { height: 100%; }
+  .log-list { max-height: 250px; }
+}
+
+@media (max-width: 1000px) {
+  .mission-card { grid-template-columns: 126px minmax(0, 1fr); }
+  .mission-cta { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; border-left: 0; border-top: 1px solid var(--line); padding: 10px 14px; }
+  .mission-cta .btn { width: auto; min-width: 170px; }
+  .mission-sub { text-align: right; }
+  .mission-stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .rail { grid-template-columns: 1fr 1fr; }
+  .roster-grid { grid-template-columns: 1fr 1fr; }
+  body.in-heist .mobile-nav { display: none; }
+  body.in-heist .mobile-promo-cta { display: none; }
+  body.in-heist .view { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+  body.in-heist .toast-root { bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .capacity-panel { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .capacity-side { grid-column: 1 / -1; text-align: left; padding-top: 8px; border-top: 1px solid var(--line); }
+  .heist-side { grid-template-columns: 1fr; }
+  .action-panel { position: static; }
+  .log-list { max-height: 200px; }
+  .heist-head { align-items: flex-start; }
+  .heist-live { margin-top: 6px; }
+}
+
+@media (max-width: 760px) {
+  .rail { grid-template-columns: 1fr; }
+  .facility-grid { grid-template-columns: 1fr; }
+  .expansion-grid { grid-template-columns: 1fr; }
+  .expansion-card > p { min-height: 0; }
+  .expansion-intro { display: block; }
+  .expansion-intro .btn { margin-top: 10px; }
+  .expansion-locked { display: grid; grid-template-columns: auto 1fr; }
+  .locked-preview { grid-column: 1 / -1; }
+  .roster-grid { grid-template-columns: 1fr; }
+  .mon-card { grid-template-columns: 130px minmax(0, 1fr); }
+  .mon-art { min-height: 210px; }
+  .view-head h1 { font-size: 32px; }
+  .section-head { margin-top: 20px; }
+  .section-head--boss { margin-top: 26px; }
+  .mission-card { grid-template-columns: 118px minmax(0, 1fr); }
+  .mission-body { padding: 12px 12px 12px; }
+  .mission-title-row h3 { font-size: 22px; }
+  .mission-flavor { font-size: 10px; }
+  .mission-stat-grid { grid-template-columns: 1fr 1fr; }
+  .mission-tag { margin-left: 0; }
+  .mission-topline { gap: 5px; }
+  .mission-meta-row { gap: 10px; }
+  .rooms-left { margin-left: 0; }
+  .mission-cta { flex-wrap: wrap; }
+  .mission-cta .btn { width: 100%; }
+  .mission-sub { width: 100%; text-align: left; }
+  .mission-card--final .mission-cta { border-top-color: #4d3f23; }
+  .capacity-panel { grid-template-columns: 1fr; gap: 10px; }
+  .capacity-side { grid-column: auto; }
+  .roster-foot { gap: 8px; }
+  .heist-head { display: block; }
+  .heist-head h1 { font-size: 36px; }
+  .heist-live { display: inline-flex; margin-top: 10px; }
+  .heist-grid { display: flex; flex-direction: column; align-items: stretch; gap: 9px; }
+  .heist-main, .heist-side { display: contents; }
+  .target-band { order: 1; }
+  .map-panel { order: 2; }
+  .action-panel { order: 3; }
+  .alert-panel { order: 4; }
+  .heist-chips { order: 5; }
+  .heist-footer { order: 6; }
+  .log-panel { order: 7; }
+  .heist-head { margin-bottom: 12px; }
+  .target-band { padding: 11px 12px; gap: 10px; flex-wrap: wrap; }
+  .target-art { width: 84px; height: 84px; }
+  .target-art .poke-sprite { width: 84px; height: 84px; }
+  .target-title h2 { font-size: 27px; }
+  .map-panel { padding: 10px 12px; }
+  .map-track { height: 32px; margin: 10px 8px 8px; }
+  .alert-panel { padding: 10px 12px; }
+  .alert-head strong { font-size: 23px; }
+  .alert-bar { margin: 8px 0 6px; }
+  .action-panel { padding: 11px 11px 10px; }
+  .action-grid { gap: 4px; grid-template-columns: 1fr 1fr; }
+  .heist-action { min-height: 46px; padding: 7px 6px; }
+  .heist-footer { grid-template-columns: 1fr 1fr; }
+  .hf-cell { padding: 10px 12px; }
+  .hf-cell:nth-child(3) { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+  .target-chance { width: 100%; display: flex; align-items: baseline; justify-content: space-between; padding: 9px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+  .target-chance strong { font-size: 26px; }
+  .heist-chips { grid-template-columns: 1fr 1fr; }
+
+  .modal-backdrop { padding: 10px; align-items: end; }
+  .modal { width: 100%; max-height: 92dvh; clip-path: none; }
+  .modal--wide, .modal--result, .modal--help, .modal--promo { width: 100%; }
+  .modal-head { padding: 16px 15px 0; }
+  .modal-body { padding: 14px 15px 16px; }
+  .prep-grid { grid-template-columns: 1fr; }
+  .prep-mission { border-right: 0; border-bottom: 1px solid var(--line); padding: 13px; }
+  .prep-art { height: 135px; }
+  .prep-art .poke-sprite { width: 112px; height: 112px; }
+  .prep-art .target-halo { width: 118px; height: 118px; }
+  .prep-crew { padding: 13px; }
+  .partner-options { max-height: 245px; }
+  .prep-crew-head h3 { font-size: 18px; }
+  .prep-rewards { grid-template-columns: 1fr 1fr 1fr; }
+  .prep-mission > p { font-size: 10px; }
+  .prep-chance { margin-top: 9px; }
+  .result-card, .result-card.is-victory { grid-template-columns: 1fr; }
+  .result-art { min-height: 160px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .result-art .poke-sprite { width: 100px; height: 100px; }
+  .result-stamp { bottom: 12px; font-size: 24px; }
+  .result-main { padding: 16px; }
+  .result-main h2 { font-size: 31px; }
+  .result-actions { flex-wrap: wrap; padding: 11px 15px 15px; }
+  .result-actions .btn { flex: 1; min-width: 140px; }
+  .victory-stats { grid-template-columns: 1fr 1fr; }
+  .help-grid { grid-template-columns: 1fr; }
+  .help-foot { display: grid; gap: 9px; }
+  .help-foot .btn { width: 100%; }
+  .promo-modal h2 { font-size: 41px; }
+  .promo-modal { padding: 20px 16px 18px; }
+  .promo-emblem { width: 88px; height: 88px; margin-bottom: 14px; }
+  .promo-emblem .rank-r { font-size: 42px; }
+  .help-grid section { padding: 11px; }
+  .captured-block { grid-template-columns: 60px 1fr; }
+  .captured-note { grid-column: 1 / -1; text-align: left; }
+}
+
+@media (max-width: 560px) {
+  .topres { gap: 4px; }
+  .res { padding: 5px 4px; gap: 4px; }
+  .res strong { font-size: 8.5px; }
+  .res .icon { width: 11px; height: 11px; }
+  .view { padding-left: 12px; padding-right: 12px; }
+  .view-head h1 { font-size: 30px; }
+  .head-actions { display: grid; grid-template-columns: 1fr; }
+  .head-actions .btn { grid-column: 1; }
+  .status-chip { font-size: 7px; padding: 5px 7px; }
+  .section-head h2 { font-size: 19px; }
+  .section-note { font-size: 7px; text-align: right; }
+  .facility-card { min-height: 0; }
+  .roster-grid { grid-template-columns: 1fr; }
+  .mon-card { grid-template-columns: 108px minmax(0, 1fr); }
+  .mon-art { min-height: 190px; padding: 6px; }
+  .mon-art .poke-sprite { width: 96px; height: 96px; }
+  .mon-halo { width: 82px; height: 82px; }
+  .mon-body { padding: 10px; }
+  .mon-title-row h3 { font-size: 18px; }
+  .mon-tagline { font-size: 8.5px; }
+  .mon-actions .btn { font-size: 6.5px; padding: 6px 4px; }
+  .mission-card { grid-template-columns: 1fr; }
+  .mission-art { min-height: 138px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .mission-cta { grid-column: auto; }
+  .mission-title-row h3 { font-size: 24px; }
+  .action-grid { grid-template-columns: 1fr 1fr; }
+  .heist-action { min-height: 46px; }
+  .heist-chips { grid-template-columns: 1fr 1fr; }
+  .heist-head h1 { font-size: 32px; }
+  .map-legend { gap: 8px; font-size: 6px; }
+  .alert-mark em { display: none; }
+  .modal-backdrop { padding: 0; align-items: end; }
+  .modal { max-height: 94dvh; border-left: 0; border-right: 0; border-bottom: 0; }
+  .modal-head { padding: 14px 13px 0; }
+  .modal-body { padding: 12px 13px 14px; }
+  .prep-rewards { grid-template-columns: 1fr 1fr; }
+  .prep-rewards .reward-chip:last-child { grid-column: 1 / -1; }
+  .partner-option { grid-template-columns: 46px 1fr; }
+  .po-sprite { width: 46px; height: 46px; }
+  .po-sprite .poke-sprite { width: 46px; height: 46px; }
+  .result-main h2 { font-size: 28px; }
+  .result-line { font-size: 7px; }
+  .result-line strong { font-size: 8px; }
+  .result-actions .btn { flex: 1 1 100%; }
+  .confirm-actions { flex-direction: column-reverse; }
+  .confirm-actions .btn { width: 100%; }
+  .btn-start { height: 50px; }
+  .intro-copy { padding: 24px 16px 22px; }
+  .intro-logo h1 { font-size: 52px; }
+  .intro-steps { grid-template-columns: 1fr; }
+  .intro-story { padding-left: 12px; }
+  .intro-save em { display: block; width: 100%; }
+  .intro-fine { font-size: 7.5px; }
+  .toast-root { left: 10px; right: 10px; }
+}
+
+@media (max-height: 720px) and (min-width: 901px) {
+  .intro-card { min-height: 520px; }
+  .intro-copy { padding-top: 32px; padding-bottom: 28px; }
+  .intro-logo h1 { font-size: 66px; }
+  .intro-story p { font-size: 13px; }
+  .intro-steps { margin: 18px 0 20px; }
+  .rail { top: 76px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
