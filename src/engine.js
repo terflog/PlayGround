@@ -21,8 +21,9 @@ export function unpackBytes(b64) {
   return out;
 }
 
-function createLazy2BitMap(sourceDict) {
+function createLazy2BitMap(sourceDict, maxEntries = 28) {
   const cache = {};
+  const keysQueue = [];
   const src = sourceDict || {};
   return new Proxy(cache, {
     get(target, prop) {
@@ -30,12 +31,17 @@ function createLazy2BitMap(sourceDict) {
       if (prop in target) return target[prop];
       const raw = src[prop];
       if (!raw) return undefined;
+      while (keysQueue.length >= maxEntries) {
+        const oldest = keysQueue.shift();
+        if (oldest) delete target[oldest];
+      }
       const unpacked = {
         width: raw.width,
         height: raw.height,
         pixels: unpack2Bit(raw.data, raw.width, raw.height),
       };
       target[prop] = unpacked;
+      keysQueue.push(prop);
       return unpacked;
     },
     has(target, prop) {
@@ -58,8 +64,8 @@ export class PokeYellowEngine {
     this.data = data;
     this.palettes = data.palettes;
 
-    // Lazily unpack tilesets & blocksets on first access to avoid startup memory spike
-    this.gfxSheets = createLazy2BitMap(data.tilesets.gfx);
+    // Bounded VRAM caches (evicts inactive tilesets/sprites on map swaps like 8KB GB VRAM)
+    this.gfxSheets = createLazy2BitMap(data.tilesets.gfx, 4);
 
     this.bstData = {};
     for (const [k, v] of Object.entries(data.tilesets.bst)) {
@@ -78,26 +84,39 @@ export class PokeYellowEngine {
       this.tilesetsByConst[ts.constName] = ts;
     }
 
-    // Lazily unpack overworld, portrait, emote, Pokémon & trainer sprites on demand
-    this.spriteSheets = createLazy2BitMap(data.sprites.sheets);
+    // Bounded VRAM sprite banks
+    this.spriteSheets = createLazy2BitMap(data.sprites.sheets, 24);
     this.spriteConstToKey = data.sprites.constToKey;
-    this.pikachuFaces = createLazy2BitMap(data.sprites.pikachuFaces);
-    this.emotes = createLazy2BitMap(data.sprites.emotes);
-    this.pokemonSprites = createLazy2BitMap(data.sprites.pokemon);
-    this.trainerSprites = createLazy2BitMap(data.sprites.trainers || {});
+    this.pikachuFaces = createLazy2BitMap(data.sprites.pikachuFaces, 6);
+    this.emotes = createLazy2BitMap(data.sprites.emotes, 8);
+    this.pokemonSprites = createLazy2BitMap(data.sprites.pokemon, 16);
+    this.trainerSprites = createLazy2BitMap(data.sprites.trainers || {}, 8);
 
-    // Index all zones with lazy blockBytes decoding
+    // 1. The 1-Byte Map ID System (0x00..0xFF) & Compressed Map Headers
+    // Single active WRAM map buffer (wOverworldMap: 1300 bytes in Gen I WRAM)
+    this.wOverworldMap = new Uint8Array(1600);
+    this.wOverworldMapStride = 0;
+    this.wCurMapConst = null;
+    this.wCurMapBlocks = null;
+    this.mapHeaderById = new Array(256).fill(null);
+
+    const self = this;
     this.allZones = data.zones.map((z) => {
-      let decodedBlocks = null;
-      const copy = { ...z };
+      const conns = z.connections || {};
+      const connectionsByte =
+        (conns.north ? 8 : 0) |
+        (conns.south ? 4 : 0) |
+        (conns.west ? 2 : 0) |
+        (conns.east ? 1 : 0);
+      const copy = { ...z, connectionsByte };
       Object.defineProperty(copy, "blockBytes", {
         enumerable: true,
         configurable: true,
         get() {
-          if (!decodedBlocks) {
-            decodedBlocks = unpackBytes(z.blocks);
+          if (self.wCurMapConst === z.constName && self.wCurMapBlocks) {
+            return self.wCurMapBlocks;
           }
-          return decodedBlocks;
+          return unpackBytes(z.blocks);
         },
       });
       return copy;
@@ -109,7 +128,12 @@ export class PokeYellowEngine {
     for (const z of this.allZones) {
       this.zonesByConst[z.constName] = z;
       this.zonesByNumber[z.zoneNumber] = z;
-      if (!this.zonesByRomId[z.romId]) this.zonesByRomId[z.romId] = z;
+      if (!this.zonesByRomId[z.romId]) {
+        this.zonesByRomId[z.romId] = z;
+        if (z.romId >= 0 && z.romId < 256) {
+          this.mapHeaderById[z.romId] = z;
+        }
+      }
     }
 
     // Animation state (matches home/vcopy.asm UpdateMovingBgTiles)
@@ -118,6 +142,104 @@ export class PokeYellowEngine {
     this.paletteMode = "reference"; // "reference" | "sgb" | "cgb" | "dmg"
     this.cutTrees = new Set(); // Step coordinates cleared by HM01 CUT ("ZONE:sx,sy")
     this.flashIlluminated = false; // Dark cave illumination via HM05 FLASH
+  }
+
+  // 3 & 4. Dynamic Tile Block Mapping + Overworld Connection Vector Stitching into wOverworldMap WRAM
+  loadMapIntoWRAM(zone) {
+    if (!zone) return;
+    const w = zone.width;
+    const h = zone.height;
+    const stride = w + 6;
+    const totalH = h + 6;
+    const needed = stride * totalH;
+    if (this.wOverworldMap.length < needed) {
+      this.wOverworldMap = new Uint8Array(needed);
+    }
+    this.wOverworldMapStride = stride;
+    this.wCurMapConst = zone.constName;
+    this.wOverworldMap.fill(zone.borderBlock, 0, needed);
+
+    // Stream active map's compressed blocks into WRAM center
+    const curBlocks = unpackBytes(zone.blocks);
+    this.wCurMapBlocks = curBlocks;
+    for (let by = 0; by < h; by++) {
+      const srcRow = by * w;
+      const dstRow = (by + 3) * stride + 3;
+      for (let bx = 0; bx < w; bx++) {
+        this.wOverworldMap[dstRow + bx] = curBlocks[srcRow + bx];
+      }
+    }
+
+    // Stitch 3-block border strips from connected neighbor maps using Connections Byte
+    const conns = zone.connections || {};
+    if ((zone.connectionsByte & 8) && conns.north) {
+      const target = this.zonesByConst[conns.north.targetConst];
+      if (target) {
+        const nb = unpackBytes(target.blocks);
+        for (let by = -3; by < 0; by++) {
+          const ty = target.height + by;
+          if (ty < 0 || ty >= target.height) continue;
+          for (let bx = -3; bx < w + 3; bx++) {
+            const tx = bx - conns.north.offset;
+            if (tx >= 0 && tx < target.width) {
+              this.wOverworldMap[(by + 3) * stride + (bx + 3)] =
+                nb[ty * target.width + tx];
+            }
+          }
+        }
+      }
+    }
+    if ((zone.connectionsByte & 4) && conns.south) {
+      const target = this.zonesByConst[conns.south.targetConst];
+      if (target) {
+        const nb = unpackBytes(target.blocks);
+        for (let by = h; by < h + 3; by++) {
+          const ty = by - h;
+          if (ty < 0 || ty >= target.height) continue;
+          for (let bx = -3; bx < w + 3; bx++) {
+            const tx = bx - conns.south.offset;
+            if (tx >= 0 && tx < target.width) {
+              this.wOverworldMap[(by + 3) * stride + (bx + 3)] =
+                nb[ty * target.width + tx];
+            }
+          }
+        }
+      }
+    }
+    if ((zone.connectionsByte & 2) && conns.west) {
+      const target = this.zonesByConst[conns.west.targetConst];
+      if (target) {
+        const nb = unpackBytes(target.blocks);
+        for (let by = -3; by < h + 3; by++) {
+          const ty = by - conns.west.offset;
+          if (ty < 0 || ty >= target.height) continue;
+          for (let bx = -3; bx < 0; bx++) {
+            const tx = target.width + bx;
+            if (tx >= 0 && tx < target.width) {
+              this.wOverworldMap[(by + 3) * stride + (bx + 3)] =
+                nb[ty * target.width + tx];
+            }
+          }
+        }
+      }
+    }
+    if ((zone.connectionsByte & 1) && conns.east) {
+      const target = this.zonesByConst[conns.east.targetConst];
+      if (target) {
+        const nb = unpackBytes(target.blocks);
+        for (let by = -3; by < h + 3; by++) {
+          const ty = by - conns.east.offset;
+          if (ty < 0 || ty >= target.height) continue;
+          for (let bx = w; bx < w + 3; bx++) {
+            const tx = bx - w;
+            if (tx >= 0 && tx < target.width) {
+              this.wOverworldMap[(by + 3) * stride + (bx + 3)] =
+                nb[ty * target.width + tx];
+            }
+          }
+        }
+      }
+    }
   }
 
   getOrCreateImageData(canvas, ctx, w, h) {
@@ -244,8 +366,15 @@ export class PokeYellowEngine {
     return [215, 130, 55];
   }
 
-  // Get block ID at (bx, by) in a zone, including connected neighbor zones in the 3-block border!
+  // Get block ID at (bx, by) in a zone using the pre-stitched wOverworldMap WRAM buffer!
   getBlockAt(zone, bx, by) {
+    if (!zone) return 0;
+    if (this.wCurMapConst === zone.constName && this.wOverworldMapStride > 0) {
+      if (bx >= -3 && bx < zone.width + 3 && by >= -3 && by < zone.height + 3) {
+        return this.wOverworldMap[(by + 3) * this.wOverworldMapStride + (bx + 3)];
+      }
+      return zone.borderBlock;
+    }
     if (bx >= 0 && bx < zone.width && by >= 0 && by < zone.height) {
       return zone.blockBytes[by * zone.width + bx];
     }
