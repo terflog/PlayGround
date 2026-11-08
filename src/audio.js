@@ -168,4 +168,32 @@ export class GameBoyAudio {
       });
     }
   }
+
+  // Synthesize authentic species-specific Gen I Pokémon Cry (PlayCry in home/audio.asm)
+  playPokemonCry(species, baseStats = null) {
+    if (!this.init()) return false;
+    const sp = String(species || "PIKACHU").toUpperCase();
+    let hash = 0;
+    for (let i = 0; i < sp.length; i++) {
+      hash = (hash * 31 + sp.charCodeAt(i)) & 0xffff;
+    }
+    const baseFreq = 260 + ((baseStats?.spd || (hash & 0x7f)) * 4.2);
+    const modFreq = 320 + ((baseStats?.spc || ((hash >> 4) & 0x7f)) * 4.8);
+    const tailFreq = 220 + ((baseStats?.atk || ((hash >> 8) & 0x7f)) * 3.9);
+    const stepMs = Math.max(42, Math.min(95, 110 - (baseStats?.spd || 50) * 0.4));
+    const notes =
+      sp === "PIKACHU"
+        ? [1174, 1480, 1318, 1760]
+        : [baseFreq, modFreq, baseFreq * 0.88, tailFreq, modFreq * 1.12];
+
+    notes.forEach((f, i) => {
+      const id = setTimeout(() => {
+        const idx = this.sfxTimers.indexOf(id);
+        if (idx !== -1) this.sfxTimers.splice(idx, 1);
+        this.playNote(f, stepMs * 1.1, i % 2 === 0 ? "square" : "sawtooth", 0.38);
+      }, i * stepMs);
+      this.sfxTimers.push(id);
+    });
+    return true;
+  }
 }
