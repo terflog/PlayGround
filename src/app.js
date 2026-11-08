@@ -23,7 +23,7 @@ const state = {
   searchQuery: "",
   townMapFilterCoords: null,
   visitedZones: new Set(["PALLET_TOWN"]),
-  caughtPokemon: new Set(["PIKACHU", "BULBASAUR", "CHARMANDER", "SQUIRTLE"]),
+  caughtPokemon: new Set(["PIKACHU"]),
   defeatedTrainers: new Set(),
   events: {
     enteredBluesHouse: false, // EVENT_ENTERED_BLUES_HOUSE (scripts/BluesHouse.asm:14)
@@ -192,7 +192,7 @@ const ELEVATOR_FLOORS = {
   ],
 };
 
-const STORAGE_KEY = "pokeyellow_220_save_v1";
+const STORAGE_KEY = "pokeyellow_220_save_v2";
 
 const SPECIAL_TYPES = new Set([
   "FIRE",
@@ -288,17 +288,10 @@ export function buildMonInstance(speciesKey, level = 10, customMoveIds = null) {
 
 function initDefaultParty() {
   if (state.party.length > 0) return;
-  // Authentic pret/pokeyellow starting & gift levels:
+  // Authentic pret/pokeyellow starting party:
   // - PIKACHU: Lv.5 (scripts/OaksLab.asm:1033 -> THUNDERSHOCK, GROWL)
-  // - BULBASAUR: Lv.10 (scripts/CeruleanMelaniesHouse.asm:37 -> TACKLE, GROWL, LEECH SEED)
-  // - CHARMANDER: Lv.10 (scripts/Route24.asm:301 -> SCRATCH, GROWL, EMBER)
-  // - SQUIRTLE: Lv.10 (scripts/VermilionCity_2.asm:24 -> TACKLE, TAIL WHIP, BUBBLE)
-  state.party = [
-    buildMonInstance("PIKACHU", 5),
-    buildMonInstance("BULBASAUR", 10),
-    buildMonInstance("CHARMANDER", 10),
-    buildMonInstance("SQUIRTLE", 10),
-  ];
+  // Gift starters (BULBASAUR, CHARMANDER, SQUIRTLE) are obtained later in-game from Melanie, Route 24 trainer, and Officer Jenny.
+  state.party = [buildMonInstance("PIKACHU", 5)];
 }
 
 export function isStarterPikachuAlive() {
