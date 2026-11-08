@@ -30,9 +30,9 @@
 
         <div class="header-controls">
           <div class="seg-group" role="group" aria-label="Viewport Mode">
-            <button type="button" class="seg-btn active" data-view-mode="split">Split View</button>
+            <button type="button" class="seg-btn active" data-view-mode="gb">Game Boy 160×144</button>
+            <button type="button" class="seg-btn" data-view-mode="split">Split View</button>
             <button type="button" class="seg-btn" data-view-mode="zone">Full Zone Map</button>
-            <button type="button" class="seg-btn" data-view-mode="gb">Game Boy 160×144</button>
           </div>
 
           <label class="select-wrap" title="Hardware Color Palette">
@@ -81,9 +81,9 @@
       </section>
 
       <!-- Main Workspace -->
-      <main class="workspace">
+      <main id="workspace" class="workspace" data-view-mode="gb">
         <!-- Left/Center Stage: Full Zone Reference Map + Playable Game Boy Viewport -->
-        <section id="main-stage" class="main-stage" data-view-mode="split">
+        <section id="main-stage" class="main-stage" data-view-mode="gb">
           <!-- Card 1: Full Zone Segment Renderer (Reference Mode) -->
           <div class="viewport-card zone-map-card">
             <div class="card-header">
@@ -282,6 +282,29 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Authentic Generation I (pret/pokeyellow) In-Game START Menu (home/start_menu.asm & engine/menus/draw_start_menu.asm) -->
+                  <div id="start-menu-overlay" class="start-menu-overlay hidden">
+                    <!-- DrawStartMenu box at (10,0..19,15): Right-side 7-item vertical menu -->
+                    <div id="start-menu-box" class="gb-poke-box start-menu-box" role="menu" aria-label="Start Menu">
+                      <button type="button" class="smenu-item" data-smenu-item="0"><span class="bcursor">▶</span>POKéDEX</button>
+                      <button type="button" class="smenu-item" data-smenu-item="1"><span class="bcursor"> </span>POKéMON</button>
+                      <button type="button" class="smenu-item" data-smenu-item="2"><span class="bcursor"> </span>ITEM</button>
+                      <button type="button" class="smenu-item" data-smenu-item="3"><span class="bcursor"> </span>RED</button>
+                      <button type="button" class="smenu-item" data-smenu-item="4"><span class="bcursor"> </span>SAVE</button>
+                      <button type="button" class="smenu-item" data-smenu-item="5"><span class="bcursor"> </span>OPTION</button>
+                      <button type="button" class="smenu-item" data-smenu-item="6"><span class="bcursor"> </span>EXIT</button>
+                    </div>
+
+                    <!-- Full-Screen Submenu Panel (POKéDEX / POKéMON / ITEM / RED / SAVE / OPTION) -->
+                    <div id="start-sub-panel" class="gb-poke-box start-sub-panel hidden">
+                      <div class="start-sub-header">
+                        <strong id="start-sub-title">POKéDEX</strong>
+                        <button type="button" id="start-sub-back-btn" class="bmenu-back-hint">◀ BACK (B)</button>
+                      </div>
+                      <div id="start-sub-body" class="start-sub-body"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -301,7 +324,7 @@
 
                 <div class="meta-btns">
                   <button type="button" id="btn-gb-select" class="gb-pill-btn">SELECT (PIKA)</button>
-                  <button type="button" id="btn-gb-start" class="gb-pill-btn">START (ATLAS)</button>
+                  <button type="button" id="btn-gb-start" class="gb-pill-btn">START (MENU)</button>
                 </div>
 
                 <div class="ab-btns">
