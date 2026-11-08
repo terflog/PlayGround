@@ -455,10 +455,12 @@ export class PokeYellowEngine {
   // Get 8x8 tile ID at 8x8 tile coordinate (tx, ty) in zone
   getTileIdAt8x8(zone, tx, ty) {
     if (!zone) return 0;
-    const stepX = Math.floor(tx / 2);
-    const stepY = Math.floor(ty / 2);
-    if (this.cutTrees && this.cutTrees.has(`${zone.constName}:${stepX},${stepY}`)) {
-      return zone.tileset === "GYM" ? 0x11 : 0x2c;
+    if (this.cutTrees && this.cutTrees.size > 0) {
+      const stepX = Math.floor(tx / 2);
+      const stepY = Math.floor(ty / 2);
+      if (this.cutTrees.has(`${zone.constName}:${stepX},${stepY}`)) {
+        return zone.tileset === "GYM" ? 0x11 : 0x2c;
+      }
     }
     const bx = Math.floor(tx / 4);
     const by = Math.floor(ty / 4);
@@ -705,6 +707,7 @@ export class PokeYellowEngine {
     const bst = this.bstData[ts.bstKey];
     const pal = this.getPaletteColors(zone.palette);
 
+    const hasCutTrees = Boolean(this.cutTrees && this.cutTrees.size > 0);
     for (let by = -borderBlocks; by < zone.height + borderBlocks; by++) {
       for (let bx = -borderBlocks; bx < zone.width + borderBlocks; bx++) {
         const blockId = this.getBlockAt(zone, bx, by);
@@ -712,11 +715,13 @@ export class PokeYellowEngine {
         const destBlockY = (by + borderBlocks) * 32;
         for (let ty = 0; ty < 4; ty++) {
           for (let tx = 0; tx < 4; tx++) {
-            const stepX = bx * 2 + Math.floor(tx / 2);
-            const stepY = by * 2 + Math.floor(ty / 2);
             const isCut =
-              this.cutTrees &&
-              this.cutTrees.has(`${zone.constName}:${stepX},${stepY}`);
+              hasCutTrees &&
+              this.cutTrees.has(
+                `${zone.constName}:${bx * 2 + Math.floor(tx / 2)},${
+                  by * 2 + Math.floor(ty / 2)
+                }`
+              );
             const tileId = isCut
               ? zone.tileset === "GYM"
                 ? 0x11
@@ -931,6 +936,7 @@ export class PokeYellowEngine {
     const startTileY = Math.floor(camY / 8) - 1;
     const endTileY = Math.ceil((camY + H) / 8) + 1;
 
+    const hasCutTrees = Boolean(this.cutTrees && this.cutTrees.size > 0);
     for (let ty = startTileY; ty <= endTileY; ty++) {
       const by = Math.floor(ty / 4);
       const subY = ((ty % 4) + 4) % 4;
@@ -938,11 +944,11 @@ export class PokeYellowEngine {
       for (let tx = startTileX; tx <= endTileX; tx++) {
         const bx = Math.floor(tx / 4);
         const subX = ((tx % 4) + 4) % 4;
-        const stepX = Math.floor(tx / 2);
-        const stepY = Math.floor(ty / 2);
         const isCut =
-          this.cutTrees &&
-          this.cutTrees.has(`${zone.constName}:${stepX},${stepY}`);
+          hasCutTrees &&
+          this.cutTrees.has(
+            `${zone.constName}:${Math.floor(tx / 2)},${Math.floor(ty / 2)}`
+          );
         const blockId = this.getBlockAt(zone, bx, by);
         const tileId = isCut
           ? zone.tileset === "GYM"

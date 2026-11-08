@@ -814,11 +814,13 @@ function initZoneNpcs(zone) {
     } else if (zone.constName === "OAKS_LAB") {
       if (o.name === "OAKSLAB_OAK1") {
         defaultVisible = Boolean(
-          state.events.oakRescuedInGrass || state.events.gotStarterPikachu
+          state.events.oakRescuedInGrass ||
+            state.events.gotStarterPikachu ||
+            state.party.length > 0
         );
       } else if (
         o.name === "OAKSLAB_EEVEE_POKE_BALL" &&
-        state.events.gotStarterPikachu
+        (state.events.gotStarterPikachu || state.party.length > 0)
       ) {
         collected = true; // Snatched by Rival Blue during the lab intro cutscene
       } else if (
@@ -2267,6 +2269,14 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
       : npc.text;
   openDialogue(npc.name.replace(/_/g, " "), baseText + giftSuffix, {
     trainerBattle: trainerEntry,
+    onComplete: trainerEntry
+      ? () => {
+          triggerWildEncounter(
+            [trainerEntry.level, trainerEntry.species],
+            trainerEntry
+          );
+        }
+      : null,
   });
 }
 
@@ -3829,18 +3839,7 @@ function renderDialogueModal() {
 
   const battleBtn = document.getElementById("dialogue-battle-btn");
   if (battleBtn) {
-    if (state.dialogue.trainerBattle) {
-      const tb = state.dialogue.trainerBattle;
-      battleBtn.classList.remove("hidden");
-      battleBtn.textContent = tb.trainerName
-        ? `⚔️ BATTLE ${tb.trainerName}`
-        : `⚔️ BATTLE ${tb.species}`;
-      battleBtn.onclick = () => {
-        state.dialogue = null;
-        renderDialogueModal();
-        triggerWildEncounter([tb.level, tb.species], tb);
-      };
-    } else if (state.dialogue.fieldMoveAction) {
+    if (state.dialogue.fieldMoveAction) {
       const fma = state.dialogue.fieldMoveAction;
       battleBtn.classList.remove("hidden");
       battleBtn.textContent = fma.label;

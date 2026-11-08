@@ -1,140 +1,92 @@
-// Authentic Generation I CryData Table (pret/pokeyellow data/pokemon/cries.asm: [baseCry, pitch, length])
-const GEN1_CRY_DATA = {
-  BULBASAUR: [0x0f, 0x80, 0x01], IVYSAUR: [0x0f, 0x20, 0x80], VENUSAUR: [0x0f, 0x00, 0xc0],
-  CHARMANDER: [0x04, 0x60, 0x40], CHARMELEON: [0x04, 0x20, 0x40], CHARIZARD: [0x00, 0x00, 0x80],
-  SQUIRTLE: [0x1d, 0x60, 0x40], WARTORTLE: [0x18, 0x20, 0x40], BLASTOISE: [0x13, 0x00, 0x80],
-  CATERPIE: [0x16, 0x80, 0x20], METAPOD: [0x1c, 0xcc, 0x01], BUTTERFREE: [0x16, 0x77, 0x40],
-  WEEDLE: [0x15, 0xee, 0x01], KAKUNA: [0x13, 0xff, 0x01], BEEDRILL: [0x13, 0x60, 0x80],
-  PIDGEY: [0x0e, 0xdf, 0x04], PIDGEOTTO: [0x14, 0x28, 0xc0], PIDGEOT: [0x14, 0x11, 0xff],
-  RATTATA: [0x22, 0x00, 0x80], RATICATE: [0x22, 0x20, 0xff], SPEAROW: [0x10, 0x00, 0x80],
-  FEAROW: [0x0d, 0x40, 0xa0], EKANS: [0x17, 0x12, 0x40], ARBOK: [0x17, 0xe0, 0x10],
-  PIKACHU: [0x0f, 0xee, 0x01], RAICHU: [0x09, 0xee, 0x88], SANDSHREW: [0x00, 0x20, 0x40],
-  SANDSLASH: [0x00, 0xff, 0xff], NIDORAN_F: [0x01, 0x00, 0x80], NIDORINA: [0x01, 0x2c, 0xe0],
-  NIDOQUEEN: [0x0a, 0x00, 0x80], NIDORAN_M: [0x00, 0x00, 0x80], NIDORINO: [0x00, 0x2c, 0xe0],
-  NIDOKING: [0x09, 0x00, 0x80], CLEFAIRY: [0x19, 0xcc, 0x01], CLEFABLE: [0x19, 0xaa, 0x20],
-  VULPIX: [0x24, 0x4f, 0x10], NINETALES: [0x24, 0x88, 0x60], JIGGLYPUFF: [0x0e, 0xff, 0x35],
-  WIGGLYTUFF: [0x0e, 0x68, 0x60], ZUBAT: [0x1d, 0xe0, 0x80], GOLBAT: [0x1d, 0xfa, 0x80],
-  ODDISH: [0x08, 0xdd, 0x01], GLOOM: [0x08, 0xaa, 0x40], VILEPLUME: [0x23, 0x22, 0xff],
-  PARAS: [0x1e, 0x42, 0xff], PARASECT: [0x1e, 0x42, 0xff], VENONAT: [0x1a, 0x44, 0xbf],
-  VENOMOTH: [0x1a, 0x29, 0x80], DIGLETT: [0x0b, 0xaa, 0x01], DUGTRIO: [0x0b, 0x2a, 0x10],
-  MEOWTH: [0x19, 0x77, 0x10], PERSIAN: [0x19, 0x99, 0xff], PSYDUCK: [0x21, 0x20, 0x60],
-  GOLDUCK: [0x21, 0xff, 0x40], MANKEY: [0x0a, 0xdd, 0x60], PRIMEAPE: [0x0a, 0xaf, 0x40],
-  GROWLITHE: [0x1f, 0x20, 0x40], ARCANINE: [0x15, 0x00, 0x80], POLIWAG: [0x0e, 0xff, 0xff],
-  POLIWHIRL: [0x0e, 0x77, 0x60], POLIWRATH: [0x0e, 0x00, 0xff], ABRA: [0x1c, 0xc0, 0x01],
-  KADABRA: [0x1c, 0xa8, 0xc0], ALAKAZAM: [0x1c, 0x98, 0xff], MACHOP: [0x1f, 0xee, 0x01],
-  MACHOKE: [0x1f, 0x48, 0x60], MACHAMP: [0x1f, 0x08, 0xc0], BELLSPROUT: [0x21, 0x55, 0x01],
-  WEEPINBELL: [0x25, 0x44, 0x20], VICTREEBEL: [0x25, 0x66, 0xcc], TENTACOOL: [0x1a, 0x00, 0x80],
-  TENTACRUEL: [0x1a, 0xee, 0xff], GEODUDE: [0x24, 0xf0, 0x10], GRAVELER: [0x24, 0x00, 0x80],
-  GOLEM: [0x12, 0xe0, 0x40], PONYTA: [0x25, 0x00, 0x80], RAPIDASH: [0x25, 0x20, 0xc0],
-  SLOWPOKE: [0x02, 0x00, 0x80], SLOWBRO: [0x1f, 0x00, 0x80], MAGNEMITE: [0x1c, 0x80, 0x60],
-  MAGNETON: [0x1c, 0x20, 0xc0], FARFETCH_D: [0x10, 0xdd, 0x01], DODUO: [0x0b, 0xbb, 0x01],
-  DODRIO: [0x0b, 0x99, 0x20], SEEL: [0x0c, 0x88, 0xc0], DEWGONG: [0x0c, 0x23, 0xff],
-  GRIMER: [0x05, 0x00, 0x80], MUK: [0x07, 0xef, 0xff], SHELLDER: [0x18, 0x00, 0x80],
-  CLOYSTER: [0x18, 0x6f, 0xe0], GASTLY: [0x1c, 0x00, 0x80], HAUNTER: [0x1c, 0x30, 0x40],
-  GENGAR: [0x07, 0x00, 0xff], ONIX: [0x17, 0xff, 0xc0], DROWZEE: [0x0d, 0x88, 0x20],
-  HYPNO: [0x0d, 0xee, 0x40], KRABBY: [0x20, 0x20, 0xe0], KINGLER: [0x20, 0xee, 0xe0],
-  VOLTORB: [0x06, 0xed, 0x80], ELECTRODE: [0x06, 0xa8, 0x90], EXEGGCUTE: [0x0b, 0x00, 0x80],
-  EXEGGUTOR: [0x0d, 0x00, 0x80], CUBONE: [0x19, 0x00, 0x80], MAROWAK: [0x08, 0x4f, 0x60],
-  HITMONLEE: [0x12, 0x80, 0xc0], HITMONCHAN: [0x0c, 0xee, 0xc0], LICKITUNG: [0x0c, 0x00, 0x80],
-  KOFFING: [0x12, 0xe6, 0xdd], WEEZING: [0x12, 0xff, 0xff], RHYHORN: [0x04, 0x00, 0x80],
-  RHYDON: [0x11, 0x00, 0x80], CHANSEY: [0x14, 0x0a, 0xc0], TANGELA: [0x12, 0x00, 0x80],
-  KANGASKHAN: [0x03, 0x00, 0x80], HORSEA: [0x19, 0x99, 0x10], SEADRA: [0x19, 0x3c, 0x01],
-  GOLDEEN: [0x16, 0x80, 0x40], SEAKING: [0x16, 0x10, 0xff], STARYU: [0x1e, 0x02, 0x20],
-  STARMIE: [0x1e, 0x00, 0x80], MR_MIME: [0x20, 0x08, 0x40], SCYTHER: [0x16, 0x00, 0x80],
-  JYNX: [0x0d, 0xff, 0xff], ELECTABUZZ: [0x06, 0x8f, 0xff], MAGMAR: [0x04, 0xff, 0x30],
-  PINSIR: [0x14, 0x00, 0x80], TAUROS: [0x1d, 0x11, 0x40], MAGIKARP: [0x17, 0x80, 0x00],
-  GYARADOS: [0x17, 0x00, 0x80], LAPRAS: [0x1b, 0x00, 0x80], DITTO: [0x0e, 0xff, 0xff],
-  EEVEE: [0x1a, 0x88, 0x60], VAPOREON: [0x1a, 0xaa, 0xff], JOLTEON: [0x1a, 0x3d, 0x80],
-  FLAREON: [0x1a, 0x10, 0x20], PORYGON: [0x25, 0xaa, 0xff], OMANYTE: [0x1f, 0xf0, 0x01],
-  OMASTAR: [0x1f, 0xff, 0x40], KABUTO: [0x16, 0xbb, 0x40], KABUTOPS: [0x18, 0xee, 0x01],
-  AERODACTYL: [0x23, 0x20, 0xf0], SNORLAX: [0x05, 0x55, 0x01], ARTICUNO: [0x09, 0x80, 0x40],
-  ZAPDOS: [0x18, 0xff, 0x80], MOLTRES: [0x09, 0xf8, 0x40], DRATINI: [0x0f, 0x60, 0x40],
-  DRAGONAIR: [0x0f, 0x40, 0x80], DRAGONITE: [0x0f, 0x3c, 0xc0], MEWTWO: [0x1e, 0x99, 0xff],
-  MEW: [0x1e, 0xee, 0xff],
-};
+// Authentic Game Boy (pret/pokeyellow) Audio1 & APU Hardware Cry + Music Synthesizer
+// Compiled directly from pret/pokeyellow data/pokemon/cries.asm & audio/sfx/cry00_1.asm..cry25_1.asm
 
-// 38 Distinct Base Cry Synthesis Profiles (matching SFX_Cry00..SFX_Cry25 in audio/cry_commands.asm)
-// Each entry: { steps: [[m0, m1, durWeight, wave], ...], detune: ratio, noise: [freqHz, gain] }
-const BASE_CRY_CONTOURS = [
-  // 0x00: NidoranM / Charizard / Sandshrew (2-part rising roar + gritty tail)
-  { steps: [[0.75, 1.35, 1.1, "square"], [1.3, 0.95, 0.7, "sawtooth"], [0.95, 1.48, 1.4, "square"], [1.4, 0.62, 1.6, "sawtooth"]], detune: 1.018, noise: [950, 0.14] },
-  // 0x01: NidoranF / Nidorina (3-chirp staccato squeak)
-  { steps: [[1.25, 1.65, 0.6, "square"], [0.9, 1.35, 0.5, "square"], [1.35, 1.85, 0.7, "square"], [1.7, 1.05, 1.1, "triangle"]], detune: 1.012, noise: [1800, 0.08] },
-  // 0x02: Slowpoke (long, slow, sleepy downward drawl)
-  { steps: [[0.82, 0.76, 2.2, "triangle"], [0.76, 0.92, 1.8, "square"], [0.9, 0.58, 2.8, "triangle"]], detune: 1.006, noise: [520, 0.06] },
-  // 0x03: Kangaskhan (deep double-stomp bellow)
-  { steps: [[0.62, 0.95, 1.2, "sawtooth"], [0.55, 0.85, 0.9, "square"], [0.85, 1.18, 1.5, "sawtooth"], [1.1, 0.52, 1.9, "sawtooth"]], detune: 0.985, noise: [680, 0.18] },
-  // 0x04: Charmander / Rhyhorn / Magmar (bright lizards chirp -> raspy tail)
-  { steps: [[1.1, 1.72, 0.75, "square"], [1.65, 1.15, 0.55, "square"], [1.18, 1.88, 0.95, "sawtooth"], [1.8, 0.88, 1.35, "square"]], detune: 1.022, noise: [1450, 0.12] },
-  // 0x05: Grimer / Snorlax (low, heavy, rumbling bass yawn)
-  { steps: [[0.52, 0.68, 1.9, "sawtooth"], [0.66, 0.48, 1.7, "triangle"], [0.58, 0.42, 2.4, "sawtooth"]], detune: 0.988, noise: [420, 0.16] },
-  // 0x06: Voltorb / Electrode / Electabuzz (rapid electric buzz-trill)
-  { steps: [[1.4, 1.95, 0.4, "sawtooth"], [1.1, 1.85, 0.4, "square"], [1.45, 2.05, 0.4, "sawtooth"], [1.15, 1.9, 0.4, "square"], [1.5, 2.15, 0.45, "sawtooth"], [2.0, 0.9, 0.9, "square"]], detune: 1.035, noise: [2600, 0.15] },
-  // 0x07: Muk / Gengar (menacing dark vibrato descent)
-  { steps: [[0.95, 0.65, 1.1, "sawtooth"], [0.72, 1.08, 0.9, "square"], [1.05, 0.58, 1.3, "sawtooth"], [0.68, 0.45, 1.8, "sawtooth"]], detune: 0.978, noise: [760, 0.17] },
-  // 0x08: Oddish / Gloom / Marowak (clear 2-syllable whistle)
-  { steps: [[1.15, 1.55, 0.8, "triangle"], [1.5, 1.85, 0.9, "square"], [1.3, 0.95, 1.2, "triangle"]], detune: 1.01, noise: [1200, 0.05] },
-  // 0x09: Raichu / Nidoking / Articuno / Moltres (majestic sweeping legendary cry)
-  { steps: [[0.9, 1.45, 1.0, "square"], [1.4, 1.82, 1.1, "triangle"], [1.75, 1.25, 0.9, "square"], [1.3, 1.92, 1.3, "sawtooth"], [1.85, 0.85, 1.6, "triangle"]], detune: 1.016, noise: [1650, 0.11] },
-  // 0x0A: Nidoqueen / Mankey / Primeape (screeching Simian bark)
-  { steps: [[1.35, 0.85, 0.65, "sawtooth"], [0.95, 1.55, 0.7, "square"], [1.45, 0.78, 0.8, "sawtooth"], [0.88, 1.42, 1.1, "sawtooth"]], detune: 1.028, noise: [1900, 0.18] },
-  // 0x0B: Diglett / Doduo / Exeggcute (fast 4-pip chattering chirp)
-  { steps: [[1.3, 1.7, 0.42, "square"], [1.1, 1.55, 0.42, "square"], [1.35, 1.8, 0.42, "square"], [1.2, 1.65, 0.42, "square"], [1.5, 1.05, 0.75, "triangle"]], detune: 1.015, noise: [2100, 0.07] },
-  // 0x0C: Seel / Dewgong / Hitmonchan / Lickitung (smooth barking arpeggio)
-  { steps: [[0.88, 1.22, 0.9, "triangle"], [1.2, 1.52, 0.9, "square"], [1.48, 0.92, 1.4, "triangle"]], detune: 1.008, noise: [980, 0.08] },
-  // 0x0D: Fearow / Drowzee / Exeggutor / Jynx (warbling hypnotic vibrato)
-  { steps: [[1.15, 0.92, 0.6, "square"], [0.92, 1.22, 0.6, "triangle"], [1.22, 0.88, 0.6, "square"], [0.88, 1.28, 0.6, "triangle"], [1.25, 0.75, 1.2, "square"]], detune: 1.02, noise: [1100, 0.09] },
-  // 0x0E: Pidgey / Jigglypuff / Poliwag / Ditto (rapid fluttering bird/fairy trill)
-  { steps: [[1.25, 1.68, 0.48, "triangle"], [1.62, 1.28, 0.48, "square"], [1.3, 1.78, 0.52, "triangle"], [1.72, 1.18, 0.65, "square"]], detune: 1.009, noise: [1750, 0.06] },
-  // 0x0F: Bulbasaur / Ivysaur / Venusaur / Dratini / Dragonite (iconic 2-phrase frog/dragon cry!)
-  { steps: [[0.92, 1.38, 1.0, "square"], [1.32, 0.82, 0.75, "sawtooth"], [0.78, 0.78, 0.35, "triangle"], [0.88, 1.48, 1.25, "square"], [1.42, 0.68, 1.55, "sawtooth"]], detune: 1.014, noise: [1050, 0.13] },
-  // 0x10: Spearow / Farfetch'd (sharp avian squawk)
-  { steps: [[1.55, 1.05, 0.5, "sawtooth"], [1.1, 1.85, 0.65, "square"], [1.75, 0.95, 0.95, "sawtooth"]], detune: 1.024, noise: [2300, 0.14] },
-  // 0x11: Rhydon (heavy armored horn blast)
-  { steps: [[0.58, 0.92, 1.3, "sawtooth"], [0.88, 0.64, 0.9, "sawtooth"], [0.7, 1.15, 1.5, "square"], [1.08, 0.52, 1.8, "sawtooth"]], detune: 0.982, noise: [620, 0.19] },
-  // 0x12: Golem / Hitmonlee / Koffing / Tangela (percussive martial/rock crunch)
-  { steps: [[0.72, 1.18, 0.7, "sawtooth"], [1.12, 0.68, 0.7, "square"], [0.78, 1.28, 0.8, "sawtooth"], [1.22, 0.58, 1.4, "sawtooth"]], detune: 0.99, noise: [840, 0.2] },
-  // 0x13: Blastoise / Kakuna / Beedrill (buzzing cannon/insect drone)
-  { steps: [[0.82, 1.12, 0.75, "sawtooth"], [1.08, 0.85, 0.65, "square"], [0.88, 1.25, 0.9, "sawtooth"], [1.2, 0.62, 1.5, "sawtooth"]], detune: 1.026, noise: [1300, 0.16] },
-  // 0x14: Pidgeotto / Pidgeot / Chansey / Pinsir (sweeping crest call)
-  { steps: [[1.05, 1.58, 0.95, "square"], [1.52, 1.18, 0.8, "triangle"], [1.22, 1.72, 1.1, "square"], [1.65, 0.88, 1.4, "triangle"]], detune: 1.012, noise: [1500, 0.1] },
-  // 0x15: Weedle / Arcanine (high-to-low howl/squeak)
-  { steps: [[1.48, 1.92, 0.65, "square"], [1.85, 1.25, 0.85, "sawtooth"], [1.3, 0.78, 1.35, "square"]], detune: 1.015, noise: [1600, 0.11] },
-  // 0x16: Caterpie / Butterfree / Goldeen / Scyther / Kabuto (delicate fluttering wing-trill)
-  { steps: [[1.35, 1.75, 0.38, "triangle"], [1.65, 1.25, 0.38, "square"], [1.4, 1.85, 0.38, "triangle"], [1.75, 1.3, 0.38, "square"], [1.5, 1.95, 0.65, "triangle"]], detune: 1.007, noise: [2400, 0.05] },
-  // 0x17: Ekans / Arbok / Onix / Magikarp / Gyarados (hissing serpent/leviathan roar!)
-  { steps: [[0.68, 1.22, 1.1, "sawtooth"], [1.18, 0.75, 0.95, "sawtooth"], [0.82, 1.38, 1.25, "square"], [1.32, 0.55, 1.85, "sawtooth"]], detune: 0.984, noise: [1150, 0.22] },
-  // 0x18: Wartortle / Shellder / Cloyster / Kabutops / Zapdos (sharp crackling shell/lightning burst)
-  { steps: [[1.28, 1.88, 0.55, "sawtooth"], [1.12, 1.72, 0.5, "square"], [1.35, 1.98, 0.65, "sawtooth"], [1.9, 0.85, 1.2, "square"]], detune: 1.03, noise: [2200, 0.17] },
-  // 0x19: Clefairy / Meowth / Cubone / Horsea (cute bell-like 3-note chime)
-  { steps: [[1.18, 1.48, 0.65, "triangle"], [1.45, 1.12, 0.55, "square"], [1.22, 1.68, 1.05, "triangle"]], detune: 1.005, noise: [1400, 0.04] },
-  // 0x1A: Venonat / Tentacool / Eevee / Vaporeon / Jolteon / Flareon (lyrical fox/aquatic trill)
-  { steps: [[1.08, 1.52, 0.7, "triangle"], [1.48, 1.18, 0.6, "square"], [1.24, 1.74, 0.85, "triangle"], [1.68, 0.96, 1.1, "square"]], detune: 1.011, noise: [1550, 0.07] },
-  // 0x1B: Lapras (whale song harmonic glide)
-  { steps: [[0.85, 1.28, 1.6, "triangle"], [1.25, 1.48, 1.4, "triangle"], [1.42, 0.92, 2.1, "square"]], detune: 1.004, noise: [650, 0.05] },
-  // 0x1C: Metapod / Abra / Kadabra / Alakazam / Magnemite / Gastly (psychic/metallic phase pulse)
-  { steps: [[1.45, 0.95, 0.5, "square"], [0.98, 1.55, 0.5, "sawtooth"], [1.5, 0.88, 0.5, "square"], [0.92, 1.62, 0.5, "sawtooth"], [1.58, 0.72, 1.1, "square"]], detune: 1.038, noise: [1950, 0.1] },
-  // 0x1D: Squirtle / Zubat / Golbat / Tauros (bubbly/ultrasonic 4-bounce cry)
-  { steps: [[1.15, 1.58, 0.58, "square"], [1.5, 1.08, 0.52, "triangle"], [1.18, 1.68, 0.68, "square"], [1.62, 0.92, 1.05, "triangle"]], detune: 1.016, noise: [1680, 0.09] },
-  // 0x1E: Paras / Staryu / Starmie / Mewtwo / Mew (cosmic resonant shimmer)
-  { steps: [[1.22, 1.78, 0.7, "triangle"], [1.72, 1.32, 0.65, "square"], [1.38, 1.92, 0.85, "triangle"], [1.85, 1.12, 0.8, "square"], [1.45, 2.05, 1.35, "triangle"]], detune: 1.019, noise: [2050, 0.08] },
-  // 0x1F: Growlithe / Machop / Machoke / Machamp / Omanyte (brawling double-bark)
-  { steps: [[0.95, 1.42, 0.65, "sawtooth"], [1.35, 0.82, 0.55, "square"], [0.98, 1.52, 0.85, "sawtooth"], [1.45, 0.72, 1.15, "sawtooth"]], detune: 1.021, noise: [1250, 0.15] },
-  // 0x20: Krabby / Kingler / Mr. Mime (clicking pincer/clown arpeggio)
-  { steps: [[1.32, 0.92, 0.45, "square"], [0.95, 1.45, 0.45, "square"], [1.4, 0.88, 0.45, "square"], [0.92, 1.55, 0.85, "triangle"]], detune: 1.025, noise: [2250, 0.12] },
-  // 0x21: Psyduck / Golduck / Bellsprout (quacking 3-honk cadence)
-  { steps: [[1.02, 1.32, 0.7, "sawtooth"], [0.92, 1.25, 0.7, "square"], [1.08, 1.48, 0.95, "sawtooth"], [1.4, 0.82, 1.1, "triangle"]], detune: 1.017, noise: [1350, 0.13] },
-  // 0x22: Rattata / Raticate (fast, scratchy rodent double-squeak)
-  { steps: [[1.38, 1.92, 0.48, "sawtooth"], [1.8, 1.12, 0.42, "square"], [1.28, 1.98, 0.68, "sawtooth"]], detune: 1.028, noise: [2500, 0.16] },
-  // 0x23: Vileplume / Aerodactyl (soaring prehistoric shriek)
-  { steps: [[1.12, 1.75, 0.9, "sawtooth"], [1.68, 1.22, 0.75, "square"], [1.28, 1.88, 1.1, "sawtooth"], [1.8, 0.78, 1.65, "sawtooth"]], detune: 1.022, noise: [1750, 0.18] },
-  // 0x24: Vulpix / Ninetales / Geodude / Graveler (yip / rocky resonance)
-  { steps: [[0.92, 1.36, 0.75, "square"], [1.3, 0.88, 0.65, "sawtooth"], [0.96, 1.44, 1.15, "square"]], detune: 1.014, noise: [1100, 0.14] },
-  // 0x25: Weepinbell / Victreebel / Ponyta / Rapidash / Porygon (cyber/whinnying glissando)
-  { steps: [[0.98, 1.58, 0.7, "square"], [1.52, 1.15, 0.65, "triangle"], [1.2, 1.78, 0.8, "square"], [1.72, 0.92, 1.3, "sawtooth"]], detune: 1.02, noise: [1600, 0.11] },
-];
+const GEN1_CRY_DATA = {"RHYDON":[17,0,128],"KANGASKHAN":[3,0,128],"NIDORAN_M":[0,0,128],"CLEFAIRY":[25,204,1],"SPEAROW":[16,0,128],"VOLTORB":[6,237,128],"NIDOKING":[9,0,128],"SLOWBRO":[31,0,128],"IVYSAUR":[15,32,128],"EXEGGUTOR":[13,0,128],"LICKITUNG":[12,0,128],"EXEGGCUTE":[11,0,128],"GRIMER":[5,0,128],"GENGAR":[7,0,255],"NIDORAN_F":[1,0,128],"NIDOQUEEN":[10,0,128],"CUBONE":[25,0,128],"RHYHORN":[4,0,128],"LAPRAS":[27,0,128],"ARCANINE":[21,0,128],"MEW":[30,238,255],"GYARADOS":[23,0,128],"SHELLDER":[24,0,128],"TENTACOOL":[26,0,128],"GASTLY":[28,0,128],"SCYTHER":[22,0,128],"STARYU":[30,2,32],"BLASTOISE":[19,0,128],"PINSIR":[20,0,128],"TANGELA":[18,0,128],"GROWLITHE":[31,32,64],"ONIX":[23,255,192],"FEAROW":[24,64,160],"PIDGEY":[14,223,4],"SLOWPOKE":[2,0,128],"KADABRA":[28,168,192],"GRAVELER":[36,0,128],"CHANSEY":[20,10,192],"MACHOKE":[31,72,96],"MR_MIME":[32,8,64],"HITMONLEE":[18,128,192],"HITMONCHAN":[12,238,192],"ARBOK":[23,224,16],"PARASECT":[30,66,255],"PSYDUCK":[33,32,96],"DROWZEE":[13,136,32],"GOLEM":[18,224,64],"MAGMAR":[4,255,48],"ELECTABUZZ":[6,143,255],"MAGNETON":[28,32,192],"KOFFING":[18,230,221],"MANKEY":[10,221,96],"SEEL":[12,136,192],"DIGLETT":[11,170,1],"TAUROS":[29,17,64],"FARFETCH_D":[16,221,1],"VENONAT":[26,68,64],"DRAGONITE":[15,60,192],"DODUO":[11,187,1],"POLIWAG":[14,255,255],"JYNX":[13,255,255],"MOLTRES":[9,248,64],"ARTICUNO":[9,128,64],"ZAPDOS":[24,255,128],"DITTO":[14,255,255],"MEOWTH":[25,119,16],"KRABBY":[32,32,224],"VULPIX":[36,79,16],"NINETALES":[36,136,96],"PIKACHU":[15,238,1],"RAICHU":[9,238,8],"DRATINI":[15,96,64],"DRAGONAIR":[15,64,128],"KABUTO":[22,187,64],"KABUTOPS":[24,238,1],"HORSEA":[25,153,16],"SEADRA":[25,60,1],"SANDSHREW":[0,32,64],"SANDSLASH":[0,255,255],"OMANYTE":[31,240,1],"OMASTAR":[31,255,64],"JIGGLYPUFF":[14,255,53],"WIGGLYTUFF":[14,104,96],"EEVEE":[26,136,96],"FLAREON":[26,16,32],"JOLTEON":[26,61,128],"VAPOREON":[26,170,255],"MACHOP":[31,238,1],"ZUBAT":[29,224,128],"EKANS":[23,18,64],"PARAS":[30,32,224],"POLIWHIRL":[14,119,96],"POLIWRATH":[14,0,255],"WEEDLE":[21,238,1],"KAKUNA":[19,255,1],"BEEDRILL":[19,96,128],"DODRIO":[11,153,32],"PRIMEAPE":[10,175,64],"DUGTRIO":[11,42,16],"VENOMOTH":[26,41,128],"DEWGONG":[12,35,255],"CATERPIE":[22,128,32],"METAPOD":[28,204,1],"BUTTERFREE":[22,119,64],"MACHAMP":[31,8,192],"GOLDUCK":[33,255,64],"HYPNO":[13,238,64],"GOLBAT":[29,250,128],"MEWTWO":[30,153,255],"SNORLAX":[5,85,1],"MAGIKARP":[23,128,0],"MUK":[7,239,255],"KINGLER":[32,238,224],"CLOYSTER":[24,111,224],"ELECTRODE":[6,168,144],"CLEFABLE":[25,170,32],"WEEZING":[18,255,255],"PERSIAN":[25,153,255],"MAROWAK":[8,79,96],"HAUNTER":[28,48,64],"ABRA":[28,192,1],"ALAKAZAM":[28,152,255],"PIDGEOTTO":[20,40,192],"PIDGEOT":[20,17,255],"STARMIE":[30,0,128],"BULBASAUR":[15,128,1],"VENUSAUR":[15,0,192],"TENTACRUEL":[26,238,255],"GOLDEEN":[22,128,64],"SEAKING":[22,16,255],"PONYTA":[37,0,128],"RAPIDASH":[37,32,192],"RATTATA":[34,0,128],"RATICATE":[34,32,255],"NIDORINO":[0,44,192],"NIDORINA":[1,44,224],"GEODUDE":[36,240,16],"PORYGON":[37,170,255],"AERODACTYL":[35,32,240],"MAGNEMITE":[28,128,96],"CHARMANDER":[4,96,64],"SQUIRTLE":[29,96,64],"CHARMELEON":[4,32,64],"WARTORTLE":[29,32,64],"CHARIZARD":[4,0,128],"ODDISH":[8,221,1],"GLOOM":[8,170,64],"VILEPLUME":[35,34,255],"BELLSPROUT":[33,85,1],"WEEPINBELL":[37,68,32],"VICTREEBEL":[37,102,204]};
 
-// Authentic Game Boy 3-Channel Chiptune Synthesizer & Sound Effects Engine
+const SFX_CRIES_DATA = [{"ch5":[[0,245],[2,4,243,1816],[2,15,229,1944],[2,8,145,1880]],"ch6":[[0,160],[2,5,179,1800],[2,15,197,1928],[2,8,113,1864]],"ch8":[[3,3,161,28],[3,14,148,44],[3,8,129,28]]},{"ch5":[[0,160],[2,4,243,1536],[2,8,213,1888],[2,3,226,1824],[2,8,209,1808]],"ch6":[[0,90],[2,5,179,1777],[2,7,197,1874],[2,3,162,1809],[2,8,177,1537]],"ch8":[[3,3,162,60],[3,12,148,44],[3,3,130,28],[3,8,113,44]]},{"ch5":[[1,0],[2,8,245,1152],[2,2,225,1504],[2,8,209,1500]],"ch6":[[0,165],[2,7,149,1089],[2,2,129,1313],[2,8,97,1306]],"ch8":[]},{"ch5":[[0,240],[2,4,247,1544],[2,6,230,1536],[2,6,215,1520],[2,6,196,1504],[2,5,211,1472],[2,4,211,1440],[2,8,225,1408]],"ch6":[[0,10],[2,4,199,1284],[2,6,166,1282],[2,6,151,1265],[2,4,180,1249],[2,5,163,1218],[2,4,179,1187],[2,8,193,1154]],"ch8":[[3,12,228,76],[3,10,199,92],[3,12,182,76],[3,15,162,92]]},{"ch5":[[0,240],[2,4,247,1696],[2,8,230,1700],[2,4,214,1696],[2,12,211,1568],[2,8,195,1572],[2,4,194,1568],[2,8,177,1552]],"ch6":[[0,90],[2,4,231,1537],[2,8,214,1539],[2,4,198,1537],[2,12,195,1409],[2,8,179,1411],[2,4,178,1410],[2,8,161,1393]],"ch8":[[3,7,214,92],[3,8,230,76],[3,4,212,92],[3,4,212,76],[3,7,195,76],[3,8,161,92]]},{"ch5":[[0,10],[2,6,226,1280],[2,6,227,1408],[2,6,211,1392],[2,8,161,1376]],"ch6":[[0,245],[2,6,226,1154],[2,6,211,1281],[2,6,178,1250],[2,8,129,1217]],"ch8":[]},{"ch5":[[0,250],[2,6,131,583],[2,15,98,550],[2,4,82,581],[2,9,99,518],[2,15,130,549],[2,15,66,519]],"ch6":[],"ch8":[[3,8,212,140],[3,4,226,156],[3,15,198,140],[3,8,228,172],[3,15,215,156],[3,15,242,172]]},{"ch5":[[0,240],[2,4,243,1760],[2,15,228,1600],[2,8,193,1568]],"ch6":[[0,10],[2,3,195,1667],[2,14,180,1538],[2,8,161,1537]],"ch8":[[3,4,211,92],[3,15,230,76],[3,8,177,92]]},{"ch5":[[0,240],[2,15,246,1381],[2,10,228,1404],[2,3,194,1372],[2,15,178,1340]],"ch6":[[0,90],[2,14,214,1283],[2,9,180,1307],[2,4,146,1274],[2,15,162,1243]],"ch8":[[3,12,230,76],[3,11,215,92],[3,15,194,76]]},{"ch5":[[0,240],[2,15,247,1952],[2,6,230,1955],[2,10,244,1952],[0,165],[2,10,246,2008],[2,4,227,2007],[2,15,242,2008]],"ch6":[[0,5],[2,2,0,0],[2,15,167,1697],[2,6,134,1698],[2,10,116,1697],[0,95],[2,10,118,1750],[2,4,131,1753],[2,15,162,1751]],"ch8":[[3,2,242,60],[3,8,228,62],[3,15,215,60],[3,6,197,59],[3,6,228,61],[3,8,182,60],[3,6,212,61],[3,8,193,59]]},{"ch5":[[0,240],[2,8,247,1760],[2,6,230,1765],[2,3,244,1760],[2,3,246,1744],[2,3,227,1728],[2,4,242,1712],[2,15,162,1736]],"ch6":[[0,5],[2,3,0,0],[2,8,167,1697],[2,6,134,1699],[2,3,116,1697],[2,3,118,1681],[2,3,131,1666],[2,4,162,1649],[2,15,114,1673]],"ch8":[[3,2,242,60],[3,8,228,62],[3,8,215,60],[3,5,197,59],[3,3,212,44],[3,2,182,60],[3,3,164,44],[3,8,145,60]]},{"ch5":[[0,204],[2,4,241,1792],[2,4,225,1920],[2,4,209,1856],[2,4,225,1856],[2,4,241,1920],[2,4,209,1792],[2,4,241,1793],[2,4,209,1922],[2,4,193,1858],[2,8,177,1857]],"ch6":[[0,68],[2,12,0,0],[2,4,241,1793],[2,4,225,1922],[2,4,209,1857],[2,4,225,1857],[2,4,241,1922],[2,8,209,1793]],"ch8":[[3,15,0,0],[3,4,0,0],[3,4,209,76],[3,4,177,44],[3,4,209,60],[3,4,177,60],[3,4,193,44],[3,8,161,76]]},{"ch5":[[0,204],[2,8,245,1536],[2,2,210,1592],[2,2,194,1584],[2,2,194,1576],[2,2,178,1568],[2,2,178,1552],[2,2,162,1560],[2,2,178,1552],[2,8,193,1568]],"ch6":[[0,68],[2,12,195,1472],[2,3,177,1529],[2,2,161,1521],[2,2,161,1513],[2,2,145,1505],[2,2,145,1497],[2,2,129,1489],[2,2,145,1497],[2,8,145,1505]],"ch8":[]},{"ch5":[[0,136],[2,5,242,1616],[2,9,209,1632],[2,5,226,1554],[2,9,193,1570],[2,5,242,1552],[2,6,209,1568]],"ch6":[[0,64],[2,4,0,0],[2,5,242,1617],[2,9,209,1633],[2,5,226,1556],[2,8,193,1572],[2,5,242,1553],[2,12,209,1569],[2,5,226,1556],[2,8,193,1572],[2,5,242,1553],[2,4,209,1569]],"ch8":[[3,6,210,28],[3,9,177,44],[3,8,194,44],[3,9,177,60],[3,6,194,44],[3,9,162,60],[3,7,194,44],[3,5,161,60],[3,9,194,44],[3,4,161,60]]},{"ch5":[[0,165],[2,4,225,1792],[2,4,242,1920],[2,2,146,1856],[2,8,225,1536]],"ch6":[[0,10],[2,4,177,1761],[2,3,194,1761],[2,3,98,1665],[2,8,177,1505]],"ch8":[[3,2,97,50],[3,2,97,33],[3,8,97,17]]},{"ch5":[[0,241],[2,4,247,1984],[2,12,230,1986],[2,6,181,1664],[2,4,196,1648],[2,4,181,1632],[2,8,193,1600]],"ch6":[[0,204],[2,3,199,1921],[2,12,182,1920],[2,6,165,1601],[2,4,196,1586],[2,6,181,1569],[2,8,161,1538]],"ch8":[[3,3,228,60],[3,12,214,44],[3,4,228,60],[3,8,183,92],[3,15,194,93]]},{"ch5":[[0,201],[2,8,247,1664],[2,2,247,1632],[2,1,231,1600],[2,1,231,1568],[2,15,209,1536],[2,4,199,1856],[2,4,167,1840],[2,15,145,1824]],"ch6":[[0,121],[2,10,231,1666],[2,2,231,1634],[2,1,215,1602],[2,1,215,1570],[2,15,193,1538],[2,4,183,1858],[2,2,151,1842],[2,15,129,1826]],"ch8":[[3,4,116,33],[3,4,116,16],[3,4,113,32]]},{"ch5":[[0,240],[2,6,247,1952],[2,8,230,1956],[2,4,214,1952],[2,15,211,1824],[2,8,195,1827],[2,2,194,1832],[2,8,177,1840]],"ch6":[[0,10],[2,4,0,0],[2,6,167,1857],[2,8,134,1859],[2,4,118,1857],[2,13,131,1730],[2,7,115,1729],[2,3,130,1740],[2,8,113,1752]],"ch8":[[3,2,242,76],[3,6,230,58],[3,4,215,58],[3,6,214,44],[3,8,229,60],[3,12,210,61],[3,8,209,44]]},{"ch5":[[0,165],[2,12,242,1088],[2,15,227,1184],[2,4,210,1168],[2,8,209,1152]],"ch6":[[0,238],[2,11,210,1080],[2,14,198,1176],[2,3,178,1160],[2,8,177,1144]],"ch8":[[3,10,230,108],[3,15,210,92],[3,3,194,108],[3,8,209,92]]},{"ch5":[[0,51],[2,15,246,1472],[2,8,227,1468],[2,6,210,1488],[2,6,178,1504],[2,6,194,1520],[2,8,177,1536]],"ch6":[[0,153],[2,14,198,1201],[2,7,195,1197],[2,5,178,1217],[2,8,146,1233],[2,6,162,1249],[2,8,145,1265]],"ch8":[[3,10,230,92],[3,10,214,108],[3,4,194,76],[3,6,211,92],[3,8,179,76],[3,8,161,92]]},{"ch5":[[0,240],[2,8,228,1936],[2,15,245,1984],[2,8,209,2008]],"ch6":[[0,165],[2,10,196,1905],[2,15,182,1954],[2,8,161,1975]],"ch8":[[3,8,228,76],[3,14,196,60],[3,8,209,44]]},{"ch5":[[0,240],[2,4,243,1920],[2,15,231,1792],[2,8,211,1808],[2,4,194,1792],[2,4,210,1776],[2,8,193,1760]],"ch6":[[0,90],[2,6,195,1793],[2,14,183,1665],[2,7,179,1682],[2,3,162,1665],[2,4,178,1650],[2,8,161,1633]],"ch8":[[3,6,227,92],[3,14,214,76],[3,6,198,60],[3,3,179,76],[3,3,162,92],[3,8,177,108]]},{"ch5":[[0,240],[2,15,215,1920],[2,4,230,1952],[2,15,210,1856]],"ch6":[[0,90],[2,15,199,1875],[2,5,182,1906],[2,15,194,1809]],"ch8":[[3,13,246,76],[3,4,230,60],[3,15,242,76]]},{"ch5":[[0,15],[2,15,247,1280],[2,15,231,1288],[2,8,180,1152],[2,15,162,1120]],"ch6":[[0,68],[2,14,215,1153],[2,14,199,1161],[2,10,180,1025],[2,15,194,993]],"ch8":[[3,14,247,124],[3,12,246,108],[3,9,228,124],[3,15,226,108]]},{"ch5":[[0,80],[2,10,245,1664],[2,3,226,1696],[2,3,242,1728],[2,3,226,1760],[2,3,210,1792],[2,3,194,1760],[2,3,210,1728],[2,8,193,1696]],"ch6":[[0,15],[2,9,213,1585],[2,3,210,1618],[2,3,226,1649],[2,3,178,1681],[2,3,194,1714],[2,3,178,1681],[2,3,194,1649],[2,8,177,1617]],"ch8":[[3,6,227,76],[3,4,195,60],[3,5,212,60],[3,4,196,44],[3,6,180,60],[3,8,193,44]]},{"ch5":[[0,27],[2,7,210,1856],[2,15,229,1888],[2,15,193,1840]],"ch6":[[0,129],[2,2,194,1793],[2,4,194,1800],[2,15,215,1857],[2,15,162,1793]],"ch8":[]},{"ch5":[[0,240],[2,6,247,1856],[2,12,230,1860],[2,6,213,1872],[2,4,195,1888],[2,3,195,1920],[2,8,209,1952]],"ch6":[[0,10],[2,6,199,1793],[2,11,182,1794],[2,6,165,1809],[2,4,147,1825],[2,3,163,1857],[2,8,145,1890]],"ch8":[[3,3,226,60],[3,8,214,76],[3,5,212,60],[3,12,199,76],[3,2,226,60],[3,8,209,44]]},{"ch5":[[0,240],[2,6,247,1728],[2,15,231,1792],[2,4,244,1776],[2,4,228,1760],[2,8,209,1744]],"ch6":[[0,10],[2,7,230,1665],[2,14,213,1729],[2,4,196,1713],[2,4,212,1697],[2,8,193,1681]],"ch8":[[3,10,166,60],[3,14,148,44],[3,5,163,60],[3,8,145,44]]},{"ch5":[[0,245],[2,7,214,2017],[2,6,198,2018],[2,9,214,2017],[2,7,198,2016],[2,5,182,2018],[2,7,198,2017],[2,6,182,2016],[2,8,161,2015]],"ch6":[[0,68],[2,6,195,1993],[2,6,179,1991],[2,10,196,1987],[2,8,180,1991],[2,6,195,1993],[2,15,162,1989]],"ch8":[[3,13,25,124],[3,13,247,140],[3,12,214,124],[3,8,196,108],[3,15,179,92]]},{"ch5":[[0,244],[2,15,240,1797],[2,10,224,1792],[2,6,180,1808],[2,4,211,1792],[2,6,178,1568],[2,8,161,1572]],"ch6":[[0,34],[2,15,176,1731],[2,10,160,1729],[2,6,132,1746],[2,4,147,1729],[2,6,130,1505],[2,8,97,1512]],"ch8":[[3,6,230,76],[3,15,214,60],[3,10,197,74],[3,1,178,91],[3,15,194,76]]},{"ch5":[[0,240],[2,6,242,1536],[2,6,226,1600],[2,6,210,1664],[2,6,226,1728],[2,6,210,1792],[2,6,194,1856],[2,6,178,1920],[2,8,161,1984]],"ch6":[[0,17],[2,3,0,1],[2,6,194,1473],[2,6,178,1538],[2,6,162,1601],[2,6,178,1666],[2,6,162,1730],[2,6,146,1793],[2,6,162,1858],[2,8,129,1921]],"ch8":[[3,6,0,1],[3,5,226,92],[3,5,194,76],[3,5,210,60],[3,5,178,44],[3,5,194,28],[3,5,162,27],[3,5,146,26],[3,8,129,24]]},{"ch5":[[0,165],[2,3,244,1601],[2,13,214,1825],[2,8,244,1817],[2,8,193,1818]],"ch6":[[0,204],[2,4,244,1408],[2,14,230,1760],[2,8,213,1752],[2,8,209,1756]],"ch8":[[3,5,196,70],[3,13,165,68],[3,8,196,69],[3,8,177,68]]},{"ch5":[[0,240],[2,13,241,1297],[2,13,225,1301],[2,13,225,1297],[2,8,209,1297]],"ch6":[[0,21],[2,12,225,1292],[2,12,209,1296],[2,14,193,1292],[2,8,193,1290]],"ch8":[[3,14,242,101],[3,13,226,85],[3,14,210,86],[3,8,209,102]]},{"ch5":[[0,27],[2,3,243,1380],[2,2,226,1348],[2,5,209,1314],[2,2,178,1156],[2,8,209,1186],[2,3,243,1316],[2,4,228,1252],[2,8,209,1282]],"ch6":[[0,204],[2,3,211,1376],[2,2,194,1344],[2,5,193,1312],[2,2,146,1152],[2,8,193,1184],[2,3,211,1312],[2,3,196,1248],[2,8,193,1280]],"ch8":[]},{"ch5":[[0,17],[2,2,61,897],[2,7,245,1537],[2,1,194,1153],[2,8,145,897]],"ch6":[[0,238],[2,2,62,1456],[2,7,213,1885],[2,1,178,1712],[2,8,97,1456]],"ch8":[[3,2,146,73],[3,7,181,41],[3,1,162,57],[3,8,145,73]]},{"ch5":[[0,240],[2,15,247,1984],[2,6,228,1985],[2,10,246,1984],[2,4,211,1986],[2,8,193,1984]],"ch6":[[0,95],[2,15,151,1921],[2,6,132,1920],[2,10,150,1921],[2,15,131,1921]],"ch8":[[3,3,242,60],[3,13,230,44],[3,15,215,60],[3,8,193,44]]},{"ch5":[[0,240],[2,15,247,1664],[2,10,230,1668],[2,15,215,1680],[2,8,213,1680],[2,6,196,1672],[2,5,211,1648],[2,4,211,1632],[2,8,193,1600]],"ch6":[[0,5],[2,15,183,1601],[2,10,150,1602],[2,15,167,1617],[2,8,165,1617],[2,6,148,1607],[2,5,163,1585],[2,4,147,1570],[2,8,113,1537]],"ch8":[[3,15,228,60],[3,10,199,76],[3,10,199,60],[3,12,183,76],[3,15,162,92]]},{"ch5":[[0,165],[2,6,244,1856],[2,15,227,1840],[2,4,244,1856],[2,5,179,1864],[2,8,209,1872]],"ch6":[[0,119],[2,6,195,1810],[2,15,179,1796],[2,3,195,1810],[2,4,195,1825],[2,8,177,1842]],"ch8":[[3,8,214,44],[3,12,198,60],[3,10,182,44],[3,8,145,28]]}];
+
+const DUTY_THRESHOLDS = [0.125, 0.25, 0.5, 0.75];
+
+function buildSquareFrames(cmds, pitchByte, lengthByte, faint) {
+  const frames = [];
+  const tempo = ((lengthByte & 0xff) + 0x80) * (faint ? 1.32 : 1.0);
+  let dutyPattern = 0xaa;
+  let duty = 2;
+  let rotateDuty = false;
+  let frac = 0;
+
+  for (const cmd of cmds || []) {
+    if (cmd[0] === 0) {
+      dutyPattern = cmd[1] & 0xff;
+      duty = (dutyPattern >> 6) & 3;
+      rotateDuty = true;
+    } else if (cmd[0] === 1) {
+      duty = (cmd[1] >> 6) & 3;
+      rotateDuty = false;
+    } else if (cmd[0] === 2) {
+      const len = (cmd[1] & 0x0f) + 1;
+      const env = cmd[2] & 0xff;
+      const gbFreq = cmd[3] & 0x7ff;
+
+      const scaled = Math.round(len * tempo) + frac;
+      frac = scaled & 0xff;
+      const delayFrames = Math.max(1, scaled >> 8);
+
+      // Audio1_ApplyWavePatternAndFrequency + Audio1_ApplyFrequencyModifier (audio/engine_1.asm:713-771)
+      const lo = (gbFreq & 0xff) + (pitchByte & 0xff);
+      const hi = ((gbFreq >> 8) & 0x07) + (lo > 0xff ? 1 : 0);
+      const reg11 = ((hi & 0x07) << 8) | (lo & 0xff);
+      const freqHz = (131072 / (2048 - reg11)) * (faint ? 0.78 : 1.0);
+
+      const initVol = (env >> 4) & 0x0f;
+      const envDir = (env & 0x08) ? 1 : -1;
+      const envPeriod = env & 0x07;
+
+      for (let f = 0; f < delayFrames; f++) {
+        if (f > 0 && rotateDuty) {
+          dutyPattern = ((dutyPattern << 2) | (dutyPattern >> 6)) & 0xff;
+          duty = (dutyPattern >> 6) & 3;
+        }
+        const curVol =
+          envPeriod > 0
+            ? Math.max(0, Math.min(15, initVol + envDir * Math.floor(f / envPeriod)))
+            : initVol;
+        frames.push({ freqHz, vol: curVol / 15, duty });
+      }
+    }
+  }
+  return frames;
+}
+
+function buildNoiseFrames(cmds, pitchByte) {
+  const frames = [];
+  for (const cmd of cmds || []) {
+    if (cmd[0] === 3) {
+      const delayFrames = (cmd[1] & 0x0f) + 1;
+      const env = cmd[2] & 0xff;
+      const polyReg = (cmd[3] + (pitchByte & 0xff)) & 0xff;
+      const s = (polyReg >> 4) & 0x0f;
+      const width7 = ((polyReg >> 3) & 1) === 1;
+      const rCode = polyReg & 0x07;
+      const divisor = rCode === 0 ? 8 : rCode << 4;
+      const clockHz = s >= 14 ? 0 : 4194304 / (divisor * Math.pow(2, s + 1));
+
+      const initVol = (env >> 4) & 0x0f;
+      const envDir = (env & 0x08) ? 1 : -1;
+      const envPeriod = env & 0x07;
+
+      for (let f = 0; f < delayFrames; f++) {
+        const curVol =
+          envPeriod > 0
+            ? Math.max(0, Math.min(15, initVol + envDir * Math.floor(f / envPeriod)))
+            : initVol;
+        frames.push({ clockHz, width7, vol: curVol / 15 });
+      }
+    }
+  }
+  return frames;
+}
+
 export class GameBoyAudio {
   constructor(musicTracks) {
     this.tracks = musicTracks || {};
@@ -143,12 +95,11 @@ export class GameBoyAudio {
     this.currentTrackName = null;
     this.timers = [];
     this.sfxTimers = [];
-    this.cryTimers = [];
     this.activeOscillators = new Set();
+    this.activeCrySource = null;
+    this.cryBufferCache = new Map();
     this.masterGain = null;
-    this.noiseBuffer = null;
 
-    // Automatically unlock AudioContext on first user interaction so cries always play
     if (typeof window !== "undefined") {
       const unlock = () => {
         if (this.ctx && this.ctx.state === "suspended") {
@@ -168,7 +119,7 @@ export class GameBoyAudio {
         if (!AudioCtx) return false;
         this.ctx = new AudioCtx();
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 0.14;
+        this.masterGain.gain.value = 0.16;
         this.masterGain.connect(this.ctx.destination);
       }
       if (this.ctx.state === "suspended") {
@@ -309,9 +260,7 @@ export class GameBoyAudio {
     } else if (kind === "bump") {
       this.playNote(130, 80, "square", 0.3);
     } else if (kind === "pika") {
-      [1174, 1480, 1318, 1760].forEach((f, i) => {
-        schedule(() => this.playNote(f, 65, "square", 0.4), i * 60);
-      });
+      this.playPokemonCry("PIKACHU");
     } else if (kind === "thunder") {
       [1567, 1318, 1046, 880, 1760, 1396].forEach((f, i) => {
         schedule(() => this.playNote(f, 55, "sawtooth", 0.4), i * 45);
@@ -319,154 +268,112 @@ export class GameBoyAudio {
     }
   }
 
-  playSweepNote(startFreq, endFreq, durMs, type = "square", volume = 0.3) {
-    if (!this.ctx || !this.masterGain) return;
-    if (!Number.isFinite(startFreq) || startFreq <= 0) return;
-    if (this.activeOscillators.size >= 16) return;
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = type;
-      const f0 = Math.max(40, Math.min(8000, startFreq));
-      const f1 = Math.max(40, Math.min(8000, endFreq || startFreq));
-      const durSec = Math.max(0.02, (Number(durMs) || 60) / 1000);
-      osc.frequency.setValueAtTime(f0, now);
-      osc.frequency.exponentialRampToValueAtTime(f1, now + durSec);
-
-      const safeVol = Math.max(0.002, Math.min(1, Number(volume) || 0.3));
-      gain.gain.setValueAtTime(safeVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + durSec);
-
-      osc.connect(gain);
-      gain.connect(this.masterGain);
-      osc.start(now);
-      osc.stop(now + durSec + 0.01);
-      this.activeOscillators.add(osc);
-      osc.onended = () => {
-        this.activeOscillators.delete(osc);
-        try {
-          gain.disconnect();
-        } catch {}
-      };
-    } catch {}
-  }
-
-  // Game Boy Channel 4 LFSR Noise Burst for authentic Pokémon cry texture
-  playNoiseBurst(filterFreq, durMs, volume = 0.12) {
-    if (!this.ctx || !this.masterGain) return;
-    try {
-      if (!this.noiseBuffer) {
-        const sr = this.ctx.sampleRate;
-        const len = Math.floor(sr * 0.5);
-        this.noiseBuffer = this.ctx.createBuffer(1, len, sr);
-        const data = this.noiseBuffer.getChannelData(0);
-        let lfsr = 0x7fff;
-        for (let i = 0; i < len; i++) {
-          const bit = ((lfsr >> 0) ^ (lfsr >> 1)) & 1;
-          lfsr = (lfsr >> 1) | (bit << 14);
-          data[i] = (lfsr & 1) ? 0.8 : -0.8;
-        }
-      }
-      const now = this.ctx.currentTime;
-      const src = this.ctx.createBufferSource();
-      src.buffer = this.noiseBuffer;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "bandpass";
-      filter.frequency.setValueAtTime(Math.max(120, Math.min(6000, filterFreq || 1000)), now);
-      filter.Q.setValueAtTime(2.2, now);
-      const gain = this.ctx.createGain();
-      const durSec = Math.max(0.02, (Number(durMs) || 80) / 1000);
-      gain.gain.setValueAtTime(Math.max(0.005, Math.min(0.4, volume)), now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + durSec);
-
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain);
-      src.start(now);
-      src.stop(now + durSec + 0.01);
-    } catch {}
-  }
-
-  // Synthesize authentic species-specific Gen I Pokémon Cry (PlayCry in home/audio.asm & data/pokemon/cries.asm)
+  // Hardware-accurate Game Boy Audio1 + APU Cry Synthesizer (PlayCry in audio/engine_1.asm)
   playPokemonCry(species, options = {}) {
     if (!this.init()) return false;
-    for (const t of this.cryTimers) clearTimeout(t);
-    this.cryTimers = [];
+    const sp = String(species || "PIKACHU")
+      .toUpperCase()
+      .replace(/[^A-Z0-9_]/g, "_");
+    const faint = Boolean(options && options.faint);
+    const cacheKey = `${sp}:${faint ? 1 : 0}`;
 
-    const sp = String(species || "PIKACHU").toUpperCase();
-    const faintFactor = options && options.faint ? 0.72 : 1.0;
+    try {
+      if (this.activeCrySource) {
+        try {
+          this.activeCrySource.stop();
+          this.activeCrySource.disconnect();
+        } catch {}
+        this.activeCrySource = null;
+      }
 
-    // Special Pikachu Yellow voice cry ("Pika-Pika!")
-    if (sp === "PIKACHU") {
-      const pikaSeq = [
-        [1180, 1560, 62, "square"],
-        [1480, 1310, 56, "triangle"],
-        [1260, 1820, 95, "square"],
-      ];
-      let delay = 0;
-      pikaSeq.forEach(([f0, f1, dur, w]) => {
-        const id = setTimeout(() => {
-          const idx = this.cryTimers.indexOf(id);
-          if (idx !== -1) this.cryTimers.splice(idx, 1);
-          this.playSweepNote(f0 * faintFactor, f1 * faintFactor, dur, w, 0.36);
-          this.playSweepNote(f0 * 1.012 * faintFactor, f1 * 1.012 * faintFactor, dur, "triangle", 0.2);
-        }, delay);
-        this.cryTimers.push(id);
-        delay += dur + 14;
-      });
-      return true;
-    }
+      let audioBuf = this.cryBufferCache.get(cacheKey);
+      if (!audioBuf) {
+        const [baseCryId, pitchByte, lengthByte] =
+          GEN1_CRY_DATA[sp] || [0x0f, 0x80, 0x01];
+        const cryDef = SFX_CRIES_DATA[baseCryId] || SFX_CRIES_DATA[0];
+        const sr = this.ctx.sampleRate;
+        const samplesPerFrame = Math.round(sr / 59.7275);
 
-    const [baseCryId, pitchByte, lengthByte] =
-      GEN1_CRY_DATA[sp] || [0x00, 0x40, 0x80];
-    const profile =
-      BASE_CRY_CONTOURS[baseCryId % BASE_CRY_CONTOURS.length] ||
-      BASE_CRY_CONTOURS[0];
+        const ch5Frames = buildSquareFrames(cryDef.ch5, pitchByte, lengthByte, faint);
+        const ch6Frames = buildSquareFrames(cryDef.ch6, pitchByte, lengthByte, faint);
+        const ch8Frames = buildNoiseFrames(cryDef.ch8, pitchByte);
 
-    // Map unsigned Gen I pitchByte (0x00..0xFF) across a wide 165 Hz .. 1,180 Hz range
-    // and unsigned lengthByte (0x00..0xFF) across 30ms .. 145ms base step duration
-    let speciesSalt = 0;
-    for (let i = 0; i < sp.length; i++) {
-      speciesSalt = (speciesSalt * 17 + sp.charCodeAt(i)) & 0xff;
-    }
-    const rootFreq =
-      (165 + (pitchByte / 255) * 760 + (baseCryId % 9) * 24 + (speciesSalt % 37)) *
-      faintFactor;
-    const baseStepMs = Math.max(28, Math.min(155, 34 + (lengthByte / 255) * 96));
-    const detune = profile.detune || 1.015;
-    const [noiseFreq, noiseVol] = profile.noise || [1100, 0.1];
+        const totalFrames = Math.max(ch5Frames.length, ch6Frames.length, 1);
+        const totalSamples = totalFrames * samplesPerFrame;
+        audioBuf = this.ctx.createBuffer(1, totalSamples, sr);
+        const out = audioBuf.getChannelData(0);
 
-    let offsetMs = 0;
-    profile.steps.forEach(([m0, m1, durWeight, wave], idx) => {
-      const dur = Math.max(24, baseStepMs * (durWeight || 1.0));
-      const id = setTimeout(() => {
-        const pos = this.cryTimers.indexOf(id);
-        if (pos !== -1) this.cryTimers.splice(pos, 1);
-        // Channel 1: Lead Pulse
-        this.playSweepNote(
-          rootFreq * m0,
-          rootFreq * m1,
-          dur,
-          wave || "square",
-          0.34
-        );
-        // Channel 2: Detuned Harmony / Counter-Sweep Pulse
-        this.playSweepNote(
-          rootFreq * m0 * detune,
-          rootFreq * m1 * (2 - detune),
-          dur * 0.95,
-          idx % 2 === 0 ? "sawtooth" : "square",
-          0.2
-        );
-        // Channel 4: LFSR Noise rasp on accented cry steps
-        if (idx === 0 || idx === profile.steps.length - 1) {
-          this.playNoiseBurst(noiseFreq * faintFactor, dur * 0.85, noiseVol);
+        let phase5 = 0;
+        let phase6 = 0;
+        let noisePhase = 0;
+        let lfsr = 0x7fff;
+
+        for (let f = 0; f < totalFrames; f++) {
+          const s5 = ch5Frames[f] || { freqHz: 0, vol: 0, duty: 2 };
+          const s6 = ch6Frames[f] || { freqHz: 0, vol: 0, duty: 2 };
+          const s8 =
+            ch8Frames[f] ||
+            ch8Frames[ch8Frames.length - 1] || { clockHz: 0, width7: false, vol: 0 };
+
+          const d5 = DUTY_THRESHOLDS[s5.duty & 3];
+          const d6 = DUTY_THRESHOLDS[s6.duty & 3];
+          const inc5 = s5.freqHz > 0 ? s5.freqHz / sr : 0;
+          const inc6 = s6.freqHz > 0 ? s6.freqHz / sr : 0;
+          const inc8 = s8.clockHz > 0 ? s8.clockHz / sr : 0;
+          const baseIdx = f * samplesPerFrame;
+
+          for (let i = 0; i < samplesPerFrame; i++) {
+            let sample = 0;
+            if (s5.vol > 0 && inc5 > 0) {
+              phase5 = (phase5 + inc5) % 1.0;
+              sample += (phase5 < d5 ? 1 : -1) * s5.vol * 0.42;
+            }
+            if (s6.vol > 0 && inc6 > 0) {
+              phase6 = (phase6 + inc6) % 1.0;
+              sample += (phase6 < d6 ? 1 : -1) * s6.vol * 0.38;
+            }
+            if (s8.vol > 0 && inc8 > 0) {
+              noisePhase += inc8;
+              while (noisePhase >= 1.0) {
+                noisePhase -= 1.0;
+                const bit = ((lfsr >> 0) ^ (lfsr >> 1)) & 1;
+                lfsr = (lfsr >> 1) | (bit << 14);
+                if (s8.width7) {
+                  lfsr = (lfsr & ~(1 << 6)) | (bit << 6);
+                }
+              }
+              sample += ((lfsr & 1) ? -1 : 1) * s8.vol * 0.22;
+            }
+            out[baseIdx + i] = sample;
+          }
         }
-      }, offsetMs);
-      this.cryTimers.push(id);
-      offsetMs += dur * 0.88;
-    });
-    return true;
+
+        if (this.cryBufferCache.size >= 32) {
+          const oldest = this.cryBufferCache.keys().next().value;
+          if (oldest) this.cryBufferCache.delete(oldest);
+        }
+        this.cryBufferCache.set(cacheKey, audioBuf);
+      }
+
+      const src = this.ctx.createBufferSource();
+      src.buffer = audioBuf;
+      const cryGain = this.ctx.createGain();
+      cryGain.gain.value = 1.35;
+      src.connect(cryGain);
+      cryGain.connect(this.masterGain);
+      this.activeCrySource = src;
+      src.onended = () => {
+        if (this.activeCrySource === src) {
+          this.activeCrySource = null;
+        }
+        try {
+          cryGain.disconnect();
+        } catch {}
+      };
+      src.start();
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

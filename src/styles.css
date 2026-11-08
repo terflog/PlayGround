@@ -656,10 +656,9 @@ button {
   margin-right: 16px;
 }
 
+#dialogue-battle-btn,
 .gb-next-btn.battle-challenge-btn {
-  background: #fcfaff;
-  color: #111827;
-  border: 2px solid #111827;
+  display: none !important;
 }
 
 /* Authentic Generation I (pret/pokeyellow) Battle Screen & Menu System */
