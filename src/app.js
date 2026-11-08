@@ -27,6 +27,7 @@ const state = {
   seenPokemon: new Set(),
   caughtPokemon: new Set(),
   defeatedTrainers: new Set(),
+  playTimeStartMs: Date.now(),
   events: {
     oakRescuedInGrass: false, // EVENT_FOLLOWED_OAK_INTO_LAB (scripts/PalletTown.asm)
     gotStarterPikachu: false, // EVENT_GOT_STARTER (scripts/OaksLab.asm:1033)
@@ -629,14 +630,14 @@ function getOrderedPokedexEntries() {
 }
 
 const KANTO_GYM_BADGES = [
-  { id: "BOULDER", name: "BOULDERBADGE", leader: "BROCK", zone: "PEWTER_GYM" },
-  { id: "CASCADE", name: "CASCADEBADGE", leader: "MISTY", zone: "CERULEAN_GYM" },
-  { id: "THUNDER", name: "THUNDERBADGE", leader: "LT.SURGE", zone: "VERMILION_GYM" },
-  { id: "RAINBOW", name: "RAINBOWBADGE", leader: "ERIKA", zone: "CELADON_GYM" },
-  { id: "SOUL", name: "SOULBADGE", leader: "KOGA", zone: "FUCHSIA_GYM" },
-  { id: "MARSH", name: "MARSHBADGE", leader: "SABRINA", zone: "SAFFRON_GYM" },
-  { id: "VOLCANO", name: "VOLCANOBADGE", leader: "BLAINE", zone: "CINNABAR_GYM" },
-  { id: "EARTH", name: "EARTHBADGE", leader: "GIOVANNI", zone: "VIRIDIAN_GYM" },
+  { id: "BOULDER", name: "BOULDERBADGE", leader: "BROCK", leaderSprite: "BROCK", zone: "PEWTER_GYM" },
+  { id: "CASCADE", name: "CASCADEBADGE", leader: "MISTY", leaderSprite: "MISTY", zone: "CERULEAN_GYM" },
+  { id: "THUNDER", name: "THUNDERBADGE", leader: "LT.SURGE", leaderSprite: "LT_SURGE", zone: "VERMILION_GYM" },
+  { id: "RAINBOW", name: "RAINBOWBADGE", leader: "ERIKA", leaderSprite: "ERIKA", zone: "CELADON_GYM" },
+  { id: "SOUL", name: "SOULBADGE", leader: "KOGA", leaderSprite: "KOGA", zone: "FUCHSIA_GYM" },
+  { id: "MARSH", name: "MARSHBADGE", leader: "SABRINA", leaderSprite: "SABRINA", zone: "SAFFRON_GYM" },
+  { id: "VOLCANO", name: "VOLCANOBADGE", leader: "BLAINE", leaderSprite: "BLAINE", zone: "CINNABAR_GYM" },
+  { id: "EARTH", name: "EARTHBADGE", leader: "GIOVANNI", leaderSprite: "GIOVANNI", zone: "VIRIDIAN_GYM" },
 ];
 
 export function getEarnedBadges() {
@@ -2204,10 +2205,10 @@ export function startScriptedCatchScene(mode = "OAK_PIKACHU") {
     partySubCursor: 0,
     forcedSwitch: false,
     showTrainerSprite: false,
-    log: messages[0],
-    messageQueue: messages.slice(1),
-    finished: true,
-    onComplete: isOak
+      log: messages[0],
+      messageQueue: messages.slice(1),
+      finished: true,
+      onComplete: isOak
       ? () => {
           state.events.oakRescuedInGrass = true;
           loadZone("OAKS_LAB", { x: 5, y: 3, dir: "UP" });
@@ -2331,7 +2332,7 @@ export function openPikachuInteraction() {
   const shownFriendship = state.pikachu.friendship;
   modifyPikachuHappiness("USEDITEM");
   triggerEmote(mood.emote, 2400);
-  audio.playSfx("pika");
+  audio.playPokemonCry("PIKACHU");
   openDialogue(
     `${mood.title} (Friendship: ${shownFriendship}/255)`,
     mood.text,
@@ -2558,7 +2559,7 @@ export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
     messageQueue: [],
     finished: false,
   };
-  audio.playSfx("thunder");
+  audio.playPokemonCry(firstFoe.species);
   renderBattleModal();
 }
 
@@ -2931,6 +2932,7 @@ function awardExpAndCheckLevelUp(mon, expGain, msgs) {
 function handleEnemyFainted(b, msgs) {
   const foe = b.enemyParty[b.activeEnemyIdx];
   const pMon = state.party[b.activePlayerIdx];
+  audio.playPokemonCry(foe.species, { faint: true });
   const expGain = Math.max(12, Math.floor((foe.baseExp * foe.level) / 7));
   msgs.push(
     `${b.isTrainer ? "Enemy " : "Wild "}${foe.nickname}\nfainted!`,
@@ -2945,6 +2947,7 @@ function handleEnemyFainted(b, msgs) {
     const nextFoe = b.enemyParty[nextEnemyIdx];
     if (nextFoe?.species) {
       state.seenPokemon.add(nextFoe.species);
+      audio.playPokemonCry(nextFoe.species);
       saveProgress();
     }
     syncBattleTopLevelProps(b);
@@ -3002,6 +3005,7 @@ function handleEnemyFainted(b, msgs) {
 
 function handlePlayerFainted(b, msgs) {
   const pMon = state.party[b.activePlayerIdx];
+  audio.playPokemonCry(pMon.species, { faint: true });
   msgs.push(`${pMon.nickname}\nfainted!`);
   syncPikachuOverworldState();
   const nextAliveIdx = state.party.findIndex((m) => m.hp > 0);
@@ -5211,35 +5215,62 @@ export function renderStartMenu() {
     subBody.appendChild(bagWrap);
   } else if (sm.subView === "RED") {
     if (subTitle) subTitle.textContent = `TRAINER CARD — RED`;
+    // Authentic Generation I DrawTrainerInfo (engine/pokemon/status_screen.asm:575-720):
+    // - Top-Left: Framed box with NAME/, MONEY/, TIME/
+    // - Top-Right: Red's front trainer sprite (RedPicFront)
+    // - Bottom: •BADGES• 2x4 numbered box (showing Gym Leader portrait before earning, Badge emblem once earned)
     const earnedIds = new Set(getEarnedBadges().map((b) => b.id));
-    const badgeLine1 = KANTO_GYM_BADGES.slice(0, 4)
-      .map((b) => `${earnedIds.has(b.id) ? "●" : "○"} ${b.id}`)
-      .join(" ");
-    const badgeLine2 = KANTO_GYM_BADGES.slice(4, 8)
-      .map((b) => `${earnedIds.has(b.id) ? "●" : "○"} ${b.id}`)
-      .join(" ");
+    const elapsedMinTotal = Math.max(
+      1,
+      Math.floor((Date.now() - (state.playTimeStartMs || Date.now())) / 60000) +
+        state.visitedZones.size
+    );
+    const playHours = Math.floor(elapsedMinTotal / 60);
+    const playMins = elapsedMinTotal % 60;
+    const timeStr = `${String(playHours).padStart(3, " ")}:${String(playMins).padStart(2, "0")}`;
+
     const cardWrap = document.createElement("div");
-    cardWrap.style.padding = "8px 10px";
-    cardWrap.style.display = "flex";
-    cardWrap.style.flexDirection = "column";
-    cardWrap.style.gap = "5px";
+    cardWrap.className = "gb-trainer-card";
     cardWrap.innerHTML = `
-      <div class="stats-top-grid">
-        <canvas id="start-red-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
-        <div>
-          <div><strong>NAME/</strong> RED</div>
-          <div><strong>MONEY/</strong> ¥${3000 + state.defeatedTrainers.size * 350}</div>
-          <div><strong>PIKA ♥/</strong> ${state.pikachu.friendship}/255</div>
+      <div class="gb-trainer-top">
+        <div class="gb-trainer-info-box">
+          <div class="gb-trainer-info-row"><span>NAME/</span><span>RED</span></div>
+          <div class="gb-trainer-info-row"><span>MONEY/</span><span>¥${3000 + state.defeatedTrainers.size * 350}</span></div>
+          <div class="gb-trainer-info-row"><span>TIME/</span><span>${timeStr}</span></div>
+        </div>
+        <div class="gb-trainer-pic-wrap">
+          <canvas id="start-red-canvas" width="16" height="16"></canvas>
         </div>
       </div>
-      <div><strong>ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
-      <div><strong>POKéDEX OWN:</strong> ${state.caughtPokemon.size} / 151</div>
-      <div><strong>BADGES (${earnedIds.size}/8):</strong><br/>${badgeLine1}<br/>${badgeLine2}</div>
+      <div class="gb-badges-box">
+        <span class="gb-badges-header">•BADGES•</span>
+        <div class="gb-badges-grid">
+          ${KANTO_GYM_BADGES.map(
+            (b, idx) => `
+            <div class="gb-badge-slot" title="${b.name} (${b.leader})">
+              <span class="gb-badge-num">${idx + 1}</span>
+              <canvas class="gb-badge-canvas" data-badge-idx="${idx}" width="24" height="24"></canvas>
+            </div>
+          `
+          ).join("")}
+        </div>
+      </div>
     `;
     subBody.appendChild(cardWrap);
     const rc = document.getElementById("start-red-canvas");
-    const spr = engine.trainerSprites.BROCK || engine.pokemonSprites.PIKACHU;
-    engine.render2BitGraphicToCanvas(rc, spr, "PAL_REDMON");
+    engine.renderRedTrainerCardSprite(rc);
+    cardWrap.querySelectorAll(".gb-badge-canvas").forEach((bCanvas) => {
+      const idx = Number(bCanvas.dataset.badgeIdx);
+      const badgeDef = KANTO_GYM_BADGES[idx];
+      if (badgeDef) {
+        engine.renderTrainerCardBadgeSlot(
+          bCanvas,
+          idx,
+          badgeDef.leaderSprite,
+          earnedIds.has(badgeDef.id)
+        );
+      }
+    });
   } else if (sm.subView === "SAVE") {
     if (subTitle) subTitle.textContent = `SAVE GAME (sMainData)`;
     saveProgress();
@@ -5656,16 +5687,12 @@ function setupControlsAndEvents() {
       ) {
         e.preventDefault();
         handleBattleInput("A");
-      } else if (e.code === "KeyX" || e.code === "Backspace") {
+      } else if (e.code === "KeyX" || e.code === "Backspace" || e.code === "Escape") {
         e.preventDefault();
         handleBattleInput("B");
       } else if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
         e.preventDefault();
         handleBattleInput("SELECT");
-      } else if (e.code === "Escape") {
-        e.preventDefault();
-        state.battle = null;
-        renderBattleModal();
       }
       return;
     }

@@ -1235,4 +1235,236 @@ export class PokeYellowEngine {
     }
     ctx.putImageData(imgData, 0, 0);
   }
+
+  // Render Red's front trainer sprite (RedPicFront) on the Trainer Card (DrawTrainerInfo)
+  renderRedTrainerCardSprite(canvas) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const pal = this.getPaletteColors("PAL_REDMON");
+    const imgData = this.getOrCreateImageData(canvas, ctx, 16, 16);
+    imgData.data.fill(0);
+    this.drawSprite16x16(
+      imgData.data,
+      16,
+      16,
+      0,
+      0,
+      "red",
+      "DOWN",
+      false,
+      false,
+      pal,
+      false
+    );
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // Render 16x16 Gym Leader portrait (unearned) or 16x16 Badge emblem (earned) for DrawTrainerInfo (gfx/trainer_card/badges.png)
+  renderTrainerCardBadgeSlot(canvas, badgeIndex, leaderKey, isEarned) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const pal = this.getPaletteColors("PAL_REDMON");
+
+    if (!isEarned) {
+      // Draw the Gym Leader's face cropped from their trainer sprite (or overworld sprite)
+      const tSpr = this.trainerSprites[leaderKey];
+      if (tSpr) {
+        const cropW = 28;
+        const cropH = 28;
+        const srcX0 = Math.max(0, Math.floor((tSpr.width - cropW) / 2));
+        const srcY0 = 2;
+        const imgData = this.getOrCreateImageData(canvas, ctx, cropW, cropH);
+        const buf = imgData.data;
+        for (let y = 0; y < cropH; y++) {
+          for (let x = 0; x < cropW; x++) {
+            const val = tSpr.pixels[(srcY0 + y) * tSpr.width + (srcX0 + x)] ?? 3;
+            const c = pal[3 - (val & 3)];
+            const off = (y * cropW + x) * 4;
+            buf[off] = c[0];
+            buf[off + 1] = c[1];
+            buf[off + 2] = c[2];
+            buf[off + 3] = 255;
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        return;
+      }
+    }
+
+    // Earned 16x16 Kanto Badge Emblem (0: Boulder, 1: Cascade, 2: Thunder, 3: Rainbow, 4: Soul, 5: Marsh, 6: Volcano, 7: Earth)
+    const imgData = this.getOrCreateImageData(canvas, ctx, 16, 16);
+    const buf = imgData.data;
+    buf.fill(0);
+    const patterns = [
+      // 0: BOULDERBADGE (Octagon rock)
+      [
+        "....########....",
+        "..##++++++++##..",
+        ".#++########++#.",
+        ".#+##......##+#.",
+        "#+#..######..#+#",
+        "#+#.#++++++#.#+#",
+        "#+#.#+####+#.#+#",
+        "#+#.#+####+#.#+#",
+        "#+#.#++++++#.#+#",
+        "#+#..######..#+#",
+        ".#+##......##+#.",
+        ".#++########++#.",
+        "..##++++++++##..",
+        "....########....",
+        "................",
+        "................",
+      ],
+      // 1: CASCADEBADGE (Water droplet)
+      [
+        ".......##.......",
+        "......#++#......",
+        ".....#++++#.....",
+        "....#++..++#....",
+        "...#++.++.#+#...",
+        "..#++.#++#.#+#..",
+        "..#++.#++#.++#..",
+        ".#+++.++++.+++#.",
+        ".#++++....++++#.",
+        ".#++++++++++++#.",
+        "..#++++++++++#..",
+        "...##++++++##...",
+        ".....######.....",
+        "................",
+        "................",
+        "................",
+      ],
+      // 2: THUNDERBADGE (8-point sunburst star)
+      [
+        ".......##.......",
+        "..#...#++#...#..",
+        "...#..#++#..#...",
+        "...#.##++##.#...",
+        ".###++++++++###.",
+        "..#+++####+++#..",
+        "...#+######+#...",
+        "###++######++###",
+        "...#+######+#...",
+        "..#+++####+++#..",
+        ".###++++++++###.",
+        "...#.##++##.#...",
+        "...#..#++#..#...",
+        "..#...#++#...#..",
+        ".......##.......",
+        "................",
+      ],
+      // 3: RAINBOWBADGE (8-petal flower)
+      [
+        ".....##..##.....",
+        "....#++##++#....",
+        "..##++++++++##..",
+        ".#++++####++++#.",
+        ".#+++#....#+++#.",
+        "..#++#....#++#..",
+        ".#+++#....#+++#.",
+        ".#++++####++++#.",
+        "..##++++++++##..",
+        "....#++##++#....",
+        ".....##..##.....",
+        ".......##.......",
+        "......#++#......",
+        ".......##.......",
+        "................",
+        "................",
+      ],
+      // 4: SOULBADGE (Heart emblem)
+      [
+        "..####....####..",
+        ".#++++#..#++++#.",
+        "#++++++##++++++#",
+        "#+++++.++.+++++#",
+        "#++++++..++++++#",
+        ".#++++++++++++#.",
+        "..#++++++++++#..",
+        "...#++++++++#...",
+        "....#++++++#....",
+        ".....#++++#.....",
+        "......#++#......",
+        ".......##.......",
+        "................",
+        "................",
+        "................",
+        "................",
+      ],
+      // 5: MARSHBADGE (Concentric gold disc)
+      [
+        "....########....",
+        "..##........##..",
+        ".#...######...#.",
+        ".#..#++++++#..#.",
+        "#..#++####++#..#",
+        "#..#+######+#..#",
+        "#..#+######+#..#",
+        "#..#+######+#..#",
+        "#..#+######+#..#",
+        "#..#++####++#..#",
+        ".#..#++++++#..#.",
+        ".#...######...#.",
+        "..##........##..",
+        "....########....",
+        "................",
+        "................",
+      ],
+      // 6: VOLCANOBADGE (Dual flame)
+      [
+        ".......##.......",
+        "......#++#..#...",
+        ".....#+++..#+#..",
+        "....#+++..#++#..",
+        "...#++++.#+++#..",
+        "..#+++++#+++++#.",
+        "..#++++.++++++#.",
+        ".#++++..#.++++#.",
+        ".#++++.##.++++#.",
+        "..#++++++++++#..",
+        "...##++++++##...",
+        ".....######.....",
+        "................",
+        "................",
+        "................",
+        "................",
+      ],
+      // 7: EARTHBADGE (Viridian leaf plume)
+      [
+        "........###.....",
+        ".......#+++#....",
+        "......#++.++#...",
+        ".....#++.#++#...",
+        "....#++.#++#....",
+        "...#++.#++#.....",
+        "..#++.#++#......",
+        "..#++#++#.......",
+        "..#++++#........",
+        "...#++#.........",
+        "..#++#..........",
+        ".#++#...........",
+        "..##............",
+        "................",
+        "................",
+        "................",
+      ],
+    ];
+    const grid = patterns[badgeIndex % patterns.length];
+    for (let y = 0; y < 16; y++) {
+      const row = grid[y] || "................";
+      for (let x = 0; x < 16; x++) {
+        const ch = row[x];
+        if (ch === ".") continue;
+        const c = ch === "#" ? pal[3] : ch === "+" ? pal[1] : pal[0];
+        const off = (y * 16 + x) * 4;
+        buf[off] = c[0];
+        buf[off + 1] = c[1];
+        buf[off + 2] = c[2];
+        buf[off + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
 }
