@@ -396,6 +396,7 @@ function saveProgress() {
   try {
     const payload = {
       visitedZones: Array.from(state.visitedZones),
+      seenPokemon: Array.from(state.seenPokemon),
       caughtPokemon: Array.from(state.caughtPokemon),
       defeatedTrainers: Array.from(state.defeatedTrainers),
       friendship: state.pikachu.friendship,
@@ -440,10 +441,18 @@ function loadProgress() {
         }
       });
     }
+    if (Array.isArray(data.seenPokemon)) {
+      data.seenPokemon.forEach((p) => {
+        if (typeof p === "string" && POKEYELLOW_DATA.battle?.pokemonStats?.[p]) {
+          state.seenPokemon.add(p);
+        }
+      });
+    }
     if (Array.isArray(data.caughtPokemon)) {
       data.caughtPokemon.forEach((p) => {
         if (typeof p === "string" && POKEYELLOW_DATA.battle?.pokemonStats?.[p]) {
           state.caughtPokemon.add(p);
+          state.seenPokemon.add(p);
         }
       });
     }
@@ -1601,6 +1610,7 @@ function onPlayerStepCompleted() {
 function checkInGameGiftOrEvent(npc, zone) {
   const upName = `${zone.constName} ${npc.name}`.toUpperCase();
   const giveGiftMon = (species, level) => {
+    state.seenPokemon.add(species);
     state.caughtPokemon.add(species);
     if (!state.party.some((m) => m.species === species) && state.party.length < 6) {
       state.party.push(buildMonInstance(species, level));
@@ -2131,6 +2141,8 @@ export function startScriptedCatchScene(mode = "OAK_PIKACHU") {
   }
   const isOak = mode === "OAK_PIKACHU";
   const foeMon = buildMonInstance(isOak ? "PIKACHU" : "RATTATA", 5);
+  state.seenPokemon.add(foeMon.species);
+  saveProgress();
   const demoPlayerMon = {
     species: isOak ? "PROF_OAK" : "OLD_MAN",
     nickname: isOak ? "PROF. OAK" : "OLD MAN",
@@ -2502,8 +2514,9 @@ export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
     state.currentZone.constName.startsWith("SAFARI_ZONE");
 
   const firstFoe = enemyParty[0];
-  for (const em of enemyParty) {
-    if (em?.species) state.seenPokemon.add(em.species);
+  if (firstFoe?.species) {
+    state.seenPokemon.add(firstFoe.species);
+    saveProgress();
   }
   const pMon = state.party[activePlayerIdx];
 
@@ -2844,6 +2857,7 @@ export function evolvePokemon(mon, newSpeciesKey, msgs = [], options = {}) {
     }
   }
 
+  state.seenPokemon.add(targetKey);
   state.caughtPokemon.add(targetKey);
   saveProgress();
   updateUIForCurrentZone();
@@ -2929,6 +2943,10 @@ function handleEnemyFainted(b, msgs) {
   if (nextEnemyIdx !== -1) {
     b.activeEnemyIdx = nextEnemyIdx;
     const nextFoe = b.enemyParty[nextEnemyIdx];
+    if (nextFoe?.species) {
+      state.seenPokemon.add(nextFoe.species);
+      saveProgress();
+    }
     syncBattleTopLevelProps(b);
     msgs.push(`${b.trainerName} sent out\n${nextFoe.nickname}!`);
     queueBattleMessages(msgs, "MAIN_MENU");
@@ -4489,10 +4507,16 @@ export function handleStartMenuInput(input) {
       renderStartMenu();
     } else if (input === "A") {
       const chosen = allStats[sm.subCursor];
-      if (chosen) {
+      const isSeen =
+        chosen &&
+        (state.seenPokemon.has(chosen.species) ||
+          state.caughtPokemon.has(chosen.species));
+      if (isSeen) {
         audio.playSfx("blip");
         sm.selectedDexSpecies = chosen.species;
         renderStartMenu();
+      } else {
+        audio.playSfx("bump");
       }
     } else if (input === "B" || input === "START") {
       audio.playSfx("blip");
@@ -4748,6 +4772,7 @@ export function renderStartMenu() {
 
     allStats.forEach((st, idx) => {
       const owned = state.caughtPokemon.has(st.species);
+      const seen = owned || state.seenPokemon.has(st.species);
       const isSelected = idx === sm.subCursor;
       const row = document.createElement("button");
       row.type = "button";
@@ -4757,13 +4782,17 @@ export function renderStartMenu() {
         <div class="gb-dex-name-line">
           <span class="bcursor">${isSelected ? "▶" : " "}</span>
           <span style="width:11px;display:inline-block">${owned ? "◓" : " "}</span>
-          <span>${st.species.replace(/_/g, " ")}</span>
+          <span>${seen ? st.species.replace(/_/g, " ") : "----------"}</span>
         </div>
       `;
       row.onclick = () => {
-        audio.playSfx("blip");
         sm.subCursor = idx;
-        sm.selectedDexSpecies = st.species;
+        if (seen) {
+          audio.playSfx("blip");
+          sm.selectedDexSpecies = st.species;
+        } else {
+          audio.playSfx("bump");
+        }
         renderStartMenu();
       };
       listWrap.appendChild(row);
@@ -4788,15 +4817,25 @@ export function renderStartMenu() {
     rightCol.querySelectorAll("[data-dex-cmd]").forEach((btn) => {
       btn.onclick = () => {
         const cmd = btn.dataset.dexCmd;
+        const cur = allStats[sm.subCursor];
+        const isSeen =
+          cur &&
+          (state.seenPokemon.has(cur.species) ||
+            state.caughtPokemon.has(cur.species));
         if (cmd === "DATA") {
-          const cur = allStats[sm.subCursor];
-          if (cur) {
+          if (isSeen) {
             audio.playSfx("blip");
             sm.selectedDexSpecies = cur.species;
             renderStartMenu();
+          } else {
+            audio.playSfx("bump");
           }
         } else if (cmd === "CRY") {
-          audio.playSfx("pika");
+          if (isSeen) {
+            audio.playSfx("pika");
+          } else {
+            audio.playSfx("bump");
+          }
         } else if (cmd === "AREA") {
           audio.playSfx("blip");
         } else if (cmd === "QUIT") {
