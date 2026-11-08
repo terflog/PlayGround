@@ -832,6 +832,11 @@ function initZoneNpcs(zone) {
         collected = true;
       } else if (o.name === "MTMOONB2F_HELIX_FOSSIL" && state.events.gotHelixFossil) {
         collected = true;
+      } else if (
+        o.name === "MTMOONB2F_SUPER_NERD" &&
+        (state.events.gotDomeFossil || state.events.gotHelixFossil)
+      ) {
+        collected = true;
       }
     } else if (zone.constName === "FIGHTING_DOJO") {
       if (o.name === "FIGHTINGDOJO_HITMONLEE_POKE_BALL" && state.events.gotHitmonlee) {
@@ -1743,8 +1748,15 @@ function checkInGameGiftOrEvent(npc, zone) {
       state.events.gotHelixFossil = true;
       giveBagItem("HELIX_FOSSIL", 1);
     }
+    const nerd = state.npcs.find((n) => n.name === "MTMOONB2F_SUPER_NERD");
+    let nerdSuffix = "";
+    if (nerd && !nerd.collected) {
+      nerd.collected = true;
+      nerdSuffix = `\n\nSUPER NERD: Actually, I'm a dumbass who doesn't need these fossils anyway! Keep the other one too, I'm leaving!\n\nSUPER NERD left without taking the other fossil!`;
+    }
+    saveProgress();
     renderAllCanvases(true);
-    return `\n\nRED got the ${isDome ? "DOME FOSSIL" : "HELIX FOSSIL"}!`;
+    return `\n\nRED got the ${isDome ? "DOME FOSSIL" : "HELIX FOSSIL"}!${nerdSuffix}`;
   }
   if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
     const hasDome = state.bag.some((it) => it.id === "DOME_FOSSIL");
