@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#171d22" />
+  <title>Rocket Ops — Field Division</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Rocket Ops home">
+        <span class="brand-mark"><span>R</span></span>
+        <span class="brand-words">ROCKET<span>FIELD DIVISION</span></span>
+      </a>
+      <div class="division-label">KANTO OPERATIONS <span class="live-dot"></span></div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="operations"><span class="nav-icon">◈</span> Operations <span class="nav-arrow">›</span></button>
+        <button class="nav-item" data-view="hideout"><span class="nav-icon">⌂</span> Hideout <span class="nav-count" id="nav-upgrades">0</span></button>
+        <button class="nav-item" data-view="roster"><span class="nav-icon">♧</span> Roster <span class="nav-count" id="nav-roster">0</span></button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="field-note">
+        <div class="note-stamp">FIELD NOTE <span>№ 014</span></div>
+        <p>“A good plan beats a good punch. Usually.”</p>
+        <span class="note-sign">— BOSS GIOVANNI</span>
+      </div>
+      <button class="profile-button" id="profile-button">
+        <span class="avatar">R</span><span class="profile-copy"><b id="profile-rank">ROCKET GRUNT</b><small>FIELD OPERATIVE</small></span><span class="profile-menu">···</span>
+      </button>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="breadcrumbs"><span>TEAM ROCKET</span><span class="crumb-slash">/</span><b id="breadcrumb-view">OPERATIONS</b></div>
+        <div class="top-actions">
+          <div class="top-stat"><span class="stat-icon money-icon">₽</span><span id="money">240</span><small>₽</small></div>
+          <div class="top-stat"><span class="stat-icon rep-icon">✳</span><span id="rep">0</span><small>REP</small></div>
+          <button class="icon-button" id="sound-toggle" aria-label="Toggle sound">♫</button>
+        </div>
+      </header>
+
+      <section class="view active" id="operations-view">
+        <div class="welcome-row">
+          <div><div class="eyebrow"><span class="eyebrow-line"></span> FIELD OPERATIONS <span class="date-stamp">PALLET SECTOR · 06:40</span></div><h1>Morning, <span id="greeting-rank">grunt</span><span class="title-period">.</span></h1><p class="welcome-sub">The region’s full of rare finds. Let’s make them <i>our</i> problem.</p></div>
+          <div class="rank-ticket"><div class="ticket-top"><span>CURRENT RANK</span><span class="ticket-star">✦</span></div><div class="ticket-rank" id="rank-name">GRUNT I</div><div class="ticket-progress"><span id="rank-progress-bar" style="width:0%"></span></div><div class="ticket-bottom"><span id="rank-progress-text">0 / 80 REP</span><span id="next-rank-label">NEXT: GRUNT II</span></div></div>
+        </div>
+
+        <div class="mission-heading"><div><div class="section-overline">PICK YOUR APPROACH</div><h2>Available operations <span class="live-dot"></span></h2></div><div class="refresh-tag"><span>⌁</span> INTEL UPDATED JUST NOW</div></div>
+        <div class="mission-grid" id="mission-grid"></div>
+
+        <div class="lower-grid">
+          <section class="panel progress-panel">
+            <div class="panel-heading"><div><div class="section-overline">THE LONG GAME</div><h3>Your climb</h3></div><span class="heading-mark">↗</span></div>
+            <div class="climb-track" id="climb-track"></div>
+            <div class="next-unlock" id="next-unlock"></div>
+          </section>
+          <section class="panel hq-panel">
+            <div class="panel-heading"><div><div class="section-overline">CURRENTLY OCCUPIED</div><h3>Hideout status</h3></div><button class="text-link" data-goto="hideout">VIEW BASE <span>↗</span></button></div>
+            <div class="hq-preview"><div class="hq-illustration"><div class="hq-building"><span class="hq-window">✦</span><span class="hq-door"></span><span class="hq-flag">R</span></div><div class="hq-ground"></div><span class="hq-spark spark-one">✦</span><span class="hq-spark spark-two">✧</span></div><div class="hq-details"><div class="hq-level"><span id="hq-level">LEVEL 01</span><span class="online-status"><i></i> OPERATIONAL</span></div><b id="hq-name">The Old Storehouse</b><p id="hq-description">A modest start. Every empire has one.</p><div class="hq-slots"><span>CREATURE BEDS</span><div id="hq-slots">▰ ▱ ▱</div></div></div></div>
+          </section>
+        </div>
+        <footer class="footer"><span>TEAM ROCKET · FIELD DIVISION</span><span>STRICTLY OFF THE RECORD <span class="footer-star">✳</span></span><button id="reset-button">RESET SAVE</button></footer>
+      </section>
+
+      <section class="view" id="hideout-view">
+        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> BASE OF OPERATIONS</div><h1>Home, <span class="title-period">unfortunately.</span></h1><p class="welcome-sub">A suspiciously well-organized criminal enterprise starts with good shelving.</p></div><div class="base-level-card"><span>HIDEOUT LEVEL</span><b id="base-level-big">01</b><small id="base-rank-req">CURRENT HEADQUARTERS</small></div></div>
+        <div class="hideout-scene panel"><div class="scene-topline"><span>◉ PALLET TOWN · SERVICE ROAD</span><span><i class="online-status"><i></i> UNDER COVER</i></span></div><div class="large-hideout"><div class="scene-cloud cloud-a"></div><div class="scene-cloud cloud-b"></div><div class="scene-building"><div class="roof"></div><div class="building-sign">ROCKET <b>R</b></div><div class="building-windows"><i></i><i></i><i></i></div><div class="building-door"></div></div><div class="scene-crate crate-a">R</div><div class="scene-crate crate-b">!</div><div class="scene-lamp">✦</div><div class="scene-floor"></div><div class="scene-caption"><span>01</span><b id="scene-hq-name">THE OLD STOREHOUSE</b></div></div><div class="scene-meta"><span><b id="scene-upgrade-count">0</b> UPGRADES INSTALLED</span><span>CAMOUFLAGE RATING <b id="camouflage">D</b></span><span class="scene-next" id="scene-next">RANK UP TO EXPAND ↗</span></div></div>
+        <div class="upgrades-heading"><div><div class="section-overline">INVEST IN THE OPERATION</div><h2>Base upgrades</h2></div><span class="upgrade-currency">AVAILABLE FUNDS <b>₽ <span class="money-inline">240</span></b></span></div>
+        <div class="upgrade-grid" id="upgrade-grid"></div>
+      </section>
+
+      <section class="view" id="roster-view">
+        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> FIELD COLLECTION</div><h1>Our <span class="title-period">assets.</span></h1><p class="welcome-sub">Every successful operation adds a new specialist to the team.</p></div><div class="base-level-card"><span>RECRUITED</span><b id="roster-total">00</b><small>CREATURES ON FILE</small></div></div>
+        <div class="roster-summary panel"><div class="roster-summary-icon">♧</div><div><span>ACTIVE ROSTER</span><b id="roster-summary-text">No assets on record yet.</b></div><div class="roster-summary-side"><span>TEAM CAPACITY</span><b id="roster-capacity">3 SLOTS</b></div></div>
+        <div class="roster-heading"><div><div class="section-overline">HAND-RAISED, MOSTLY</div><h2>Operatives & companions</h2></div><span id="roster-count-label">0 CREATURES</span></div>
+        <div class="roster-grid" id="roster-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div class="modal-backdrop" id="modal-backdrop" aria-hidden="true"><div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div></div>
+  <script src="app.js"></script>
+</body>
+</html>
