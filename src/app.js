@@ -32,27 +32,7 @@ const state = {
     daisyWalking: false, // EVENT_DAISY_WALKING (scripts/PalletTown.asm:208)
   },
   party: [],
-  bag: [
-    { id: "HM01_CUT", name: "HM01 CUT", qty: 1, kind: "hm", moveId: "CUT" },
-    { id: "HM02_FLY", name: "HM02 FLY", qty: 1, kind: "hm", moveId: "FLY" },
-    { id: "HM03_SURF", name: "HM03 SURF", qty: 1, kind: "hm", moveId: "SURF" },
-    { id: "HM04_STRENGTH", name: "HM04 STRENGTH", qty: 1, kind: "hm", moveId: "STRENGTH" },
-    { id: "HM05_FLASH", name: "HM05 FLASH", qty: 1, kind: "hm", moveId: "FLASH" },
-    { id: "POKE_BALL", name: "POKé BALL", qty: 10, kind: "ball", mult: 1.0 },
-    { id: "GREAT_BALL", name: "GREAT BALL", qty: 5, kind: "ball", mult: 1.5 },
-    { id: "ULTRA_BALL", name: "ULTRA BALL", qty: 3, kind: "ball", mult: 2.0 },
-    { id: "MASTER_BALL", name: "MASTER BALL", qty: 1, kind: "ball", mult: 255.0 },
-    { id: "POTION", name: "POTION", qty: 5, kind: "heal", hp: 20 },
-    { id: "SUPER_POTION", name: "SUPER POTION", qty: 3, kind: "heal", hp: 50 },
-    { id: "FULL_RESTORE", name: "FULL RESTORE", qty: 2, kind: "heal", hp: 999, cure: true },
-    { id: "RARE_CANDY", name: "RARE CANDY", qty: 10, kind: "candy" },
-    { id: "THUNDER_STONE", name: "THUNDER STONE", qty: 2, kind: "stone" },
-    { id: "FIRE_STONE", name: "FIRE STONE", qty: 2, kind: "stone" },
-    { id: "WATER_STONE", name: "WATER STONE", qty: 2, kind: "stone" },
-    { id: "LEAF_STONE", name: "LEAF STONE", qty: 2, kind: "stone" },
-    { id: "MOON_STONE", name: "MOON STONE", qty: 2, kind: "stone" },
-    { id: "POKE_FLUTE", name: "POKé FLUTE", qty: 1, kind: "flute" },
-  ],
+  bag: [], // Player starts with 0 items; items and HMs are acquired in-game!
   player: {
     x: 5,
     y: 6,
@@ -198,7 +178,56 @@ const ELEVATOR_FLOORS = {
   ],
 };
 
-const STORAGE_KEY = "pokeyellow_220_save_v2";
+const STORAGE_KEY = "pokeyellow_220_save_v3";
+
+const ITEM_CATALOG = {
+  HM01_CUT: { id: "HM01_CUT", name: "HM01 CUT", qty: 1, kind: "hm", moveId: "CUT" },
+  HM02_FLY: { id: "HM02_FLY", name: "HM02 FLY", qty: 1, kind: "hm", moveId: "FLY" },
+  HM03_SURF: { id: "HM03_SURF", name: "HM03 SURF", qty: 1, kind: "hm", moveId: "SURF" },
+  HM04_STRENGTH: { id: "HM04_STRENGTH", name: "HM04 STRENGTH", qty: 1, kind: "hm", moveId: "STRENGTH" },
+  HM05_FLASH: { id: "HM05_FLASH", name: "HM05 FLASH", qty: 1, kind: "hm", moveId: "FLASH" },
+  POKE_BALL: { id: "POKE_BALL", name: "POKé BALL", qty: 1, kind: "ball", mult: 1.0 },
+  GREAT_BALL: { id: "GREAT_BALL", name: "GREAT BALL", qty: 1, kind: "ball", mult: 1.5 },
+  ULTRA_BALL: { id: "ULTRA_BALL", name: "ULTRA BALL", qty: 1, kind: "ball", mult: 2.0 },
+  MASTER_BALL: { id: "MASTER_BALL", name: "MASTER BALL", qty: 1, kind: "ball", mult: 255.0 },
+  POTION: { id: "POTION", name: "POTION", qty: 1, kind: "heal", hp: 20 },
+  SUPER_POTION: { id: "SUPER_POTION", name: "SUPER POTION", qty: 1, kind: "heal", hp: 50 },
+  FULL_RESTORE: { id: "FULL_RESTORE", name: "FULL RESTORE", qty: 1, kind: "heal", hp: 999, cure: true },
+  RARE_CANDY: { id: "RARE_CANDY", name: "RARE CANDY", qty: 1, kind: "candy" },
+  THUNDER_STONE: { id: "THUNDER_STONE", name: "THUNDER STONE", qty: 1, kind: "stone" },
+  FIRE_STONE: { id: "FIRE_STONE", name: "FIRE STONE", qty: 1, kind: "stone" },
+  WATER_STONE: { id: "WATER_STONE", name: "WATER STONE", qty: 1, kind: "stone" },
+  LEAF_STONE: { id: "LEAF_STONE", name: "LEAF STONE", qty: 1, kind: "stone" },
+  MOON_STONE: { id: "MOON_STONE", name: "MOON STONE", qty: 1, kind: "stone" },
+  POKE_FLUTE: { id: "POKE_FLUTE", name: "POKé FLUTE", qty: 1, kind: "flute" },
+  TOWN_MAP: { id: "TOWN_MAP", name: "TOWN MAP", qty: 1, kind: "map" },
+};
+
+export function giveBagItem(itemKey, count = 1) {
+  const def = ITEM_CATALOG[itemKey];
+  if (!def) return null;
+  const existing = state.bag.find((it) => it.id === def.id);
+  if (existing) {
+    if (def.kind !== "hm" && def.kind !== "map" && def.kind !== "flute") {
+      existing.qty = Math.min(99, existing.qty + Math.max(1, count));
+    }
+    saveProgress();
+    return existing;
+  }
+  const entry = { ...def, qty: Math.max(1, count) };
+  state.bag.push(entry);
+  saveProgress();
+  return entry;
+}
+
+export function hasHmOrMove(moveId) {
+  const cleanId = String(moveId || "").toUpperCase();
+  const knownInParty = state.party.some(
+    (m) => Array.isArray(m.moves) && m.moves.some((mv) => mv.id === cleanId)
+  );
+  if (knownInParty) return true;
+  return state.bag.some((it) => it.kind === "hm" && it.moveId === cleanId);
+}
 
 const SPECIAL_TYPES = new Set([
   "FIRE",
@@ -375,6 +404,7 @@ function saveProgress() {
           pp: mv.pp,
         })),
       })),
+      bag: state.bag.map((it) => ({ ...it })),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -466,6 +496,14 @@ function loadProgress() {
         }
         state.party = restored;
       }
+    }
+    if (Array.isArray(data.bag)) {
+      state.bag = data.bag
+        .filter((it) => it && typeof it.id === "string" && typeof it.name === "string")
+        .map((it) => ({
+          ...(ITEM_CATALOG[it.id] || it),
+          qty: Math.max(1, Math.min(99, Number(it.qty) || 1)),
+        }));
     }
   } catch {
     // Ignore malformed saved state
@@ -691,6 +729,7 @@ export function loadZone(target, options = {}) {
   }
 
   heldDirs.clear();
+  engine.loadMapIntoWRAM(zone);
   state.currentZone = zone;
   state.strengthActive = false;
   if (
@@ -1404,8 +1443,64 @@ function checkInGameGiftOrEvent(npc, zone) {
   if (zone.constName === "FIGHTING_DOJO" && upName.includes("HITMONCHAN")) {
     return giveGiftMon("HITMONCHAN", 30); // scripts/FightingDojo.asm:278
   }
-  if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
-    return giveGiftMon("OMANYTE", 30); // scripts/CinnabarLabFossilRoom.asm:79
+  // 3. Canonical Hidden Machine (HM01–HM05), Key Item & Ground Item Ball scripts:
+  if (zone.constName === "SS_ANNE_CAPTAINS_ROOM" && upName.includes("CAPTAIN")) {
+    giveBagItem("HM01_CUT", 1);
+    return `\n\nRED received HM01 (CUT) from the CAPTAIN!`;
+  }
+  if (zone.constName === "ROUTE_16_FLY_HOUSE" && upName.includes("GIRL")) {
+    giveBagItem("HM02_FLY", 1);
+    return `\n\nRED received HM02 (FLY)!`;
+  }
+  if (zone.constName === "SAFARI_ZONE_SECRET_HOUSE" && upName.includes("GURU")) {
+    giveBagItem("HM03_SURF", 1);
+    return `\n\nRED received HM03 (SURF)!`;
+  }
+  if (zone.constName === "WARDENS_HOUSE" && upName.includes("WARDEN")) {
+    giveBagItem("HM04_STRENGTH", 1);
+    return `\n\nRED received HM04 (STRENGTH) from the WARDEN!`;
+  }
+  if (zone.constName === "ROUTE_2_GATE" && upName.includes("AIDE")) {
+    giveBagItem("HM05_FLASH", 1);
+    return `\n\nRED received HM05 (FLASH) from OAK's AIDE!`;
+  }
+  if (zone.constName === "MR_FUJIS_HOUSE" && upName.includes("MR_FUJI")) {
+    giveBagItem("POKE_FLUTE", 1);
+    return `\n\nRED received a POKé FLUTE from MR. FUJI!`;
+  }
+  if (zone.constName === "OAKS_LAB" && upName.includes("OAK")) {
+    giveBagItem("POKE_BALL", 5);
+    return `\n\nPROF. OAK gave RED 5 POKé BALLs!`;
+  }
+  if (npc.sprite === "SPRITE_CLERK") {
+    giveBagItem("POKE_BALL", 5);
+    giveBagItem("POTION", 3);
+    if (zone.constName.startsWith("CELADON_MART")) {
+      giveBagItem("FIRE_STONE", 1);
+      giveBagItem("WATER_STONE", 1);
+      giveBagItem("LEAF_STONE", 1);
+      giveBagItem("THUNDER_STONE", 1);
+    }
+    return `\n\nPicked up POKé BALLs & POTIONs at the POKéMON MART!`;
+  }
+  if (npc.kind === "item" && npc.sprite === "SPRITE_POKE_BALL") {
+    let foundKey = "POTION";
+    if (upName.includes("MOON_STONE")) foundKey = "MOON_STONE";
+    else if (upName.includes("FIRE_STONE")) foundKey = "FIRE_STONE";
+    else if (upName.includes("WATER_STONE")) foundKey = "WATER_STONE";
+    else if (upName.includes("LEAF_STONE")) foundKey = "LEAF_STONE";
+    else if (upName.includes("THUNDER_STONE")) foundKey = "THUNDER_STONE";
+    else if (upName.includes("RARE_CANDY")) foundKey = "RARE_CANDY";
+    else if (upName.includes("FULL_RESTORE")) foundKey = "FULL_RESTORE";
+    else if (upName.includes("SUPER_POTION") || upName.includes("MAX_POTION")) foundKey = "SUPER_POTION";
+    else if (upName.includes("MASTER_BALL")) foundKey = "MASTER_BALL";
+    else if (upName.includes("ULTRA_BALL")) foundKey = "ULTRA_BALL";
+    else if (upName.includes("GREAT_BALL")) foundKey = "GREAT_BALL";
+    else if (upName.includes("BALL")) foundKey = "POKE_BALL";
+    const added = giveBagItem(foundKey, 1);
+    if (added) {
+      return `\n\nRED found ${added.name} and put it in the BAG!`;
+    }
   }
   return "";
 }
@@ -1479,13 +1574,15 @@ export function interactInFront() {
           } else {
             openDialogue(
               "BOULDER",
-              "It's a big boulder, but a POKéMON may be able to move it with HM04 STRENGTH.",
-              {
-                fieldMoveAction: {
-                  label: "🪨 USE HM04 STRENGTH",
-                  moveId: "STRENGTH",
-                },
-              }
+              "It's a big boulder, but a POKéMON may be able to move it.",
+              hasHmOrMove("STRENGTH")
+                ? {
+                    fieldMoveAction: {
+                      label: "🪨 USE HM04 STRENGTH",
+                      moveId: "STRENGTH",
+                    },
+                  }
+                : {}
             );
           }
           return;
@@ -1502,13 +1599,15 @@ export function interactInFront() {
       audio.playSfx("blip");
       openDialogue(
         "SMALL TREE",
-        "This tree can be CUT! Use HM01 CUT to chop it down.",
-        {
-          fieldMoveAction: {
-            label: "🌳 USE HM01 CUT",
-            moveId: "CUT",
-          },
-        }
+        "This tree can be CUT!",
+        hasHmOrMove("CUT")
+          ? {
+              fieldMoveAction: {
+                label: "🌳 USE HM01 CUT",
+                moveId: "CUT",
+              },
+            }
+          : {}
       );
       return;
     }
@@ -1516,13 +1615,15 @@ export function interactInFront() {
       audio.playSfx("blip");
       openDialogue(
         "WATER'S EDGE",
-        "The water is calm and dyed a deep blue. Use HM03 SURF to ride across the water!",
-        {
-          fieldMoveAction: {
-            label: "🌊 USE HM03 SURF",
-            moveId: "SURF",
-          },
-        }
+        "The water is calm and dyed a deep blue.",
+        hasHmOrMove("SURF")
+          ? {
+              fieldMoveAction: {
+                label: "🌊 USE HM03 SURF",
+                moveId: "SURF",
+              },
+            }
+          : {}
       );
       return;
     }
@@ -3815,6 +3916,14 @@ export function renderStartMenu() {
     });
   } else if (sm.subView === "ITEM") {
     subTitle.textContent = `ITEM BAG`;
+    if (state.bag.length === 0) {
+      const emptyEl = document.createElement("div");
+      emptyEl.style.padding = "8px 4px";
+      emptyEl.style.color = "#475569";
+      emptyEl.textContent = "No items in BAG.";
+      subBody.appendChild(emptyEl);
+      return;
+    }
     state.bag.forEach((item) => {
       const row = document.createElement("button");
       row.type = "button";
@@ -4777,6 +4886,8 @@ window.POKEYELLOW = {
   healParty,
   useFieldMove,
   teachHmMove,
+  giveBagItem,
+  hasHmOrMove,
 };
 
 window.addEventListener("DOMContentLoaded", () => {
