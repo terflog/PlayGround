@@ -3938,10 +3938,9 @@ function renderBattleModal() {
               ? "▶"
               : "▷"
             : " ";
-        const iconChar = mon.species === "PIKACHU" ? "⚡" : "◓";
         row.innerHTML = `
           <span class="bcursor">${curChar}</span>
-          <span class="bparty-icon">${iconChar}</span>
+          <canvas class="bparty-icon-canvas" width="16" height="16"></canvas>
           <div class="bparty-main">
             <div class="bparty-top">
               <span>${mon.nickname}${idx === b.activePlayerIdx ? " ★" : ""}</span>
@@ -3954,6 +3953,8 @@ function renderBattleModal() {
           </div>
           <span class="bparty-nums">${mon.hp}/${mon.maxHp}</span>
         `;
+        const iconCanvas = row.querySelector(".bparty-icon-canvas");
+        engine.renderPartyMonIcon(iconCanvas, mon);
         row.onclick = (e) => {
           e.stopPropagation();
           audio.playSfx("blip");
@@ -4886,10 +4887,9 @@ export function renderStartMenu() {
             : idx === sm.partySwitchIdx
             ? "▷"
             : " ";
-        const iconChar = mon.species === "PIKACHU" ? "⚡" : "◓";
         row.innerHTML = `
           <span class="bcursor">${curChar}</span>
-          <span class="bparty-icon">${iconChar}</span>
+          <canvas class="bparty-icon-canvas" width="16" height="16"></canvas>
           <div class="bparty-main">
             <div class="bparty-top">
               <span>${mon.nickname}</span>
@@ -4902,6 +4902,8 @@ export function renderStartMenu() {
           </div>
           <span class="bparty-nums">${String(mon.hp).padStart(2, " ")}/${String(mon.maxHp).padStart(2, " ")}</span>
         `;
+        const iconCanvas = row.querySelector(".bparty-icon-canvas");
+        engine.renderPartyMonIcon(iconCanvas, mon);
         row.onclick = () => {
           audio.playSfx("blip");
           if (sm.partySwitchIdx !== null) {

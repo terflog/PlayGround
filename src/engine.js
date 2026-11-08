@@ -92,8 +92,10 @@ export class PokeYellowEngine {
     this.pokemonSprites = createLazy2BitMap(data.sprites.pokemon, 16);
     this.trainerSprites = createLazy2BitMap(data.sprites.trainers || {}, 8);
 
-    // 1. The 1-Byte Map ID System (0x00..0xFF) & Compressed Map Headers
-    // Single active WRAM map buffer (wOverworldMap: 1300 bytes in Gen I WRAM)
+    // 1. The 1-Byte Map ID System (0x00..0xFF), MBC3 ROM Banking (0x0000-0x3FFF Bank 0 + 0x4000-0x7FFF Swappable Banks 1-63), & FarCall Stack
+    this.hLoadedROMBank = 0x01; // Active 16KB ROM bank mapped at 0x4000–0x7FFF
+    this.bankStack = []; // Hardware stack for Bank 0 FarCall / Bankswitch
+    this.mapHeaderBanks = new Uint8Array(256);
     this.wOverworldMap = new Uint8Array(1600);
     this.wOverworldMapStride = 0;
     this.wCurMapConst = null;
@@ -101,14 +103,16 @@ export class PokeYellowEngine {
     this.mapHeaderById = new Array(256).fill(null);
 
     const self = this;
-    this.allZones = data.zones.map((z) => {
+    this.allZones = data.zones.map((z, idx) => {
       const conns = z.connections || {};
       const connectionsByte =
         (conns.north ? 8 : 0) |
         (conns.south ? 4 : 0) |
         (conns.west ? 2 : 0) |
         (conns.east ? 1 : 0);
-      const copy = { ...z, connectionsByte };
+      const romBank = (idx % 63) + 1; // Banks 0x01..0x3F in MBC3 0x4000-0x7FFF window
+      const romAddress = 0x4000 + ((idx * 184) & 0x3fff);
+      const copy = { ...z, connectionsByte, romBank, romAddress };
       Object.defineProperty(copy, "blockBytes", {
         enumerable: true,
         configurable: true,
@@ -116,7 +120,7 @@ export class PokeYellowEngine {
           if (self.wCurMapConst === z.constName && self.wCurMapBlocks) {
             return self.wCurMapBlocks;
           }
-          return unpackBytes(z.blocks);
+          return self.farCall(romBank, () => unpackBytes(z.blocks));
         },
       });
       return copy;
@@ -132,6 +136,7 @@ export class PokeYellowEngine {
         this.zonesByRomId[z.romId] = z;
         if (z.romId >= 0 && z.romId < 256) {
           this.mapHeaderById[z.romId] = z;
+          this.mapHeaderBanks[z.romId] = z.romBank;
         }
       }
     }
@@ -142,6 +147,27 @@ export class PokeYellowEngine {
     this.paletteMode = "reference"; // "reference" | "sgb" | "cgb" | "dmg"
     this.cutTrees = new Set(); // Step coordinates cleared by HM01 CUT ("ZONE:sx,sy")
     this.flashIlluminated = false; // Dark cave illumination via HM05 FLASH
+  }
+
+  // MBC3 Bank Register Write (0x2000–0x3FFF): Swaps active 16KB ROM bank into 0x4000–0x7FFF window
+  switchRomBank(bankId) {
+    const cleanBank = Math.max(1, Math.min(63, Number(bankId) || 1));
+    this.hLoadedROMBank = cleanBank;
+    return cleanBank;
+  }
+
+  // Bank 0 FarCall_hl / Bankswitch Routine (home/bankswitch.asm):
+  // 1. Push current bank onto stack -> 2. Jump via Bank 0 -> 3. Write target bank to MBC3 -> 4. Run target -> 5. Restore caller bank
+  farCall(targetBank, callback) {
+    const prevBank = this.hLoadedROMBank;
+    this.bankStack.push(prevBank);
+    try {
+      this.switchRomBank(targetBank);
+      return callback();
+    } finally {
+      const restored = this.bankStack.pop() ?? prevBank;
+      this.switchRomBank(restored);
+    }
   }
 
   // 3 & 4. Dynamic Tile Block Mapping + Overworld Connection Vector Stitching into wOverworldMap WRAM
@@ -159,8 +185,8 @@ export class PokeYellowEngine {
     this.wCurMapConst = zone.constName;
     this.wOverworldMap.fill(zone.borderBlock, 0, needed);
 
-    // Stream active map's compressed blocks into WRAM center
-    const curBlocks = unpackBytes(zone.blocks);
+    // FarCall into zone's ROM bank to stream compressed blocks into WRAM center
+    const curBlocks = this.farCall(zone.romBank, () => unpackBytes(zone.blocks));
     this.wCurMapBlocks = curBlocks;
     for (let by = 0; by < h; by++) {
       const srcRow = by * w;
@@ -170,12 +196,12 @@ export class PokeYellowEngine {
       }
     }
 
-    // Stitch 3-block border strips from connected neighbor maps using Connections Byte
+    // Stitch 3-block border strips from connected neighbor maps using FarCall across ROM banks
     const conns = zone.connections || {};
     if ((zone.connectionsByte & 8) && conns.north) {
       const target = this.zonesByConst[conns.north.targetConst];
       if (target) {
-        const nb = unpackBytes(target.blocks);
+        const nb = this.farCall(target.romBank, () => unpackBytes(target.blocks));
         for (let by = -3; by < 0; by++) {
           const ty = target.height + by;
           if (ty < 0 || ty >= target.height) continue;
@@ -192,7 +218,7 @@ export class PokeYellowEngine {
     if ((zone.connectionsByte & 4) && conns.south) {
       const target = this.zonesByConst[conns.south.targetConst];
       if (target) {
-        const nb = unpackBytes(target.blocks);
+        const nb = this.farCall(target.romBank, () => unpackBytes(target.blocks));
         for (let by = h; by < h + 3; by++) {
           const ty = by - h;
           if (ty < 0 || ty >= target.height) continue;
@@ -209,7 +235,7 @@ export class PokeYellowEngine {
     if ((zone.connectionsByte & 2) && conns.west) {
       const target = this.zonesByConst[conns.west.targetConst];
       if (target) {
-        const nb = unpackBytes(target.blocks);
+        const nb = this.farCall(target.romBank, () => unpackBytes(target.blocks));
         for (let by = -3; by < h + 3; by++) {
           const ty = by - conns.west.offset;
           if (ty < 0 || ty >= target.height) continue;
@@ -226,7 +252,7 @@ export class PokeYellowEngine {
     if ((zone.connectionsByte & 1) && conns.east) {
       const target = this.zonesByConst[conns.east.targetConst];
       if (target) {
-        const nb = unpackBytes(target.blocks);
+        const nb = this.farCall(target.romBank, () => unpackBytes(target.blocks));
         for (let by = -3; by < h + 3; by++) {
           const ty = by - conns.east.offset;
           if (ty < 0 || ty >= target.height) continue;
@@ -1099,6 +1125,114 @@ export class PokeYellowEngine {
       pal,
       true
     );
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // Render species-specific sprite indicator for Party Menu (data/pokemon/menu_icons.asm & species sprites)
+  renderPartyMonIcon(canvas, mon) {
+    if (!canvas || !mon) return;
+    const sp = String(mon.species || "PIKACHU").toUpperCase();
+    const dedicated16x16 = {
+      PIKACHU:
+        Array.isArray(mon.moves) && mon.moves.some((m) => m.id === "SURF")
+          ? "surfing_pikachu"
+          : "pikachu",
+      BULBASAUR: "bulbasaur",
+      ODDISH: "oddish",
+      GLOOM: "oddish",
+      VILEPLUME: "oddish",
+      CHANSEY: "chansey",
+      CLEFAIRY: "clefairy",
+      CLEFABLE: "clefairy",
+      JIGGLYPUFF: "jigglypuff",
+      WIGGLYTUFF: "jigglypuff",
+      SANDSHREW: "sandshrew",
+      SANDSLASH: "sandshrew",
+      SNORLAX: "snorlax",
+      SEEL: "seel",
+      DEWGONG: "seel",
+      VOLTORB: "poke_ball",
+      ELECTRODE: "poke_ball",
+      OMANYTE: "fossil",
+      OMASTAR: "fossil",
+      KABUTO: "fossil",
+      KABUTOPS: "fossil",
+    };
+
+    const pal = this.getPaletteColors("PAL_YELLOWMON");
+    const spr16Key = dedicated16x16[sp];
+    if (spr16Key && this.spriteSheets[spr16Key]) {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const imgData = this.getOrCreateImageData(canvas, ctx, 16, 16);
+      imgData.data.fill(0);
+      this.drawSprite16x16(
+        imgData.data,
+        16,
+        16,
+        0,
+        0,
+        spr16Key,
+        "DOWN",
+        (this.animCounter & 1) === 1,
+        false,
+        pal,
+        false
+      );
+      ctx.putImageData(imgData, 0, 0);
+      return;
+    }
+
+    // For all other species, render their tight-cropped specific species sprite with transparent background
+    const spriteObj = this.pokemonSprites[sp] || this.pokemonSprites.PIKACHU;
+    if (!spriteObj) return;
+    if (!spriteObj._bbox) {
+      let minX = spriteObj.width,
+        minY = spriteObj.height,
+        maxX = 0,
+        maxY = 0;
+      for (let y = 0; y < spriteObj.height; y++) {
+        for (let x = 0; x < spriteObj.width; x++) {
+          if (spriteObj.pixels[y * spriteObj.width + x] !== 3) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < minX) {
+        minX = 0;
+        minY = 0;
+        maxX = spriteObj.width - 1;
+        maxY = spriteObj.height - 1;
+      }
+      const bw = maxX - minX + 1;
+      const bh = maxY - minY + 1;
+      const side = Math.max(bw, bh);
+      spriteObj._bbox = { minX, minY, bw, bh, side };
+    }
+
+    const { minX, minY, bw, bh, side } = spriteObj._bbox;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const imgData = this.getOrCreateImageData(canvas, ctx, side, side);
+    const buf = imgData.data;
+    buf.fill(0);
+    const padX = Math.floor((side - bw) / 2);
+    const padY = Math.floor((side - bh) / 2);
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        const val = spriteObj.pixels[(minY + y) * spriteObj.width + (minX + x)];
+        if (val === 3) continue;
+        const c = pal[3 - val];
+        const off = ((padY + y) * side + (padX + x)) * 4;
+        buf[off] = c[0];
+        buf[off + 1] = c[1];
+        buf[off + 2] = c[2];
+        buf[off + 3] = 255;
+      }
+    }
     ctx.putImageData(imgData, 0, 0);
   }
 }
