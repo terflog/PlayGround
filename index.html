@@ -164,35 +164,43 @@
                     </div>
                   </div>
 
-                  <!-- Authentic Game Boy Wild Pokémon Battle Overlay -->
+                  <!-- Authentic Generation I (pret/pokeyellow) Battle Screen & Menu System -->
                   <div id="battle-overlay" class="gb-overlay battle-modal hidden">
                     <div class="gb-battle-screen">
+                      <button type="button" id="battle-exit-btn" class="battle-exit-btn" title="Exit Battle (Esc)">✕</button>
+
+                      <!-- Top Row: Enemy HUD (0,0..11,3) & Front Sprite -->
                       <div class="battle-top-row">
-                        <div class="battle-hud foe-hud">
-                          <div class="battle-hud-line">
-                            <strong id="battle-foe-name">PIDGEY</strong>
-                            <span id="battle-foe-lv">:L3</span>
-                          </div>
-                          <div class="hp-bar-Row">
-                            <span class="hp-tag">HP:</span>
-                            <div class="hp-track">
-                              <div id="battle-foe-hp-fill" class="hp-fill" style="width: 100%"></div>
+                        <div id="battle-foe-hud" class="battle-hud foe-hud">
+                          <div id="battle-foe-balls" class="battle-party-balls hidden"></div>
+                          <div id="battle-foe-mon-info">
+                            <div class="battle-hud-line">
+                              <strong id="battle-foe-name">PIDGEY</strong>
+                              <span id="battle-foe-lv">:L3</span>
+                            </div>
+                            <div class="hp-bar-Row">
+                              <span class="hp-tag">HP:</span>
+                              <div class="hp-track">
+                                <div id="battle-foe-hp-fill" class="hp-fill" style="width: 100%"></div>
+                              </div>
                             </div>
                           </div>
+                          <div class="hud-lbracket foe-bracket"><span class="bracket-tri">◢</span></div>
                         </div>
                         <div class="battle-sprite-box foe-sprite-box">
-                          <canvas id="battle-foe-canvas" width="40" height="40"></canvas>
+                          <canvas id="battle-foe-canvas" width="56" height="56"></canvas>
                         </div>
                       </div>
 
+                      <!-- Middle Row: Player Back Sprite & Player HUD (9,7..19,11) -->
                       <div class="battle-mid-row">
                         <div class="battle-sprite-box player-sprite-box">
                           <canvas id="battle-player-canvas" width="32" height="32"></canvas>
                         </div>
-                        <div class="battle-hud player-hud">
+                        <div id="battle-player-hud" class="battle-hud player-hud">
                           <div class="battle-hud-line">
-                            <strong>PIKACHU</strong>
-                            <span>:L25</span>
+                            <strong id="battle-player-name">PIKACHU</strong>
+                            <span id="battle-player-lv">:L25</span>
                           </div>
                           <div class="hp-bar-Row">
                             <span class="hp-tag">HP:</span>
@@ -200,17 +208,70 @@
                               <div id="battle-player-hp-fill" class="hp-fill" style="width: 100%"></div>
                             </div>
                           </div>
-                          <div id="battle-player-hp-nums" class="hp-nums">68/68</div>
+                          <div id="battle-player-hp-nums" class="hp-nums">68/ 68</div>
+                          <div class="hud-lbracket player-bracket"><span class="bracket-tri">◣</span></div>
                         </div>
                       </div>
 
-                      <div class="battle-bottom-box">
+                      <!-- Bottom Row: MESSAGE_BOX (0,12..19,17) + Overlaid Gen I Battle Menus -->
+                      <div class="battle-bottom-box" id="battle-msg-box">
                         <p id="battle-log-text" class="battle-log-text">Wild PIDGEY appeared!</p>
-                        <div class="battle-actions">
-                          <button type="button" class="battle-btn" data-battle-act="thunderbolt">⚡ THUNDERBOLT</button>
-                          <button type="button" class="battle-btn" data-battle-act="quickattack">💨 QUICK ATTACK</button>
-                          <button type="button" class="battle-btn" data-battle-act="ball">🔴 POKé BALL</button>
-                          <button type="button" class="battle-btn" data-battle-act="run">🏃 RUN / CLOSE</button>
+                        <span id="battle-msg-prompt" class="battle-msg-prompt hidden">▼</span>
+
+                        <!-- BATTLE_MENU_TEMPLATE (8,12..19,17): 2x2 FIGHT / PKMN / ITEM / RUN -->
+                        <div id="battle-main-menu" class="gb-poke-box battle-main-menu hidden" role="menu" aria-label="Battle Command Menu">
+                          <button type="button" class="bmenu-item" data-bmenu-idx="0"><span class="bcursor">▶</span>FIGHT</button>
+                          <button type="button" class="bmenu-item" data-bmenu-idx="1"><span class="bcursor"> </span><span class="pkmn-glyph">PKMN</span></button>
+                          <button type="button" class="bmenu-item" data-bmenu-idx="2"><span class="bcursor"> </span>ITEM</button>
+                          <button type="button" class="bmenu-item" data-bmenu-idx="3"><span class="bcursor"> </span>RUN</button>
+                        </div>
+
+                        <!-- SAFARI_BATTLE_MENU_TEMPLATE (0,12..19,17): BALL× / BAIT / THROW ROCK / RUN -->
+                        <div id="battle-safari-menu" class="gb-poke-box battle-safari-menu hidden" role="menu" aria-label="Safari Battle Menu">
+                          <button type="button" class="bmenu-item" data-smenu-idx="0"><span class="bcursor">▶</span><span id="safari-ball-label">BALL×30</span></button>
+                          <button type="button" class="bmenu-item" data-smenu-idx="1"><span class="bcursor"> </span>BAIT</button>
+                          <button type="button" class="bmenu-item" data-smenu-idx="2"><span class="bcursor"> </span>THROW ROCK</button>
+                          <button type="button" class="bmenu-item" data-smenu-idx="3"><span class="bcursor"> </span>RUN</button>
+                        </div>
+
+                        <!-- MoveSelectionMenu (4,12..19,17) + PrintMenuItem TYPE/PP Box (0,8..10,12) -->
+                        <div id="battle-fight-wrap" class="battle-fight-wrap hidden">
+                          <div id="battle-type-pp-box" class="gb-poke-box battle-type-pp-box">
+                            <div class="type-row">TYPE/</div>
+                            <div id="battle-move-type" class="type-val">ELECTRIC</div>
+                            <div id="battle-move-pp" class="pp-val">15/15</div>
+                          </div>
+                          <div id="battle-moves-box" class="gb-poke-box battle-moves-box" role="menu" aria-label="Move Selection Menu">
+                            <div id="battle-moves-list" class="battle-moves-list"></div>
+                            <button type="button" id="battle-fight-back-btn" class="bmenu-back-hint" title="Back (B / X)">◀B</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- LIST_MENU_BOX (4,2..19,12): Bag Item Menu (DisplayBagMenu) -->
+                      <div id="battle-bag-box" class="gb-poke-box battle-bag-box hidden" role="menu" aria-label="Item Bag Menu">
+                        <div id="battle-bag-list" class="battle-bag-list"></div>
+                      </div>
+
+                      <!-- DisplayPartyMenu (0,0..19,17): Full-Screen Party Menu + SWITCH/STATS/CANCEL -->
+                      <div id="battle-party-screen" class="battle-party-screen hidden">
+                        <div id="battle-party-list" class="battle-party-list"></div>
+                        <div class="gb-poke-box battle-party-footer">
+                          <span id="battle-party-prompt">Choose a POKéMON.</span>
+                          <button type="button" id="battle-party-close-btn" class="bmenu-back-hint">CANCEL (B)</button>
+                        </div>
+
+                        <!-- SWITCH_STATS_CANCEL_MENU_TEMPLATE (11,11..19,17) -->
+                        <div id="battle-party-sub-menu" class="gb-poke-box battle-party-sub-menu hidden" role="menu">
+                          <button type="button" class="bmenu-item" data-psub-act="switch"><span class="bcursor">▶</span>SWITCH</button>
+                          <button type="button" class="bmenu-item" data-psub-act="stats"><span class="bcursor"> </span>STATS</button>
+                          <button type="button" class="bmenu-item" data-psub-act="cancel"><span class="bcursor"> </span>CANCEL</button>
+                        </div>
+
+                        <!-- StatusScreen + StatusScreen2 Modal -->
+                        <div id="battle-stats-modal" class="gb-poke-box battle-stats-modal hidden">
+                          <div id="battle-stats-content" class="battle-stats-content"></div>
+                          <button type="button" id="battle-stats-close-btn" class="bmenu-back-hint">◀ BACK (A/B)</button>
                         </div>
                       </div>
                     </div>
