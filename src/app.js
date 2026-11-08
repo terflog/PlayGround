@@ -571,26 +571,61 @@ function resolveTrainerSpriteKey(trainerClass, trainerSprite, npcSprite) {
   return sprMap[npcSprite] || null;
 }
 
-function getTrainerBattleEntry(npc, zone) {
-  if (!npc || npc.kind === "item") return null;
-  const key = `${zone.constName}:${npc.name}:${npc.id}`;
-  if (npc.battle && Array.isArray(npc.battle.party) && npc.battle.party.length > 0) {
-    const b = npc.battle;
-    const firstMon = b.party[0];
-    return {
-      key,
-      isWild: Boolean(b.isWild),
-      trainerClass: b.trainerClass || null,
-      trainerName: b.isWild ? null : b.trainerName,
-      trainerSprite: resolveTrainerSpriteKey(b.trainerClass, b.trainerSprite, npc.sprite),
-      party: b.party,
-      species: firstMon[1],
-      level: firstMon[0],
-      battleText: b.battleText || "",
-      endBattleText: b.endBattleText || "Impossible! You defeated my POKéMON!",
-    };
+const KANTO_GYM_BADGES = [
+  { id: "BOULDER", name: "BOULDERBADGE", leader: "BROCK", zone: "PEWTER_GYM" },
+  { id: "CASCADE", name: "CASCADEBADGE", leader: "MISTY", zone: "CERULEAN_GYM" },
+  { id: "THUNDER", name: "THUNDERBADGE", leader: "LT.SURGE", zone: "VERMILION_GYM" },
+  { id: "RAINBOW", name: "RAINBOWBADGE", leader: "ERIKA", zone: "CELADON_GYM" },
+  { id: "SOUL", name: "SOULBADGE", leader: "KOGA", zone: "FUCHSIA_GYM" },
+  { id: "MARSH", name: "MARSHBADGE", leader: "SABRINA", zone: "SAFFRON_GYM" },
+  { id: "VOLCANO", name: "VOLCANOBADGE", leader: "BLAINE", zone: "CINNABAR_GYM" },
+  { id: "EARTH", name: "EARTHBADGE", leader: "GIOVANNI", zone: "VIRIDIAN_GYM" },
+];
+
+export function getEarnedBadges() {
+  const earned = [];
+  for (const b of KANTO_GYM_BADGES) {
+    const isEarned = Array.from(state.defeatedTrainers).some((k) =>
+      k.startsWith(`${b.zone}:`) && k.toUpperCase().includes(b.leader.replace(".", "_"))
+    );
+    if (isEarned) earned.push(b);
   }
-  return null;
+  return earned;
+}
+
+function getTrainerBattleEntry(npc, zone) {
+  if (!npc || npc.kind === "item" || !npc.battle) return null;
+  const b = npc.battle;
+  const isGenuineTrainer =
+    Boolean(b.isWild) ||
+    (Boolean(b.trainerClass) && b.trainerClass !== "OPP_PROF_OAK");
+  if (!isGenuineTrainer) return null;
+  if (!Array.isArray(b.party) || b.party.length === 0) return null;
+
+  const key = `${zone.constName}:${npc.name}:${npc.id}`;
+  const isEliteOrChamp =
+    zone.constName === "LORELEIS_ROOM" ||
+    zone.constName === "BRUNOS_ROOM" ||
+    zone.constName === "AGATHAS_ROOM" ||
+    zone.constName === "LANCES_ROOM" ||
+    zone.constName === "CHAMPIONS_ROOM";
+  if (state.defeatedTrainers.has(key) && !isEliteOrChamp) {
+    return null;
+  }
+
+  const firstMon = b.party[0];
+  return {
+    key,
+    isWild: Boolean(b.isWild),
+    trainerClass: b.trainerClass || null,
+    trainerName: b.isWild ? null : b.trainerName,
+    trainerSprite: resolveTrainerSpriteKey(b.trainerClass, b.trainerSprite, npc.sprite),
+    party: b.party,
+    species: firstMon[1],
+    level: firstMon[0],
+    battleText: b.battleText || "",
+    endBattleText: b.endBattleText || "Impossible! You defeated my POKéMON!",
+  };
 }
 
 function findDefaultSpawn(zone, spawnWarpIndex = null) {
@@ -1582,6 +1617,15 @@ function checkInGameGiftOrEvent(npc, zone) {
     giveBagItem("HM05_FLASH", 1);
     return `\n\nRED received HM05 (FLASH) from OAK's AIDE!`;
   }
+  if (zone.constName === "SILPH_CO_11F" && upName.includes("PRESIDENT")) {
+    giveBagItem("MASTER_BALL", 1);
+    return `\n\nPRESIDENT: You saved SILPH CO. from TEAM ROCKET! Please take our secret prototype MASTER BALL!\n\nRED received a MASTER BALL!`;
+  }
+  if (zone.constName === "HALL_OF_FAME" && upName.includes("OAK")) {
+    healParty();
+    const partyNames = state.party.map((m) => `${m.nickname} (:L${m.level})`).join(", ");
+    return `\n\nOAK: Heartfelt congratulations, RED! You and ${partyNames} are now officially recorded in the POKéMON LEAGUE HALL OF FAME!`;
+  }
   if (zone.constName === "MR_FUJIS_HOUSE" && upName.includes("MR_FUJI")) {
     giveBagItem("POKE_FLUTE", 1);
     return `\n\nRED received a POKé FLUTE from MR. FUJI!`;
@@ -1989,7 +2033,13 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
   const giftSuffix = checkInGameGiftOrEvent(npc, zone);
   audio.playSfx("blip");
   const trainerEntry = getTrainerBattleEntry(npc, zone);
-  openDialogue(npc.name.replace(/_/g, " "), npc.text + giftSuffix, {
+  const npcKey = `${zone.constName}:${npc.name}:${npc.id}`;
+  const isDefeated = state.defeatedTrainers.has(npcKey);
+  const baseText =
+    isDefeated && npc.battle?.afterBattleText
+      ? npc.battle.afterBattleText
+      : npc.text;
+  openDialogue(npc.name.replace(/_/g, " "), baseText + giftSuffix, {
     trainerBattle: trainerEntry,
   });
 }
@@ -2831,11 +2881,43 @@ function handleEnemyFainted(b, msgs) {
       if (b.trainerKey) {
         state.defeatedTrainers.add(b.trainerKey);
         saveProgress();
+        // If Game Corner Rocket guarding poster is defeated, he steps away
+        if (b.trainerKey.startsWith("GAME_CORNER:GAMECORNER_ROCKET")) {
+          const rNpc = state.npcs.find((n) => n.name === "GAMECORNER_ROCKET");
+          if (rNpc) rNpc.collected = true;
+        }
       }
       b.showTrainerSprite = Boolean(b.trainerSprite);
       msgs.push(`RED defeated\n${b.trainerName}!`);
       if (b.endBattleText) {
         msgs.push(b.endBattleText.split("\n\n")[0]);
+      }
+      // Check if defeated trainer is a Kanto Gym Leader
+      const gymBadge = KANTO_GYM_BADGES.find(
+        (gb) =>
+          b.trainerKey &&
+          b.trainerKey.startsWith(`${gb.zone}:`) &&
+          b.trainerKey.toUpperCase().includes(gb.leader.replace(".", "_"))
+      );
+      if (gymBadge) {
+        modifyPikachuHappiness("GYMLEADER");
+        msgs.push(`RED received the\n${gymBadge.name}!`);
+      }
+      // Check if defeated trainer is Champion Rival Blue in Champions Room
+      if (b.trainerKey && b.trainerKey.startsWith("CHAMPIONS_ROOM:")) {
+        msgs.push(
+          `OAK: RED! You have\nbecome the new\nPOKéMON LEAGUE CHAMPION!`
+        );
+        b.onComplete = () => {
+          loadZone("HALL_OF_FAME", { x: 5, y: 5, dir: "UP" });
+          const partySummary = state.party
+            .map((m) => `${m.nickname} (:L${m.level})`)
+            .join(", ");
+          openDialogue(
+            "INDIGO PLATEAU — HALL OF FAME",
+            `OAK: Welcome to the HALL OF FAME, RED!\n\nPOKéMON LEAGUE CHAMPIONS:\nRED & ${partySummary}\n\nCongratulations on completing your KANTO journey!`
+          );
+        };
       }
     }
     syncBattleTopLevelProps(b);
@@ -4494,6 +4576,13 @@ export function renderStartMenu() {
     });
   } else if (sm.subView === "RED") {
     subTitle.textContent = `TRAINER CARD — RED`;
+    const earnedIds = new Set(getEarnedBadges().map((b) => b.id));
+    const badgeLine1 = KANTO_GYM_BADGES.slice(0, 4)
+      .map((b) => `${earnedIds.has(b.id) ? "●" : "○"} ${b.id}`)
+      .join(" ");
+    const badgeLine2 = KANTO_GYM_BADGES.slice(4, 8)
+      .map((b) => `${earnedIds.has(b.id) ? "●" : "○"} ${b.id}`)
+      .join(" ");
     subBody.innerHTML = `
       <div class="stats-top-grid">
         <canvas id="start-red-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
@@ -4506,7 +4595,7 @@ export function renderStartMenu() {
       <div><strong>KANTO ZONES VISITED:</strong> ${state.visitedZones.size} / 220</div>
       <div><strong>POKéDEX OWNED:</strong> ${state.caughtPokemon.size} / 151</div>
       <div><strong>TRAINERS DEFEATED:</strong> ${state.defeatedTrainers.size}</div>
-      <div><strong>BADGES:</strong> ● BOULDER ● CASCADE ● THUNDER ● RAINBOW</div>
+      <div><strong>BADGES (${earnedIds.size}/8):</strong><br/>${badgeLine1}<br/>${badgeLine2}</div>
     `;
     const rc = document.getElementById("start-red-canvas");
     const spr = engine.trainerSprites.BROCK || engine.pokemonSprites.PIKACHU;
