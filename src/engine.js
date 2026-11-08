@@ -287,15 +287,18 @@ export class PokeYellowEngine {
 
   // Get 8x8 tile ID at 8x8 tile coordinate (tx, ty) in zone
   getTileIdAt8x8(zone, tx, ty) {
+    if (!zone) return 0;
     const bx = Math.floor(tx / 4);
     const by = Math.floor(ty / 4);
     const subX = ((tx % 4) + 4) % 4;
     const subY = ((ty % 4) + 4) % 4;
     const blockId = this.getBlockAt(zone, bx, by);
     const ts = this.tilesetsByConst[zone.tileset];
+    if (!ts) return 0;
     const bst = this.bstData[ts.bstKey];
+    if (!bst) return 0;
     const offset = blockId * 16 + subY * 4 + subX;
-    return offset < bst.length ? bst[offset] : 0;
+    return offset >= 0 && offset < bst.length ? bst[offset] : 0;
   }
 
   // In Pokémon Gen I (engine/overworld/player_state.asm _GetTileAndCoordsInFrontOfPlayer),
@@ -306,7 +309,9 @@ export class PokeYellowEngine {
   }
 
   isStepPassable(zone, fromStepX, fromStepY, toStepX, toStepY) {
+    if (!zone) return false;
     const ts = this.tilesetsByConst[zone.tileset];
+    if (!ts) return false;
     const targetTile = this.getCollisionTileAtStep(zone, toStepX, toStepY);
     if (!ts.passableSet.has(targetTile)) {
       return false;
@@ -438,37 +443,40 @@ export class PokeYellowEngine {
     const sheet = this.spriteSheets[spriteKey] || this.spriteSheets.red;
     if (!sheet) return;
 
-    let frameIdx = 0;
-    let flipX = false;
+      let frameIdx = 0;
+      let flipX = false;
 
-    if (sheet.height >= 96) {
-      if (dir === "DOWN") {
-        frameIdx = walking ? 3 : 0;
-        flipX = walking && flipWalk;
-      } else if (dir === "UP") {
-        frameIdx = walking ? 4 : 1;
-        flipX = walking && flipWalk;
-      } else if (dir === "LEFT") {
-        frameIdx = walking ? 5 : 2;
-        flipX = false;
-      } else if (dir === "RIGHT") {
-        frameIdx = walking ? 5 : 2;
-        flipX = true;
+      if (sheet.height >= 96) {
+        if (dir === "DOWN") {
+          frameIdx = walking ? 3 : 0;
+          flipX = walking && flipWalk;
+        } else if (dir === "UP") {
+          frameIdx = walking ? 4 : 1;
+          flipX = walking && flipWalk;
+        } else if (dir === "LEFT") {
+          frameIdx = walking ? 5 : 2;
+          flipX = false;
+        } else if (dir === "RIGHT") {
+          frameIdx = walking ? 5 : 2;
+          flipX = true;
+        }
+      } else if (sheet.height >= 48) {
+        if (dir === "DOWN") frameIdx = 0;
+        else if (dir === "UP") frameIdx = 1;
+        else if (dir === "LEFT") frameIdx = 2;
+        else if (dir === "RIGHT") {
+          frameIdx = 2;
+          flipX = true;
+        }
+      } else {
+        frameIdx = 0;
       }
-    } else if (sheet.height >= 48) {
-      if (dir === "DOWN") frameIdx = 0;
-      else if (dir === "UP") frameIdx = 1;
-      else if (dir === "LEFT") frameIdx = 2;
-      else if (dir === "RIGHT") {
-        frameIdx = 2;
-        flipX = true;
-      }
-    } else {
-      frameIdx = 0;
-    }
 
-    const srcY0 = frameIdx * 16;
-    const accent = this.getSpriteAccentColor(spriteKey, this.paletteMode, pal);
+      if ((frameIdx + 1) * 16 > sheet.height) {
+        frameIdx = 0;
+      }
+      const srcY0 = frameIdx * 16;
+      const accent = this.getSpriteAccentColor(spriteKey, this.paletteMode, pal);
 
     for (let py = 0; py < 16; py++) {
       const dy = destY + py;
@@ -892,10 +900,11 @@ export class PokeYellowEngine {
   }
 
   render2BitGraphicToCanvas(canvas, spriteObj, palName = "PAL_YELLOWMON") {
-    if (!spriteObj) return;
+    if (!canvas || !spriteObj) return;
     canvas.width = spriteObj.width;
     canvas.height = spriteObj.height;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     const imgData = ctx.createImageData(spriteObj.width, spriteObj.height);
     const pal = this.getPaletteColors(palName);
     this.drawRaw2BitSprite(

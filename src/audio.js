@@ -6,23 +6,28 @@ export class GameBoyAudio {
     this.enabled = false;
     this.currentTrackName = null;
     this.timers = [];
+    this.sfxTimers = [];
     this.activeOscillators = new Set();
     this.masterGain = null;
   }
 
   init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return false;
-      this.ctx = new AudioCtx();
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.14;
-      this.masterGain.connect(this.ctx.destination);
+    try {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return false;
+        this.ctx = new AudioCtx();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.14;
+        this.masterGain.connect(this.ctx.destination);
+      }
+      if (this.ctx.state === "suspended") {
+        this.ctx.resume().catch(() => {});
+      }
+      return true;
+    } catch {
+      return false;
     }
-    if (this.ctx.state === "suspended") {
-      this.ctx.resume();
-    }
-    return true;
   }
 
   toggle() {
@@ -41,6 +46,8 @@ export class GameBoyAudio {
   stopMusic() {
     for (const t of this.timers) clearTimeout(t);
     this.timers = [];
+    for (const t of this.sfxTimers) clearTimeout(t);
+    this.sfxTimers = [];
     for (const osc of this.activeOscillators) {
       try {
         osc.stop();
@@ -101,50 +108,64 @@ export class GameBoyAudio {
 
   playNote(freq, durMs, type = "square", volume = 0.25) {
     if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, now);
+    if (!Number.isFinite(freq) || freq <= 0) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(Math.max(20, Math.min(20000, freq)), now);
 
-    const durSec = durMs / 1000;
-    gain.gain.setValueAtTime(volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + durSec);
+      const durSec = Math.max(0.015, (Number(durMs) || 40) / 1000);
+      const safeVol = Math.max(0.002, Math.min(1, Number(volume) || 0.25));
+      gain.gain.setValueAtTime(safeVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + durSec);
 
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-    osc.start(now);
-    osc.stop(now + durSec + 0.01);
-    this.activeOscillators.add(osc);
-    osc.onended = () => {
-      this.activeOscillators.delete(osc);
-      gain.disconnect();
-    };
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + durSec + 0.01);
+      this.activeOscillators.add(osc);
+      osc.onended = () => {
+        this.activeOscillators.delete(osc);
+        try {
+          gain.disconnect();
+        } catch {}
+      };
+    } catch {}
   }
 
   playSfx(kind) {
     if (!this.enabled) return;
     if (!this.init()) return;
+    const schedule = (fn, delay) => {
+      const id = setTimeout(() => {
+        const idx = this.sfxTimers.indexOf(id);
+        if (idx !== -1) this.sfxTimers.splice(idx, 1);
+        if (this.enabled) fn();
+      }, delay);
+      this.sfxTimers.push(id);
+    };
     if (kind === "blip") {
       this.playNote(987.77, 45, "square", 0.35);
-      setTimeout(() => this.playNote(1318.51, 55, "square", 0.35), 40);
+      schedule(() => this.playNote(1318.51, 55, "square", 0.35), 40);
     } else if (kind === "warp") {
       [523, 659, 784, 1046].forEach((f, i) => {
-        setTimeout(() => this.playNote(f, 55, "square", 0.35), i * 45);
+        schedule(() => this.playNote(f, 55, "square", 0.35), i * 45);
       });
     } else if (kind === "ledge") {
       [440, 587, 784].forEach((f, i) => {
-        setTimeout(() => this.playNote(f, 50, "square", 0.3), i * 38);
+        schedule(() => this.playNote(f, 50, "square", 0.3), i * 38);
       });
     } else if (kind === "bump") {
       this.playNote(130, 80, "square", 0.3);
     } else if (kind === "pika") {
       [1174, 1480, 1318, 1760].forEach((f, i) => {
-        setTimeout(() => this.playNote(f, 65, "square", 0.4), i * 60);
+        schedule(() => this.playNote(f, 65, "square", 0.4), i * 60);
       });
     } else if (kind === "thunder") {
       [1567, 1318, 1046, 880, 1760, 1396].forEach((f, i) => {
-        setTimeout(() => this.playNote(f, 55, "sawtooth", 0.4), i * 45);
+        schedule(() => this.playNote(f, 55, "sawtooth", 0.4), i * 45);
       });
     }
   }

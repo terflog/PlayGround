@@ -355,6 +355,27 @@ function saveProgress() {
       visitedZones: Array.from(state.visitedZones),
       caughtPokemon: Array.from(state.caughtPokemon),
       defeatedTrainers: Array.from(state.defeatedTrainers),
+      friendship: state.pikachu.friendship,
+      events: { ...state.events },
+      paletteMode: engine.paletteMode,
+      wildEncountersEnabled: state.wildEncountersEnabled,
+      party: state.party.map((m) => ({
+        species: m.species,
+        nickname: m.nickname,
+        level: m.level,
+        hp: m.hp,
+        maxHp: m.maxHp,
+        atk: m.atk,
+        def: m.def,
+        spd: m.spd,
+        spc: m.spc,
+        status: m.status,
+        exp: m.exp || 0,
+        moves: (m.moves || []).map((mv) => ({
+          id: mv.id,
+          pp: mv.pp,
+        })),
+      })),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -368,14 +389,84 @@ function loadProgress() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return;
     if (Array.isArray(data.visitedZones)) {
-      data.visitedZones.forEach((z) => state.visitedZones.add(z));
+      data.visitedZones.forEach((z) => {
+        if (typeof z === "string" && engine.zonesByConst[z]) {
+          state.visitedZones.add(z);
+        }
+      });
     }
     if (Array.isArray(data.caughtPokemon)) {
-      data.caughtPokemon.forEach((p) => state.caughtPokemon.add(p));
+      data.caughtPokemon.forEach((p) => {
+        if (typeof p === "string" && POKEYELLOW_DATA.battle?.pokemonStats?.[p]) {
+          state.caughtPokemon.add(p);
+        }
+      });
     }
     if (Array.isArray(data.defeatedTrainers)) {
-      data.defeatedTrainers.forEach((t) => state.defeatedTrainers.add(t));
+      data.defeatedTrainers.forEach((t) => {
+        if (typeof t === "string") state.defeatedTrainers.add(t);
+      });
+    }
+    if (typeof data.friendship === "number" && Number.isFinite(data.friendship)) {
+      state.pikachu.friendship = Math.max(0, Math.min(255, Math.round(data.friendship)));
+    }
+    if (data.events && typeof data.events === "object") {
+      state.events.enteredBluesHouse = Boolean(data.events.enteredBluesHouse);
+      state.events.gotTownMap = Boolean(data.events.gotTownMap);
+      state.events.daisyWalking = Boolean(data.events.daisyWalking);
+    }
+    if (
+      typeof data.paletteMode === "string" &&
+      ["reference", "sgb", "cgb", "dmg"].includes(data.paletteMode)
+    ) {
+      engine.paletteMode = data.paletteMode;
+    }
+    if (typeof data.wildEncountersEnabled === "boolean") {
+      state.wildEncountersEnabled = data.wildEncountersEnabled;
+    }
+    if (Array.isArray(data.party) && data.party.length > 0) {
+      const restored = [];
+      for (const savedMon of data.party.slice(0, 6)) {
+        if (!savedMon || typeof savedMon.species !== "string") continue;
+        const sp = savedMon.species.toUpperCase();
+        if (!POKEYELLOW_DATA.battle?.pokemonStats?.[sp]) continue;
+        const moveIds = Array.isArray(savedMon.moves)
+          ? savedMon.moves.map((mv) => (typeof mv === "string" ? mv : mv?.id)).filter(Boolean)
+          : null;
+        const mon = buildMonInstance(sp, savedMon.level || 5, moveIds);
+        if (typeof savedMon.nickname === "string" && savedMon.nickname.trim()) {
+          mon.nickname = savedMon.nickname.trim().slice(0, 12);
+        }
+        if (typeof savedMon.hp === "number" && Number.isFinite(savedMon.hp)) {
+          mon.hp = Math.max(0, Math.min(mon.maxHp, Math.round(savedMon.hp)));
+        }
+        if (
+          typeof savedMon.status === "string" &&
+          ["OK", "PAR", "PSN", "SLP", "BRN", "FRZ"].includes(savedMon.status)
+        ) {
+          mon.status = mon.hp > 0 ? savedMon.status : "OK";
+        }
+        if (typeof savedMon.exp === "number" && Number.isFinite(savedMon.exp)) {
+          mon.exp = Math.max(0, Math.floor(savedMon.exp));
+        }
+        if (Array.isArray(savedMon.moves)) {
+          mon.moves.forEach((mv, idx) => {
+            const savedMv = savedMon.moves[idx];
+            if (savedMv && typeof savedMv.pp === "number" && Number.isFinite(savedMv.pp)) {
+              mv.pp = Math.max(0, Math.min(mv.maxPp, Math.round(savedMv.pp)));
+            }
+          });
+        }
+        restored.push(mon);
+      }
+      if (restored.length > 0 && restored.some((m) => m.species === "PIKACHU")) {
+        if (restored.every((m) => m.hp <= 0)) {
+          restored[0].hp = restored[0].maxHp;
+        }
+        state.party = restored;
+      }
     }
   } catch {
     // Ignore malformed saved state
@@ -590,11 +681,31 @@ export function loadZone(target, options = {}) {
     }
   }
 
+  // Ensure elevator maps always have a valid return floor if entered directly
+  if (ELEVATOR_FLOORS[zone.constName] && !state.selectedElevatorDest[zone.constName]) {
+    const prevConst = state.currentZone?.constName;
+    const matchFloor = ELEVATOR_FLOORS[zone.constName].find(
+      (f) => f.destConst === prevConst
+    );
+    state.selectedElevatorDest[zone.constName] =
+      matchFloor || ELEVATOR_FLOORS[zone.constName][0];
+  }
+
+  heldDirs.clear();
   state.currentZone = zone;
   state.visitedZones.add(zone.constName);
   saveProgress();
   state.npcs = initZoneNpcs(zone);
-  state.dialogue = null;
+  if (state.dialogue) {
+    state.dialogue = null;
+    renderDialogueModal();
+  }
+  if (state.startMenu.open) {
+    state.startMenu.open = false;
+    state.startMenu.subView = null;
+    state.startMenu.selectedDexSpecies = null;
+    renderStartMenu();
+  }
 
   const spawn =
     options.x !== undefined && options.y !== undefined
@@ -655,28 +766,43 @@ function triggerEmote(emoteKey, durationMs = 1500) {
 }
 
 function resolveWarpDestination(zone, warp) {
-  let destConst = warp.destConst;
-  let destWarpIdx = warp.destWarpIndex;
-  if (destConst === "LAST_MAP") {
+  let destConst = warp?.destConst || "PALLET_TOWN";
+  let destWarpIdx = warp?.destWarpIndex ?? 0;
+
+  // Check if we are exiting an elevator that had a floor chosen or default floor
+  if (ELEVATOR_FLOORS[zone.constName]) {
+    const chosen =
+      state.selectedElevatorDest[zone.constName] ||
+      ELEVATOR_FLOORS[zone.constName][0];
+    if (chosen) {
+      destConst = chosen.destConst;
+      destWarpIdx = chosen.warpIndex;
+    }
+  }
+
+  if (destConst === "LAST_MAP" || !engine.zonesByConst[destConst]) {
     if (
       state.lastOutdoorMap &&
       engine.zonesByConst[state.lastOutdoorMap.mapConst]
     ) {
       destConst = state.lastOutdoorMap.mapConst;
-    } else if (zone.defaultParent) {
+      if (state.lastOutdoorMap.warpIndex !== undefined) {
+        destWarpIdx = state.lastOutdoorMap.warpIndex;
+      }
+    } else if (zone.defaultParent && engine.zonesByConst[zone.defaultParent.mapConst]) {
       destConst = zone.defaultParent.mapConst;
+      destWarpIdx = zone.defaultParent.warpIndex ?? 0;
     } else {
       destConst = "PALLET_TOWN";
+      destWarpIdx = 0;
     }
   }
-  // Check if we are exiting an elevator that had a floor chosen
-  if (
-    ELEVATOR_FLOORS[zone.constName] &&
-    state.selectedElevatorDest[zone.constName]
-  ) {
-    const chosen = state.selectedElevatorDest[zone.constName];
-    destConst = chosen.destConst;
-    destWarpIdx = chosen.warpIndex;
+
+  const targetZone = engine.zonesByConst[destConst];
+  if (targetZone && targetZone.warps.length > 0) {
+    if (destWarpIdx < 0 || destWarpIdx >= targetZone.warps.length) {
+      destWarpIdx = 0;
+    }
   }
   return { destConst, destWarpIdx };
 }
@@ -703,7 +829,7 @@ function isWaterTile(zone, tileId) {
 }
 
 function attemptStep(dir) {
-  if (state.dialogue || state.battle) return;
+  if (state.dialogue || state.battle || state.startMenu.open) return;
   if (state.player.moveAnim) return;
 
   const zone = state.currentZone;
@@ -1211,6 +1337,13 @@ function openElevatorMenu(elevatorConst) {
 }
 
 export function openDialogue(title, rawText, extra = {}) {
+  heldDirs.clear();
+  if (state.startMenu.open) {
+    state.startMenu.open = false;
+    state.startMenu.subView = null;
+    state.startMenu.selectedDexSpecies = null;
+    renderStartMenu();
+  }
   const pages = String(rawText || "")
     .split(/\n\n+/)
     .map((p) => p.trim())
@@ -1294,6 +1427,34 @@ function calcGen1Damage(attacker, defender, move) {
 }
 
 export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
+  heldDirs.clear();
+  if (state.dialogue) {
+    state.dialogue = null;
+    renderDialogueModal();
+  }
+  if (state.startMenu.open) {
+    state.startMenu.open = false;
+    state.startMenu.subView = null;
+    state.startMenu.selectedDexSpecies = null;
+    renderStartMenu();
+  }
+  if (state.player.moveAnim) {
+    state.player.x = state.player.moveAnim.toX;
+    state.player.y = state.player.moveAnim.toY;
+    state.player.renderX = state.player.x;
+    state.player.renderY = state.player.y;
+    state.player.walking = false;
+    state.player.moveAnim = null;
+  }
+  if (state.pikachu.moveAnim) {
+    state.pikachu.x = state.pikachu.moveAnim.toX;
+    state.pikachu.y = state.pikachu.moveAnim.toY;
+    state.pikachu.renderX = state.pikachu.x;
+    state.pikachu.renderY = state.pikachu.y;
+    state.pikachu.walking = false;
+    state.pikachu.moveAnim = null;
+  }
+
   initDefaultParty();
   // Ensure at least one party Pokémon is conscious
   if (state.party.every((m) => m.hp <= 0)) {
@@ -1310,13 +1471,18 @@ export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
   } else {
     let level = 5;
     let species = "PIDGEY";
-    if (Array.isArray(poolOrEntry) && Array.isArray(poolOrEntry[0])) {
+    if (Array.isArray(poolOrEntry) && poolOrEntry.length > 0 && Array.isArray(poolOrEntry[0])) {
       const pick = poolOrEntry[Math.floor(Math.random() * poolOrEntry.length)];
-      level = pick[0];
-      species = pick[1];
-    } else if (Array.isArray(poolOrEntry)) {
-      level = poolOrEntry[0];
-      species = poolOrEntry[1];
+      level = pick[0] ?? 5;
+      species = pick[1] || "PIDGEY";
+    } else if (Array.isArray(poolOrEntry) && poolOrEntry.length >= 2) {
+      level = poolOrEntry[0] ?? 5;
+      species = poolOrEntry[1] || "PIDGEY";
+    } else if (typeof poolOrEntry === "string" && poolOrEntry.trim()) {
+      species = poolOrEntry.trim().toUpperCase();
+    } else if (poolOrEntry && typeof poolOrEntry === "object" && poolOrEntry.species) {
+      species = poolOrEntry.species;
+      level = poolOrEntry.level ?? 5;
     }
     enemyParty = [buildMonInstance(species, level)];
   }
@@ -1712,10 +1878,18 @@ export function levelUpPokemon(mon, msgs = [], options = {}) {
 function awardExpAndCheckLevelUp(mon, expGain, msgs) {
   if (!mon || mon.level >= 100) return;
   mon.exp = (mon.exp || 0) + expGain;
-  const needed = Math.max(20, mon.level * mon.level * 2);
-  if (mon.exp >= needed) {
+  let levelsGained = 0;
+  let hasQueuedEvo = false;
+  while (mon.level < 100 && levelsGained < 10) {
+    const needed = Math.max(20, mon.level * mon.level * 2);
+    if (mon.exp < needed) break;
     mon.exp -= needed;
-    levelUpPokemon(mon, msgs, { interactive: true });
+    levelsGained++;
+    const prevLen = msgs.length;
+    levelUpPokemon(mon, msgs, { interactive: !hasQueuedEvo });
+    if (msgs.slice(prevLen).some((m) => typeof m === "object" && m.type === "EVOLVE")) {
+      hasQueuedEvo = true;
+    }
   }
 }
 
@@ -1778,16 +1952,35 @@ function executePlayerMove(moveIndex) {
   if (!b || b.finished) return;
   const pMon = state.party[b.activePlayerIdx];
   const foe = b.enemyParty[b.activeEnemyIdx];
-  const move = pMon.moves[moveIndex];
+  if (!pMon || !foe) return;
+  if (!Array.isArray(pMon.moves) || pMon.moves.length === 0) {
+    pMon.moves = [getMoveObj("TACKLE")];
+  }
+  const safeIdx = Math.max(0, Math.min(pMon.moves.length - 1, Number(moveIndex) || 0));
+  let move = pMon.moves[safeIdx];
   if (!move) return;
 
   if (move.pp <= 0) {
-    audio.playSfx("bump");
-    queueBattleMessages([`No PP left for\nthis move!`], "FIGHT_MENU");
-    return;
+    const hasAnyPp = pMon.moves.some((mv) => mv && mv.pp > 0);
+    if (hasAnyPp) {
+      audio.playSfx("bump");
+      queueBattleMessages([`No PP left for\nthis move!`], "FIGHT_MENU");
+      return;
+    }
+    // Gen I STRUGGLE fallback when all moves are out of PP
+    move = {
+      id: "STRUGGLE",
+      name: "STRUGGLE",
+      type: "NORMAL",
+      power: 50,
+      accuracy: 100,
+      pp: 1,
+      maxPp: 1,
+      effect: "RECOIL_EFFECT",
+    };
   }
 
-  b.moveCursor = moveIndex;
+  b.moveCursor = safeIdx;
   audio.playSfx("thunder");
 
   const msgs = [];
@@ -2508,11 +2701,16 @@ function renderBattleModal() {
   if (fightWrap) {
     if (b.menuState === "FIGHT_MENU") {
       fightWrap.classList.remove("hidden");
-      const curMove = pMon.moves[b.moveCursor] || pMon.moves[0];
-      document.getElementById("battle-move-type").textContent = curMove.type;
-      document.getElementById("battle-move-pp").textContent = `${String(
-        curMove.pp
-      ).padStart(2, " ")}/${String(curMove.maxPp).padStart(2, " ")}`;
+      const curMove =
+        pMon.moves[b.moveCursor] || pMon.moves[0] || getMoveObj("TACKLE");
+      const moveTypeEl = document.getElementById("battle-move-type");
+      const movePpEl = document.getElementById("battle-move-pp");
+      if (moveTypeEl) moveTypeEl.textContent = curMove.type;
+      if (movePpEl) {
+        movePpEl.textContent = `${String(curMove.pp).padStart(2, " ")}/${String(
+          curMove.maxPp
+        ).padStart(2, " ")}`;
+      }
 
       const movesList = document.getElementById("battle-moves-list");
       movesList.innerHTML = "";
@@ -2894,13 +3092,24 @@ function updateCoordinatesUI() {
 
 function updateUIForCurrentZone() {
   const z = state.currentZone;
-  document.getElementById("active-zone-badge").textContent = `ZONE #${String(
-    z.zoneNumber
-  ).padStart(3, "0")} / 220`;
-  document.getElementById("active-zone-title").textContent = z.displayName;
-  document.getElementById("active-zone-subtitle").textContent = `${z.constName} (ROM ${z.romHex}) • ${z.regionName} • ${z.width}×${z.height} Blocks (${z.width * 32}×${z.height * 32} px) • Tileset: ${z.tileset}`;
+  if (!z) return;
+  const badgeEl = document.getElementById("active-zone-badge");
+  if (badgeEl) {
+    badgeEl.textContent = `ZONE #${String(z.zoneNumber).padStart(3, "0")} / 220`;
+  }
+  const titleEl = document.getElementById("active-zone-title");
+  if (titleEl) {
+    titleEl.textContent = z.displayName;
+  }
+  const subEl = document.getElementById("active-zone-subtitle");
+  if (subEl) {
+    subEl.textContent = `${z.constName} (ROM ${z.romHex}) • ${z.regionName} • ${z.width}×${z.height} Blocks (${z.width * 32}×${z.height * 32} px) • Tileset: ${z.tileset}`;
+  }
 
-  document.getElementById("visited-counter").textContent = `${state.visitedZones.size} / 220 Visited`;
+  const visitedEl = document.getElementById("visited-counter");
+  if (visitedEl) {
+    visitedEl.textContent = `${state.visitedZones.size} / 220 Visited`;
+  }
   const caughtEl = document.getElementById("caught-counter");
   if (caughtEl) {
     caughtEl.textContent = `🔴 ${state.caughtPokemon.size} Caught`;
@@ -2916,6 +3125,7 @@ function updateUIForCurrentZone() {
 
   // Update Connections & Warps inspector
   const connBox = document.getElementById("inspector-connections");
+  if (!connBox) return;
   connBox.innerHTML = "";
   const dirs = ["north", "south", "west", "east"];
   let hasConns = false;
@@ -3061,6 +3271,7 @@ const START_MENU_SECTIONS = [
 
 export function toggleStartMenu() {
   if (state.battle || state.dialogue) return;
+  heldDirs.clear();
   state.startMenu.open = !state.startMenu.open;
   state.startMenu.subView = null;
   state.startMenu.selectedDexSpecies = null;
@@ -3697,6 +3908,16 @@ function setupControlsAndEvents() {
     }
   });
 
+  window.addEventListener("blur", () => {
+    heldDirs.clear();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      heldDirs.clear();
+    }
+  });
+
   // On-screen D-pad & A/B buttons
   document.querySelectorAll("[data-dpad]").forEach((btn) => {
     const dir = btn.dataset.dpad;
@@ -3719,6 +3940,7 @@ function setupControlsAndEvents() {
     btn.addEventListener("mouseleave", endHold);
     btn.addEventListener("touchstart", startHold, { passive: false });
     btn.addEventListener("touchend", endHold);
+    btn.addEventListener("touchcancel", endHold);
   });
 
   document.getElementById("btn-gb-a")?.addEventListener("click", () => {
