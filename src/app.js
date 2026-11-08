@@ -24,12 +24,23 @@ const state = {
   searchQuery: "",
   townMapFilterCoords: null,
   visitedZones: new Set(["PALLET_TOWN"]),
-  caughtPokemon: new Set(["PIKACHU"]),
+  caughtPokemon: new Set(),
   defeatedTrainers: new Set(),
   events: {
+    oakRescuedInGrass: false, // EVENT_FOLLOWED_OAK_INTO_LAB (scripts/PalletTown.asm)
+    gotStarterPikachu: false, // EVENT_GOT_STARTER (scripts/OaksLab.asm:1033)
+    battledRivalInLab: false, // EVENT_BATTLED_RIVAL_IN_OAKS_LAB (scripts/OaksLab.asm)
     enteredBluesHouse: false, // EVENT_ENTERED_BLUES_HOUSE (scripts/BluesHouse.asm:14)
     gotTownMap: false, // EVENT_GOT_TOWN_MAP (scripts/BluesHouse.asm:47)
     daisyWalking: false, // EVENT_DAISY_WALKING (scripts/PalletTown.asm:208)
+    gotPotionSample: false, // EVENT_GOT_POTION_SAMPLE (scripts/Route1.asm:24)
+    gotOaksParcel: false, // EVENT_GOT_OAKS_PARCEL (scripts/ViridianMart.asm:34)
+    gotPokedex: false, // EVENT_GOT_POKEDEX (scripts/OaksLab.asm:549)
+    seenOldManTutorial: false, //Viridian City Old Man Catching Tutorial (scripts/ViridianCity.asm)
+    helpedBill: false, // EVENT_HELPED_BILL_AT_CAPE (scripts/BillsHouse.asm)
+    rescuedMrFuji: false, // EVENT_RESCUED_MR_FUJI (scripts/PokemonTower7F.asm)
+    wokeRoute12Snorlax: false, // EVENT_FIGHT_ROUTE12_SNORLAX (scripts/Route12.asm)
+    wokeRoute16Snorlax: false, // EVENT_FIGHT_ROUTE16_SNORLAX (scripts/Route16.asm)
   },
   party: [],
   bag: [], // Player starts with 0 items; items and HMs are acquired in-game!
@@ -53,9 +64,9 @@ const state = {
     dir: "DOWN",
     walking: false,
     stepParity: false,
-    visible: true,
+    visible: false, // Appears after Prof. Oak gives Red starter Pikachu in Oak's Lab!
     spawnDelayed: false, // PIKACHU_SPAWN_DELAYED when stepping from water onto land
-    friendship: 0, // Initial friendship level is 0
+    friendship: 90, // Initial friendship level in Pokémon Yellow ($5a = 90)
     mood: 128, // $80 neutral mood (engine/movie/oak_speech/init_player_data.asm:18)
     stepCounter: 0,
     moodIndex: 0,
@@ -178,7 +189,7 @@ const ELEVATOR_FLOORS = {
   ],
 };
 
-const STORAGE_KEY = "pokeyellow_220_save_v3";
+const STORAGE_KEY = "pokeyellow_220_save_v4";
 
 const ITEM_CATALOG = {
   HM01_CUT: { id: "HM01_CUT", name: "HM01 CUT", qty: 1, kind: "hm", moveId: "CUT" },
@@ -201,6 +212,8 @@ const ITEM_CATALOG = {
   MOON_STONE: { id: "MOON_STONE", name: "MOON STONE", qty: 1, kind: "stone" },
   POKE_FLUTE: { id: "POKE_FLUTE", name: "POKé FLUTE", qty: 1, kind: "flute" },
   TOWN_MAP: { id: "TOWN_MAP", name: "TOWN MAP", qty: 1, kind: "map" },
+  OAKS_PARCEL: { id: "OAKS_PARCEL", name: "OAK's PARCEL", qty: 1, kind: "key" },
+  SS_TICKET: { id: "SS_TICKET", name: "S.S. TICKET", qty: 1, kind: "key" },
 };
 
 export function giveBagItem(itemKey, count = 1) {
@@ -323,10 +336,11 @@ export function buildMonInstance(speciesKey, level = 10, customMoveIds = null) {
 
 function initDefaultParty() {
   if (state.party.length > 0) return;
-  // Authentic pret/pokeyellow starting party:
-  // - PIKACHU: Lv.5 (scripts/OaksLab.asm:1033 -> THUNDERSHOCK, GROWL)
-  // Gift starters (BULBASAUR, CHARMANDER, SQUIRTLE) are obtained later in-game from Melanie, Route 24 trainer, and Officer Jenny.
+  // Used as a safety fallback when a battle/HM is invoked directly via API before the Oak intro event
   state.party = [buildMonInstance("PIKACHU", 5)];
+  state.caughtPokemon.add("PIKACHU");
+  state.events.gotStarterPikachu = true;
+  syncPikachuOverworldState();
 }
 
 export function isStarterPikachuAlive() {
@@ -413,7 +427,6 @@ function saveProgress() {
 }
 
 function loadProgress() {
-  initDefaultParty();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -442,9 +455,11 @@ function loadProgress() {
       state.pikachu.friendship = Math.max(0, Math.min(255, Math.round(data.friendship)));
     }
     if (data.events && typeof data.events === "object") {
-      state.events.enteredBluesHouse = Boolean(data.events.enteredBluesHouse);
-      state.events.gotTownMap = Boolean(data.events.gotTownMap);
-      state.events.daisyWalking = Boolean(data.events.daisyWalking);
+      for (const k of Object.keys(state.events)) {
+        if (k in data.events) {
+          state.events[k] = Boolean(data.events[k]);
+        }
+      }
     }
     if (
       typeof data.paletteMode === "string" &&
@@ -659,6 +674,49 @@ function initZoneNpcs(zone) {
       } else if (o.name === "BLUESHOUSE_TOWN_MAP" && state.events.gotTownMap) {
         collected = true; // TOGGLE_TOWN_MAP hidden once Daisy gives it to Red
       }
+    } else if (zone.constName === "OAKS_LAB") {
+      if (o.name === "OAKSLAB_OAK1") {
+        defaultVisible = Boolean(
+          state.events.oakRescuedInGrass || state.events.gotStarterPikachu
+        );
+      } else if (
+        o.name === "OAKSLAB_EEVEE_POKE_BALL" &&
+        state.events.gotStarterPikachu
+      ) {
+        collected = true; // Snatched by Rival Blue during the lab intro cutscene
+      } else if (
+        (o.name === "OAKSLAB_POKEDEX1" || o.name === "OAKSLAB_POKEDEX2") &&
+        state.events.gotPokedex
+      ) {
+        collected = true; // TOGGLE_POKEDEX_1 & 2 hidden after Oak gives them to Red & Blue
+      }
+    } else if (zone.constName === "VIRIDIAN_CITY") {
+      const oldManAwake = state.events.gotPokedex || state.events.gotOaksParcel;
+      if (o.name === "VIRIDIANCITY_OLD_MAN_SLEEPY") {
+        defaultVisible = !oldManAwake; // TOGGLE_OLD_MAN_1 (blocking road before coffee/parcel)
+      } else if (o.name === "VIRIDIANCITY_OLD_MAN") {
+        defaultVisible = oldManAwake; // TOGGLE_OLD_MAN_2 (awake & stepped aside at (17,5))
+      }
+    } else if (zone.constName === "BILLS_HOUSE") {
+      if (o.name === "BILLSHOUSE_BILL_POKEMON") {
+        defaultVisible = !state.events.helpedBill;
+      } else if (o.name === "BILLSHOUSE_BILL1") {
+        defaultVisible = Boolean(state.events.helpedBill);
+      }
+    } else if (zone.constName === "ROUTE_12") {
+      if (o.name === "ROUTE12_SNORLAX" && state.events.wokeRoute12Snorlax) {
+        collected = true;
+      }
+    } else if (zone.constName === "ROUTE_16") {
+      if (o.name === "ROUTE16_SNORLAX" && state.events.wokeRoute16Snorlax) {
+        collected = true;
+      }
+    } else if (zone.constName === "POKEMON_TOWER_7F") {
+      if (o.name === "POKEMONTOWER7F_JESSIE" || o.name === "POKEMONTOWER7F_JAMES") {
+        defaultVisible = !state.events.rescuedMrFuji;
+      } else if (o.name === "POKEMONTOWER7F_MR_FUJI" && state.events.rescuedMrFuji) {
+        collected = true;
+      }
     }
     return {
       ...o,
@@ -799,6 +857,19 @@ export function loadZone(target, options = {}) {
   audio.playTrack(zone.music);
   updateUIForCurrentZone();
   renderAllCanvases();
+
+  // ViridianMartDefaultScript (scripts/ViridianMart.asm:19-46):
+  // Entering Viridian Mart for the first time automatically triggers Clerk's Oak's Parcel callout!
+  if (zone.constName === "VIRIDIAN_MART" && !state.events.gotOaksParcel) {
+    state.events.gotOaksParcel = true;
+    giveBagItem("OAKS_PARCEL", 1);
+    audio.playSfx("blip");
+    openDialogue(
+      "POKéMON MART CLERK",
+      "Hey! You came from PALLET TOWN?\n\nYou know PROF. OAK, right? His order came in. Will you take it to him?\n\nRED got OAK's PARCEL!"
+    );
+  }
+
   return zone;
 }
 
@@ -1113,6 +1184,10 @@ function attemptStep(dir) {
   // 2. Check map border connections (North / South / West / East seamless transition!)
   const conns = zone.connections || {};
   if (targetY < 0 && conns.north) {
+    if (zone.constName === "PALLET_TOWN" && !state.events.gotStarterPikachu) {
+      triggerOakIntroGrassEvent();
+      return;
+    }
     const targetZone = engine.zonesByConst[conns.north.targetConst];
     if (targetZone) {
       const newX = targetX - conns.north.offset * 2;
@@ -1342,6 +1417,49 @@ function onPlayerStepCompleted() {
 
   updateCoordinatesUI();
 
+  // Area-Specific Step Triggers:
+  // A. Pallet Town Intro Event with Professor Oak (scripts/PalletTown.asm:34-185)
+  if (
+    zone.constName === "PALLET_TOWN" &&
+    !state.events.gotStarterPikachu &&
+    sy <= 1 &&
+    (sx === 10 || sx === 11)
+  ) {
+    triggerOakIntroGrassEvent();
+    return;
+  }
+
+  // B. Oak's Lab First Rival Battle when walking south toward the exit after receiving Pikachu (scripts/OaksLab.asm:250-355)
+  if (
+    zone.constName === "OAKS_LAB" &&
+    state.events.gotStarterPikachu &&
+    !state.events.battledRivalInLab &&
+    sy >= 6
+  ) {
+    triggerRivalLabBattle();
+    return;
+  }
+
+  // C. Viridian City Old Man Roadblock (before coffee/parcel) & Catching Tutorial (after coffee/parcel) (scripts/ViridianCity.asm:65-175)
+  if (zone.constName === "VIRIDIAN_CITY" && sx === 19 && sy === 9) {
+    const oldManAwake = state.events.gotPokedex || state.events.gotOaksParcel;
+    if (!oldManAwake) {
+      audio.playSfx("bump");
+      state.player.y = 10;
+      state.player.renderY = 10;
+      state.player.dir = "UP";
+      renderAllCanvases(true);
+      openDialogue(
+        "VIRIDIAN GIRL",
+        "Wait! Don't go out!\n\nOh Grandpa! Don't be so mean! He hasn't had his coffee yet.\n\nYou can't go through here until Grandpa wakes up!"
+      );
+      return;
+    } else if (!state.events.seenOldManTutorial) {
+      triggerViridianOldManTutorial();
+      return;
+    }
+  }
+
   // Check if stepped onto a door / staircase warp
   const hitWarp = checkWarpAtStep(zone, sx, sy);
   if (hitWarp) {
@@ -1468,7 +1586,33 @@ function checkInGameGiftOrEvent(npc, zone) {
     giveBagItem("POKE_FLUTE", 1);
     return `\n\nRED received a POKé FLUTE from MR. FUJI!`;
   }
+  if (zone.constName === "ROUTE_1" && npc.name === "ROUTE1_YOUNGSTER1") {
+    if (!state.events.gotPotionSample) {
+      state.events.gotPotionSample = true;
+      giveBagItem("POTION", 1);
+      return `\n\nRED received a free sample POTION!`;
+    }
+    return `\n\nWe also carry POKé BALLs for catching POKéMON!`;
+  }
+  if (zone.constName === "VIRIDIAN_MART" && npc.sprite === "SPRITE_CLERK") {
+    if (!state.events.gotOaksParcel) {
+      state.events.gotOaksParcel = true;
+      giveBagItem("OAKS_PARCEL", 1);
+      return `\n\nYou came from PALLET TOWN? Here, please deliver OAK's PARCEL to PROF. OAK!\n\nRED got OAK's PARCEL!`;
+    }
+  }
   if (zone.constName === "OAKS_LAB" && upName.includes("OAK")) {
+    if (state.events.gotOaksParcel && !state.events.gotPokedex) {
+      state.events.gotPokedex = true;
+      state.bag = state.bag.filter((it) => it.id !== "OAKS_PARCEL");
+      state.npcs.forEach((n) => {
+        if (n.name === "OAKSLAB_POKEDEX1" || n.name === "OAKSLAB_POKEDEX2") {
+          n.collected = true;
+        }
+      });
+      giveBagItem("POKE_BALL", 5);
+      return `\n\nOAK: Oh! That's the custom POKé BALL I ordered! Thank you, RED!\n\nRED delivered OAK's PARCEL and received a POKéDEX and 5 POKé BALLs!`;
+    }
     giveBagItem("POKE_BALL", 5);
     return `\n\nPROF. OAK gave RED 5 POKé BALLs!`;
   }
@@ -1545,6 +1689,19 @@ export function interactInFront() {
   for (const s of zone.signs) {
     if (s.x === fx && s.y === fy) {
       audio.playSfx("blip");
+      if (zone.constName === "GAME_CORNER" && s.x === 9 && s.y === 4) {
+        openDialogue(
+          "GAME CORNER POSTER",
+          "Hey! A switch behind the poster!? Let's push it!\n\nWhoa! A secret staircase to the TEAM ROCKET HIDEOUT appeared!",
+          {
+            onComplete: () => {
+              audio.playSfx("warp");
+              loadZone("ROCKET_HIDEOUT_B1F", { warpIndex: 0 });
+            },
+          }
+        );
+        return;
+      }
       openDialogue("SIGNPOST", s.text);
       return;
     }
@@ -1643,9 +1800,145 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
     npc.facing = opp[state.player.dir] || "DOWN";
   }
 
-  // Only actual Poké Ball ground items disappear when picked up; NPCs NEVER disappear!
-  if (npc.kind === "item" && npc.sprite === "SPRITE_POKE_BALL") {
+  //Only actual Poké Ball ground items disappear when picked up; NPCs NEVER disappear!
+  // (Except OAKSLAB_EEVEE_POKE_BALL before Oak's Lab event, which belongs to Oak/Blue)
+  if (
+    npc.kind === "item" &&
+    npc.sprite === "SPRITE_POKE_BALL" &&
+    npc.name !== "OAKSLAB_EEVEE_POKE_BALL"
+  ) {
     npc.collected = true;
+  }
+
+  // Authentic Oak's Lab Eevee Poké Ball & Starter Pikachu event (scripts/OaksLab.asm)
+  if (zone.constName === "OAKS_LAB") {
+    if (npc.name === "OAKSLAB_EEVEE_POKE_BALL") {
+      audio.playSfx("blip");
+      if (state.events.oakRescuedInGrass && !state.events.gotStarterPikachu) {
+        openDialogue(
+          "PROF. OAK'S LAB",
+          "BLUE: No fair! Gramps, I want this one!\n\nBLUE pushed RED aside and snatched the POKé BALL! BLUE received an EEVEE!\n\nOAK: BLUE! What are you doing?! ...RED, this is the wild POKéMON I caught earlier in the tall grass. You can have it!\n\nRED received a PIKACHU (:L5)!",
+          {
+            onComplete: () => {
+              awardStarterPikachuInLab();
+            },
+          }
+        );
+      } else {
+        openDialogue(
+          "POKé BALL",
+          "That's a POKé BALL. There's a POKéMON inside! PROF. OAK isn't here right now."
+        );
+      }
+      return;
+    }
+    if (
+      npc.name === "OAKSLAB_OAK1" &&
+      state.events.oakRescuedInGrass &&
+      !state.events.gotStarterPikachu
+    ) {
+      audio.playSfx("blip");
+      openDialogue(
+        "PROF. OAK",
+        "OAK: Here, RED! Go ahead and take that POKé BALL!\n\nBLUE: No fair! I want this one! BLUE snatched the EEVEE!\n\nOAK: RED, take this wild PIKACHU I caught earlier!\n\nRED received a PIKACHU (:L5)!",
+        {
+          onComplete: () => {
+            awardStarterPikachuInLab();
+          },
+        }
+      );
+      return;
+    }
+  }
+
+  // Viridian City Old Man Pokémon Catching Tutorial (scripts/ViridianCity.asm)
+  if (zone.constName === "VIRIDIAN_CITY") {
+    if (
+      npc.name === "VIRIDIANCITY_OLD_MAN" ||
+      npc.name === "VIRIDIANCITY_OLD_MAN2"
+    ) {
+      triggerViridianOldManTutorial();
+      return;
+    }
+  }
+
+  // Bill's House Teleporter Experiment (scripts/BillsHouse.asm)
+  if (zone.constName === "BILLS_HOUSE") {
+    if (npc.name === "BILLSHOUSE_BILL_POKEMON") {
+      audio.playSfx("warp");
+      state.events.helpedBill = true;
+      npc.collected = true;
+      const humanBill = state.npcs.find((n) => n.name === "BILLSHOUSE_BILL1");
+      if (humanBill) humanBill.defaultVisible = true;
+      giveBagItem("SS_TICKET", 1);
+      renderAllCanvases(true);
+      openDialogue(
+        "BILL — POKéMANIAC",
+        "Hiya! I'm a POKéMON... No I'm not! Call me BILL!\n\nMy TELEPORTER experiment combined me with a POKéMON! Thanks for running the Cell Separator!\n\nTake this S.S. TICKET for the S.S. ANNE in VERMILION CITY!\n\nRED received an S.S. TICKET!"
+      );
+      return;
+    }
+    if (npc.name === "BILLSHOUSE_BILL1") {
+      audio.playSfx("blip");
+      giveBagItem("SS_TICKET", 1);
+      openDialogue(
+        "BILL",
+        "Thanks again, bud! Use that S.S. TICKET to board the S.S. ANNE at VERMILION HARBOR!"
+      );
+      return;
+    }
+  }
+
+  // Sleeping Snorlax on Route 12 & Route 16 (scripts/Route12.asm & scripts/Route16.asm)
+  if (
+    (zone.constName === "ROUTE_12" && npc.name === "ROUTE12_SNORLAX") ||
+    (zone.constName === "ROUTE_16" && npc.name === "ROUTE16_SNORLAX")
+  ) {
+    const hasFlute = state.bag.some((it) => it.id === "POKE_FLUTE");
+    if (!hasFlute) {
+      audio.playSfx("blip");
+      openDialogue(
+        "SLEEPING SNORLAX",
+        "A giant SNORLAX is sleeping peacefully blocking the road!\n\nYou need the POKé FLUTE from MR. FUJI in LAVENDER TOWN to wake it up."
+      );
+      return;
+    }
+    audio.playSfx("pika");
+    npc.collected = true;
+    if (zone.constName === "ROUTE_12") {
+      state.events.wokeRoute12Snorlax = true;
+    } else {
+      state.events.wokeRoute16Snorlax = true;
+    }
+    saveProgress();
+    renderAllCanvases(true);
+    openDialogue(
+      "POKé FLUTE",
+      "RED played the POKé FLUTE!\n\nSNORLAX woke up in a grumpy rage and attacked!",
+      {
+        onComplete: () => {
+          triggerWildEncounter([30, "SNORLAX"]);
+        },
+      }
+    );
+    return;
+  }
+
+  // Pokémon Tower 7F — Rescuing Mr. Fuji (scripts/PokemonTower7F.asm)
+  if (zone.constName === "POKEMON_TOWER_7F" && npc.name === "POKEMONTOWER7F_MR_FUJI") {
+    audio.playSfx("warp");
+    state.events.rescuedMrFuji = true;
+    giveBagItem("POKE_FLUTE", 1);
+    openDialogue(
+      "MR. FUJI",
+      "MR. FUJI: Thank you for rescuing me from TEAM ROCKET!\n\nCome with me to my home at the foot of POKéMON TOWER. Please take this POKé FLUTE!\n\nRED received a POKé FLUTE!",
+      {
+        onComplete: () => {
+          loadZone("MR_FUJIS_HOUSE", { warpIndex: 0 });
+        },
+      }
+    );
+    return;
   }
 
   // Authentic BluesHouse.asm Daisy & Town Map script (scripts/BluesHouse.asm:26-88)
@@ -1701,7 +1994,216 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
   });
 }
 
+export function awardStarterPikachuInLab() {
+  state.events.oakRescuedInGrass = true;
+  state.events.gotStarterPikachu = true;
+  if (!state.party.some((m) => m.species === "PIKACHU")) {
+    state.party.unshift(buildMonInstance("PIKACHU", 5));
+  }
+  state.caughtPokemon.add("PIKACHU");
+  const eeveeBall = state.npcs.find((n) => n.name === "OAKSLAB_EEVEE_POKE_BALL");
+  if (eeveeBall) eeveeBall.collected = true;
+  const oak1 = state.npcs.find((n) => n.name === "OAKSLAB_OAK1");
+  if (oak1) oak1.defaultVisible = true;
+  state.pikachu.x = Math.max(0, state.player.x - 1);
+  state.pikachu.y = state.player.y;
+  state.pikachu.renderX = state.pikachu.x;
+  state.pikachu.renderY = state.pikachu.y;
+  state.pikachu.dir = "RIGHT";
+  state.pikachu.spawnDelayed = false;
+  syncPikachuOverworldState();
+  triggerEmote("heart", 2600);
+  audio.playSfx("pika");
+  saveProgress();
+  updateUIForCurrentZone();
+  renderAllCanvases(true);
+}
+
+export function startScriptedCatchScene(mode = "OAK_PIKACHU") {
+  heldDirs.clear();
+  if (state.dialogue) {
+    state.dialogue = null;
+    renderDialogueModal();
+  }
+  const isOak = mode === "OAK_PIKACHU";
+  const foeMon = buildMonInstance(isOak ? "PIKACHU" : "RATTATA", 5);
+  const demoPlayerMon = {
+    species: isOak ? "PROF_OAK" : "OLD_MAN",
+    nickname: isOak ? "PROF. OAK" : "OLD MAN",
+    level: 5,
+    hp: 20,
+    maxHp: 20,
+    atk: 15,
+    def: 15,
+    spd: 15,
+    spc: 15,
+    types: ["NORMAL"],
+    status: "OK",
+    moves: [getMoveObj("TACKLE")],
+    trainerSpriteKey: isOak ? "PROF_OAK" : "GAMBLER",
+  };
+
+  const messages = isOak
+    ? [
+        `Wild PIKACHU\nappeared!`,
+        `PROF. OAK used\nPOKé BALL!`,
+        `All right! PIKACHU\nwas caught!`,
+        `OAK: Whew... That\nwas close!`,
+        `Wild POKéMON live in\ntall grass! Come with\nme to my POKéMON LAB!`,
+      ]
+    : [
+        `Wild RATTATA\nappeared!`,
+        `OLD MAN: First, you\nneed to weaken the\ntarget POKéMON!`,
+        `OLD MAN used\nPOKé BALL!`,
+        `All right! RATTATA\nwas caught!`,
+        `OLD MAN: And that's\nhow you catch POKéMON!`,
+      ];
+
+  state.battle = {
+    isTrainer: false,
+    isSafari: false,
+    isScriptedCatch: true,
+    scriptedMode: mode,
+    demoPlayerMon,
+    safariBalls: 30,
+    trainerName: null,
+    trainerSprite: null,
+    trainerKey: null,
+    endBattleText: null,
+    enemyParty: [foeMon],
+    activeEnemyIdx: 0,
+    activePlayerIdx: 0,
+    species: foeMon.species,
+    level: foeMon.level,
+    hp: foeMon.hp,
+    maxHp: foeMon.maxHp,
+    playerHp: demoPlayerMon.hp,
+    playerMaxHp: demoPlayerMon.maxHp,
+    menuState: "MESSAGE",
+    mainCursor: 0,
+    moveCursor: 0,
+    moveSwapIndex: null,
+    bagCursor: 0,
+    partyCursor: 0,
+    partySubCursor: 0,
+    forcedSwitch: false,
+    showTrainerSprite: false,
+    log: messages[0],
+    messageQueue: messages.slice(1),
+    finished: true,
+    onComplete: isOak
+      ? () => {
+          state.events.oakRescuedInGrass = true;
+          loadZone("OAKS_LAB", { x: 5, y: 3, dir: "UP" });
+          openDialogue(
+            "PROF. OAK'S LAB — INTRO EVENT",
+            "BLUE: Gramps! I'm fed up with waiting!\n\nOAK: Let me think... Oh, that's right, I told you to come! Just wait!\n\nOAK: Here, RED! There is 1 POKéMON left inside this POKé BALL on the table. Go ahead, it's yours!\n\nBLUE: No fair! Gramps, I want this one! BLUE pushed RED aside and snatched the POKé BALL! BLUE received an EEVEE!\n\nOAK: BLUE! What are you doing?! ...RED, this is the wild POKéMON I caught earlier in the tall grass. You can have it!\n\nRED received a PIKACHU (:L5)!",
+            {
+              onComplete: () => {
+                awardStarterPikachuInLab();
+              },
+            }
+          );
+        }
+      : () => {
+          state.events.seenOldManTutorial = true;
+          saveProgress();
+          openDialogue(
+            "VIRIDIAN OLD MAN",
+            "If the target POKéMON is tough to catch, weaken it or inflict a status like SLEEP or PARALYSIS first!"
+          );
+        },
+  };
+  audio.playSfx("thunder");
+  renderBattleModal();
+}
+
+export function triggerOakIntroGrassEvent() {
+  const zone = state.currentZone;
+  if (!zone || zone.constName !== "PALLET_TOWN") return;
+  const oakObj = state.npcs.find((n) => n.name === "PALLETTOWN_OAK");
+  if (oakObj) {
+    oakObj.defaultVisible = true;
+    oakObj.x = state.player.x;
+    oakObj.y = Math.min(zone.height * 2 - 1, state.player.y + 1);
+    oakObj.renderX = oakObj.x;
+    oakObj.renderY = oakObj.y;
+    oakObj.facing = "UP";
+  }
+  state.player.dir = "DOWN";
+  renderAllCanvases(true);
+  audio.playSfx("blip");
+  openDialogue(
+    "PROF. OAK",
+    "OAK: Hey! Wait! Don't go out!\n\nOAK: It's unsafe! Wild POKéMON live in tall grass!",
+    {
+      onComplete: () => {
+        startScriptedCatchScene("OAK_PIKACHU");
+      },
+    }
+  );
+}
+
+export function triggerRivalLabBattle() {
+  state.events.battledRivalInLab = true;
+  saveProgress();
+  const rival = state.npcs.find((n) => n.name === "OAKSLAB_RIVAL");
+  if (rival) {
+    rival.x = state.player.x;
+    rival.y = Math.max(0, state.player.y - 1);
+    rival.renderX = rival.x;
+    rival.renderY = rival.y;
+    rival.facing = "DOWN";
+  }
+  state.player.dir = "UP";
+  renderAllCanvases(true);
+  audio.playSfx("blip");
+  const tb = {
+    key: "OAKS_LAB:OAKSLAB_RIVAL:1",
+    isWild: false,
+    trainerClass: "RIVAL1",
+    trainerName: "RIVAL BLUE",
+    trainerSprite: "RIVAL1",
+    party: [[5, "EEVEE"]],
+    species: "EEVEE",
+    level: 5,
+    battleText: "Wait RED! Let's check out our POKéMON!",
+    endBattleText: "WHAT? Unbelievable! I picked the wrong POKéMON!",
+  };
+  openDialogue(
+    "RIVAL BLUE",
+    "BLUE: Wait RED! Let's check out our POKéMON!\n\nCome on, I'll take you on!",
+    {
+      trainerBattle: tb,
+      onComplete: () => {
+        triggerWildEncounter([5, "EEVEE"], tb);
+      },
+    }
+  );
+}
+
+export function triggerViridianOldManTutorial() {
+  audio.playSfx("blip");
+  openDialogue(
+    "VIRIDIAN OLD MAN",
+    "OLD MAN: Ahh, I've had my coffee now and I feel great!\n\nSure, you can go through! Wait! Are you in a hurry?\n\nI'll show you how to catch POKéMON — watch what I do!",
+    {
+      onComplete: () => {
+        startScriptedCatchScene("OLD_MAN");
+      },
+    }
+  );
+}
+
 export function openPikachuInteraction() {
+  if (!isStarterPikachuAlive()) {
+    audio.playSfx("bump");
+    openDialogue(
+      "PIKACHU",
+      "Walk into the tall grass at the north exit of PALLET TOWN to meet PROF. OAK and receive your starter PIKACHU!"
+    );
+    return;
+  }
   const opp = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
   state.pikachu.dir = opp[state.player.dir] || "DOWN";
   const f = state.pikachu.friendship;
@@ -1763,8 +2265,12 @@ function advanceDialogue() {
     audio.playSfx("blip");
     renderDialogueModal();
   } else {
+    const onComplete = state.dialogue.onComplete;
     state.dialogue = null;
     renderDialogueModal();
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
   }
 }
 
@@ -1939,7 +2445,8 @@ export function triggerWildEncounter(poolOrEntry, trainerMeta = null) {
 function syncBattleTopLevelProps(b) {
   if (!b) return;
   const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
-  const pMon = state.party[b.activePlayerIdx] || state.party[0];
+  const pMon =
+    b.demoPlayerMon || state.party[b.activePlayerIdx] || state.party[0];
   if (foe) {
     b.species = foe.species;
     b.level = foe.level;
@@ -2047,8 +2554,12 @@ function advanceBattleMessage() {
     return;
   }
   if (b.finished) {
+    const onComplete = b.onComplete;
     state.battle = null;
     renderBattleModal();
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
     return;
   }
   if (b.forcedSwitch) {
@@ -2983,7 +3494,8 @@ function renderBattleModal() {
   syncBattleTopLevelProps(b);
 
   const foe = b.enemyParty[b.activeEnemyIdx] || b.enemyParty[0];
-  const pMon = state.party[b.activePlayerIdx] || state.party[0];
+  const pMon =
+    b.demoPlayerMon || state.party[b.activePlayerIdx] || state.party[0];
   if (!foe || !pMon) {
     state.battle = null;
     modal.classList.add("hidden");
@@ -3065,6 +3577,7 @@ function renderBattleModal() {
 
   const backCanvas = document.getElementById("battle-player-canvas");
   const backSpr =
+    (pMon.trainerSpriteKey && engine.trainerSprites[pMon.trainerSpriteKey]) ||
     engine.pokemonSprites[`${pMon.species}_BACK`] ||
     engine.pokemonSprites.PIKACHU_BACK;
   engine.render2BitGraphicToCanvas(backCanvas, backSpr, "PAL_YELLOWMON");
@@ -4888,6 +5401,10 @@ window.POKEYELLOW = {
   teachHmMove,
   giveBagItem,
   hasHmOrMove,
+  triggerOakIntroGrassEvent,
+  triggerViridianOldManTutorial,
+  startScriptedCatchScene,
+  awardStarterPikachuInLab,
 };
 
 window.addEventListener("DOMContentLoaded", () => {
