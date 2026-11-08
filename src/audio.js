@@ -53,46 +53,89 @@ const GEN1_CRY_DATA = {
   MEW: [0x1e, 0xee, 0xff],
 };
 
-// 38 Base Cry Contour Templates (relative frequency multipliers & sweep directions matching audio/cry_commands.asm)
-const BASE_CRY_CONTOURS = [
-  [[1.0, 1.35], [1.28, 0.82], [0.95, 0.72]],
-  [[1.15, 0.9], [0.92, 1.32], [1.25, 0.88]],
-  [[0.85, 1.12], [1.08, 0.78], [0.82, 0.65]],
-  [[0.78, 1.18], [1.14, 0.84], [0.9, 1.05]],
-  [[1.22, 0.86], [0.95, 1.4], [1.3, 0.76]],
-  [[0.72, 0.92], [0.88, 0.64], [0.68, 0.55]],
-  [[1.45, 1.85], [1.75, 1.2], [1.55, 1.92]],
-  [[0.68, 1.05], [0.98, 0.62], [0.74, 0.88]],
-  [[1.32, 1.68], [1.52, 1.15], [1.28, 1.55]],
-  [[0.92, 1.42], [1.36, 0.88], [1.04, 1.24]],
-  [[0.88, 1.25], [1.18, 0.76], [0.94, 0.68]],
-  [[1.38, 1.1], [1.15, 1.52], [1.44, 1.05]],
-  [[1.05, 1.48], [1.38, 1.12], [1.18, 0.86]],
-  [[0.96, 0.74], [0.82, 1.18], [1.12, 0.78]],
-  [[1.28, 1.62], [1.48, 1.18], [1.35, 1.72]],
-  [[1.12, 1.54], [1.42, 0.96], [1.08, 1.36]],
-  [[1.42, 1.08], [1.18, 1.64], [1.5, 1.12]],
-  [[0.76, 1.14], [1.06, 0.7], [0.82, 0.62]],
-  [[0.84, 1.22], [1.12, 0.8], [0.9, 1.1]],
-  [[0.74, 1.08], [1.02, 0.68], [0.78, 0.92]],
-  [[1.18, 1.58], [1.46, 1.04], [1.22, 0.88]],
-  [[1.52, 1.18], [1.26, 1.68], [1.44, 1.08]],
-  [[1.35, 1.72], [1.58, 1.22], [1.4, 1.65]],
-  [[0.9, 1.32], [1.24, 0.78], [0.86, 1.08]],
-  [[1.08, 0.82], [0.9, 1.34], [1.26, 0.86]],
-  [[1.25, 1.62], [1.5, 1.14], [1.32, 1.54]],
-  [[1.16, 0.88], [0.96, 1.42], [1.34, 0.92]],
-  [[0.94, 1.36], [1.28, 1.02], [1.08, 0.82]],
-  [[1.38, 0.96], [1.08, 1.56], [1.46, 1.02]],
-  [[1.02, 1.44], [1.32, 0.88], [0.98, 1.22]],
-  [[1.28, 0.92], [1.04, 1.48], [1.38, 1.1]],
-  [[0.86, 1.26], [1.18, 0.82], [0.92, 1.14]],
-  [[1.2, 0.84], [0.94, 1.38], [1.28, 0.88]],
-  [[1.06, 1.46], [1.36, 0.94], [1.04, 0.78]],
-  [[1.44, 1.12], [1.22, 1.66], [1.52, 1.18]],
-  [[0.98, 1.38], [1.28, 0.84], [0.94, 1.18]],
-  [[0.82, 1.18], [1.1, 0.74], [0.86, 1.02]],
-  [[1.14, 1.52], [1.4, 0.98], [1.12, 1.38]],
+// Authentic 38 Base Cry Channel Definitions from pret/pokeyellow audio/sfx/cries.asm (SFX_Cry00..SFX_Cry25):
+// Each entry has:
+// - ch5: Pulse 1 sequence of [length (0..15 -> +1 frames), vol (0..15), reg11 (11-bit GB freq register)]
+// - ch6: Pulse 2 sequence of [length, vol, reg11] running simultaneously in parallel
+// - ch8: Noise sequence of [length, vol, polyFreqHz] running simultaneously in parallel
+// - duty5 / duty6: GB pulse duty cycle index (0=12.5%, 1=25%, 2=50%, 3=75%)
+const SFX_BASE_CRIES = [
+  // 0x00: SFX_Cry00 (NidoranM, Charizard, Sandshrew)
+  { duty5: 2, duty6: 1, ch5: [[1, 15, 0x550], [1, 15, 0x5d0], [1, 15, 0x620], [5, 13, 0x590], [3, 9, 0x520]], ch6: [[1, 14, 0x580], [1, 14, 0x600], [1, 14, 0x660], [5, 12, 0x5c0], [3, 8, 0x540]], ch8: [[3, 9, 1400], [5, 7, 900], [3, 4, 650]] },
+  // 0x01: SFX_Cry01 (NidoranF, Nidorina)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x610], [1, 14, 0x5c0], [2, 15, 0x650], [4, 12, 0x5e0], [3, 8, 0x580]], ch6: [[1, 13, 0x640], [1, 13, 0x5f0], [2, 14, 0x680], [4, 11, 0x610], [3, 7, 0x5b0]], ch8: [[2, 8, 1800], [5, 6, 1200]] },
+  // 0x02: SFX_Cry02 (Slowpoke)
+  { duty5: 2, duty6: 2, ch5: [[3, 14, 0x480], [3, 15, 0x4c0], [4, 13, 0x460], [6, 10, 0x420]], ch6: [[3, 12, 0x498], [3, 13, 0x4d8], [4, 12, 0x478], [6, 9, 0x438]], ch8: [[6, 6, 600], [8, 4, 480]] },
+  // 0x03: SFX_Cry03 (Kangaskhan)
+  { duty5: 3, duty6: 1, ch5: [[1, 15, 0x4d0], [2, 15, 0x560], [2, 14, 0x510], [4, 13, 0x590], [4, 9, 0x4c0]], ch6: [[1, 14, 0x500], [2, 14, 0x590], [2, 13, 0x540], [4, 12, 0x5c0], [4, 8, 0x4f0]], ch8: [[4, 10, 950], [6, 8, 720], [3, 4, 520]] },
+  // 0x04: SFX_Cry04 (Charmander, Charmeleon, Rhyhorn, Magmar)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x5c0], [1, 15, 0x640], [1, 14, 0x590], [3, 15, 0x680], [4, 11, 0x610], [3, 7, 0x5a0]], ch6: [[1, 13, 0x5f0], [1, 14, 0x670], [1, 13, 0x5c0], [3, 14, 0x6b0], [4, 10, 0x640], [3, 6, 0x5d0]], ch8: [[3, 9, 1650], [4, 7, 1300], [4, 4, 980]] },
+  // 0x05: SFX_Cry05 (Grimer, Snorlax)
+  { duty5: 2, duty6: 0, ch5: [[3, 15, 0x430], [3, 14, 0x470], [4, 13, 0x410], [6, 10, 0x3d0]], ch6: [[3, 14, 0x448], [3, 13, 0x488], [4, 12, 0x428], [6, 9, 0x3e8]], ch8: [[5, 10, 520], [7, 8, 410], [4, 5, 340]] },
+  // 0x06: SFX_Cry06 (Voltorb, Electrode, Electabuzz)
+  { duty5: 0, duty6: 1, ch5: [[1, 15, 0x670], [1, 15, 0x6f0], [1, 15, 0x640], [1, 15, 0x6d0], [2, 14, 0x720], [4, 11, 0x690]], ch6: [[1, 14, 0x6a0], [1, 14, 0x710], [1, 14, 0x670], [1, 14, 0x6f0], [2, 13, 0x740], [4, 10, 0x6b0]], ch8: [[2, 11, 2600], [3, 9, 2100], [4, 6, 1700]] },
+  // 0x07: SFX_Cry07 (Muk, Gengar)
+  { duty5: 3, duty6: 0, ch5: [[2, 15, 0x490], [2, 15, 0x520], [2, 14, 0x470], [3, 14, 0x550], [5, 10, 0x450]], ch6: [[2, 14, 0x4b8], [2, 14, 0x548], [2, 13, 0x498], [3, 13, 0x578], [5, 9, 0x478]], ch8: [[4, 10, 820], [6, 8, 620], [4, 5, 480]] },
+  // 0x08: SFX_Cry08 (Oddish, Gloom, Marowak)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x630], [1, 15, 0x690], [2, 15, 0x6e0], [3, 13, 0x660], [3, 9, 0x600]], ch6: [[1, 13, 0x660], [1, 14, 0x6c0], [2, 14, 0x700], [3, 12, 0x690], [3, 8, 0x630]], ch8: [[3, 7, 1900], [5, 5, 1450]] },
+  // 0x09: SFX_Cry09 (Raichu, Nidoking, Articuno, Moltres)
+  { duty5: 2, duty6: 1, ch5: [[1, 15, 0x580], [2, 15, 0x630], [1, 14, 0x5e0], [3, 15, 0x690], [4, 12, 0x5f0], [3, 8, 0x560]], ch6: [[1, 14, 0x5b0], [2, 14, 0x660], [1, 13, 0x610], [3, 14, 0x6c0], [4, 11, 0x620], [3, 7, 0x590]], ch8: [[3, 9, 1550], [5, 7, 1250], [4, 4, 900]] },
+  // 0x0A: SFX_Cry0A (Nidoqueen, Mankey, Primeape)
+  { duty5: 1, duty6: 0, ch5: [[1, 15, 0x540], [2, 15, 0x5d0], [2, 14, 0x520], [3, 14, 0x5a0], [4, 10, 0x4e0]], ch6: [[1, 14, 0x570], [2, 14, 0x600], [2, 13, 0x550], [3, 13, 0x5d0], [4, 9, 0x510]], ch8: [[4, 10, 1150], [5, 8, 860], [3, 5, 640]] },
+  // 0x0B: SFX_Cry0B (Diglett, Dugtrio, Doduo, Dodrio, Exeggcute)
+  { duty5: 0, duty6: 2, ch5: [[1, 15, 0x660], [1, 14, 0x600], [1, 15, 0x690], [1, 14, 0x620], [2, 15, 0x6c0], [3, 10, 0x640]], ch6: [[1, 13, 0x690], [1, 13, 0x630], [1, 14, 0x6c0], [1, 13, 0x650], [2, 14, 0x6f0], [3, 9, 0x670]], ch8: [[2, 8, 2200], [4, 6, 1750]] },
+  // 0x0C: SFX_Cry0C (Seel, Dewgong, Hitmonchan, Lickitung)
+  { duty5: 2, duty6: 1, ch5: [[2, 15, 0x590], [2, 15, 0x620], [3, 14, 0x5d0], [4, 11, 0x540]], ch6: [[2, 13, 0x5c0], [2, 14, 0x650], [3, 13, 0x600], [4, 10, 0x570]], ch8: [[4, 7, 1350], [5, 5, 1050]] },
+  // 0x0D: SFX_Cry0D (Fearow, Drowzee, Hypno, Exeggutor, Jynx)
+  { duty5: 1, duty6: 3, ch5: [[2, 15, 0x5c0], [1, 14, 0x550], [2, 15, 0x610], [3, 13, 0x580], [4, 9, 0x510]], ch6: [[2, 14, 0x5f0], [1, 13, 0x580], [2, 14, 0x640], [3, 12, 0x5b0], [4, 8, 0x540]], ch8: [[3, 8, 1450], [5, 6, 1100], [3, 4, 850]] },
+  // 0x0E: SFX_Cry0E (Pidgey, Jigglypuff, Wigglytuff, Poliwag, Poliwhirl, Poliwrath, Ditto)
+  { duty5: 2, duty6: 2, ch5: [[1, 15, 0x640], [2, 15, 0x6b0], [2, 14, 0x670], [3, 14, 0x6f0], [3, 10, 0x690]], ch6: [[1, 13, 0x668], [2, 14, 0x6d8], [2, 13, 0x698], [3, 13, 0x718], [3, 9, 0x6b8]], ch8: [[2, 6, 2000], [4, 4, 1600]] },
+  // 0x0F: SFX_Cry0F (Bulbasaur, Ivysaur, Venusaur, Pikachu, Dratini, Dragonair, Dragonite)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x5b0], [2, 15, 0x650], [1, 14, 0x5f0], [3, 15, 0x6a0], [4, 11, 0x5c0], [3, 8, 0x560]], ch6: [[1, 14, 0x5e0], [2, 14, 0x680], [1, 13, 0x620], [3, 14, 0x6d0], [4, 10, 0x5f0], [3, 7, 0x590]], ch8: [[3, 8, 1600], [4, 7, 1200], [4, 4, 920]] },
+  // 0x10: SFX_Cry10 (Spearow, Farfetch'd)
+  { duty5: 0, duty6: 1, ch5: [[1, 15, 0x680], [1, 15, 0x610], [1, 15, 0x6c0], [2, 14, 0x650], [3, 11, 0x6e0]], ch6: [[1, 14, 0x6b0], [1, 14, 0x640], [1, 14, 0x6f0], [2, 13, 0x680], [3, 10, 0x708]], ch8: [[2, 9, 2400], [4, 7, 1900]] },
+  // 0x11: SFX_Cry11 (Rhydon)
+  { duty5: 3, duty6: 0, ch5: [[2, 15, 0x4b0], [2, 15, 0x540], [2, 14, 0x4e0], [4, 14, 0x580], [4, 10, 0x4a0]], ch6: [[2, 14, 0x4e0], [2, 14, 0x570], [2, 13, 0x510], [4, 13, 0x5b0], [4, 9, 0x4d0]], ch8: [[4, 11, 880], [5, 9, 680], [4, 5, 500]] },
+  // 0x12: SFX_Cry12 (Golem, Hitmonlee, Koffing, Weezing, Tangela)
+  { duty5: 1, duty6: 0, ch5: [[2, 15, 0x510], [2, 14, 0x590], [2, 14, 0x4e0], [4, 13, 0x550], [4, 9, 0x4b0]], ch6: [[2, 14, 0x540], [2, 13, 0x5c0], [2, 13, 0x510], [4, 12, 0x580], [4, 8, 0x4e0]], ch8: [[4, 9, 1050], [5, 7, 780], [3, 4, 580]] },
+  // 0x13: SFX_Cry13 (Blastoise, Kakuna, Beedrill)
+  { duty5: 2, duty6: 1, ch5: [[1, 15, 0x520], [2, 15, 0x5b0], [2, 15, 0x560], [3, 14, 0x5f0], [4, 10, 0x500]], ch6: [[1, 14, 0x550], [2, 14, 0x5e0], [2, 14, 0x590], [3, 13, 0x620], [4, 9, 0x530]], ch8: [[3, 10, 1100], [5, 8, 820], [4, 5, 620]] },
+  // 0x14: SFX_Cry14 (Pidgeotto, Pidgeot, Chansey, Pinsir)
+  { duty5: 2, duty6: 2, ch5: [[2, 15, 0x5e0], [2, 15, 0x670], [2, 14, 0x620], [3, 14, 0x6b0], [4, 10, 0x5d0]], ch6: [[2, 13, 0x610], [2, 14, 0x6a0], [2, 13, 0x650], [3, 13, 0x6e0], [4, 9, 0x600]], ch8: [[3, 8, 1750], [5, 6, 1350], [3, 4, 1000]] },
+  // 0x15: SFX_Cry15 (Weedle, Arcanine)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x5f0], [2, 15, 0x680], [2, 14, 0x630], [4, 13, 0x5b0], [3, 9, 0x550]], ch6: [[1, 14, 0x620], [2, 14, 0x6b0], [2, 13, 0x660], [4, 12, 0x5e0], [3, 8, 0x580]], ch8: [[3, 8, 1600], [5, 6, 1180]] },
+  // 0x16: SFX_Cry16 (Caterpie, Butterfree, Goldeen, Seaking, Scyther, Kabuto)
+  { duty5: 0, duty6: 2, ch5: [[1, 15, 0x670], [1, 15, 0x6d0], [2, 14, 0x650], [3, 13, 0x6b0], [3, 9, 0x620]], ch6: [[1, 13, 0x6a0], [1, 14, 0x700], [2, 13, 0x680], [3, 12, 0x6e0], [3, 8, 0x650]], ch8: [[2, 7, 2100], [4, 5, 1650]] },
+  // 0x17: SFX_Cry17 (Ekans, Arbok, Onix, Magikarp, Gyarados)
+  { duty5: 3, duty6: 1, ch5: [[2, 15, 0x530], [2, 15, 0x5c0], [2, 14, 0x570], [4, 14, 0x610], [4, 10, 0x4f0]], ch6: [[2, 14, 0x560], [2, 14, 0x5f0], [2, 13, 0x5a0], [4, 13, 0x640], [4, 9, 0x520]], ch8: [[4, 10, 1250], [5, 8, 920], [4, 5, 680]] },
+  // 0x18: SFX_Cry18 (Wartortle, Shellder, Cloyster, Kabutops, Zapdos)
+  { duty5: 1, duty6: 0, ch5: [[1, 15, 0x600], [1, 15, 0x690], [2, 15, 0x640], [3, 14, 0x6d0], [4, 10, 0x5d0]], ch6: [[1, 14, 0x630], [1, 14, 0x6c0], [2, 14, 0x670], [3, 13, 0x700], [4, 9, 0x600]], ch8: [[3, 9, 1950], [5, 7, 1500], [3, 4, 1100]] },
+  // 0x19: SFX_Cry19 (Clefairy, Clefable, Meowth, Persian, Cubone, Horsea, Seadra)
+  { duty5: 2, duty6: 1, ch5: [[1, 15, 0x620], [2, 15, 0x6a0], [1, 14, 0x650], [3, 14, 0x6e0], [3, 10, 0x630]], ch6: [[1, 13, 0x650], [2, 14, 0x6d0], [1, 13, 0x680], [3, 13, 0x710], [3, 9, 0x660]], ch8: [[2, 7, 1850], [4, 5, 1400]] },
+  // 0x1A: SFX_Cry1A (Venonat, Venomoth, Tentacool, Tentacruel, Eevee, Vaporeon, Jolteon, Flareon)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x610], [2, 15, 0x680], [2, 14, 0x640], [3, 15, 0x6c0], [3, 11, 0x5f0]], ch6: [[1, 14, 0x640], [2, 14, 0x6b0], [2, 13, 0x670], [3, 14, 0x6f0], [3, 10, 0x620]], ch8: [[3, 7, 1750], [4, 5, 1350]] },
+  // 0x1B: SFX_Cry1B (Lapras)
+  { duty5: 2, duty6: 2, ch5: [[3, 15, 0x5a0], [3, 15, 0x630], [3, 14, 0x5f0], [5, 12, 0x560]], ch6: [[3, 13, 0x5c8], [3, 14, 0x658], [3, 13, 0x618], [5, 11, 0x588]], ch8: [[4, 6, 1200], [6, 4, 950]] },
+  // 0x1C: SFX_Cry1C (Metapod, Abra, Kadabra, Alakazam, Magnemite, Magneton, Gastly, Haunter)
+  { duty5: 0, duty6: 1, ch5: [[1, 15, 0x660], [1, 15, 0x6e0], [1, 14, 0x620], [2, 15, 0x6a0], [2, 14, 0x710], [3, 10, 0x640]], ch6: [[1, 14, 0x690], [1, 14, 0x710], [1, 13, 0x650], [2, 14, 0x6d0], [2, 13, 0x738], [3, 9, 0x670]], ch8: [[2, 8, 2300], [4, 6, 1800], [3, 4, 1350]] },
+  // 0x1D: SFX_Cry1D (Squirtle, Zubat, Golbat, Tauros)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x5d0], [2, 15, 0x660], [1, 14, 0x610], [3, 15, 0x6a0], [4, 11, 0x5f0]], ch6: [[1, 14, 0x600], [2, 14, 0x690], [1, 13, 0x640], [3, 14, 0x6d0], [4, 10, 0x620]], ch8: [[3, 8, 1700], [4, 6, 1300], [3, 4, 980]] },
+  // 0x1E: SFX_Cry1E (Paras, Parasect, Staryu, Starmie, Mewtwo, Mew)
+  { duty5: 2, duty6: 0, ch5: [[1, 15, 0x640], [2, 15, 0x6d0], [2, 14, 0x680], [3, 15, 0x710], [4, 11, 0x620]], ch6: [[1, 14, 0x670], [2, 14, 0x700], [2, 13, 0x6b0], [3, 14, 0x738], [4, 10, 0x650]], ch8: [[3, 8, 2050], [4, 6, 1600], [4, 4, 1200]] },
+  // 0x1F: SFX_Cry1F (Growlithe, Machop, Machoke, Machamp, Slowbro, Omanyte, Omastar)
+  { duty5: 3, duty6: 1, ch5: [[1, 15, 0x560], [2, 15, 0x5f0], [2, 14, 0x590], [3, 14, 0x630], [4, 10, 0x530]], ch6: [[1, 14, 0x590], [2, 14, 0x620], [2, 13, 0x5c0], [3, 13, 0x660], [4, 9, 0x560]], ch8: [[3, 9, 1300], [5, 7, 980], [3, 4, 720]] },
+  // 0x20: SFX_Cry20 (Krabby, Kingler, Mr. Mime)
+  { duty5: 0, duty6: 2, ch5: [[1, 15, 0x650], [1, 15, 0x5e0], [1, 15, 0x680], [2, 14, 0x610], [3, 13, 0x6b0], [3, 9, 0x5f0]], ch6: [[1, 14, 0x680], [1, 14, 0x610], [1, 14, 0x6b0], [2, 13, 0x640], [3, 12, 0x6e0], [3, 8, 0x620]], ch8: [[2, 9, 2150], [4, 7, 1650], [3, 4, 1250]] },
+  // 0x21: SFX_Cry21 (Psyduck, Golduck, Bellsprout)
+  { duty5: 1, duty6: 2, ch5: [[2, 15, 0x5c0], [2, 14, 0x640], [2, 15, 0x5f0], [3, 13, 0x670], [4, 9, 0x590]], ch6: [[2, 13, 0x5f0], [2, 13, 0x670], [2, 14, 0x620], [3, 12, 0x6a0], [4, 8, 0x5c0]], ch8: [[3, 8, 1500], [5, 6, 1150]] },
+  // 0x22: SFX_Cry22 (Rattata, Raticate)
+  { duty5: 0, duty6: 1, ch5: [[1, 15, 0x670], [1, 15, 0x6f0], [1, 14, 0x640], [2, 15, 0x6c0], [3, 11, 0x610]], ch6: [[1, 14, 0x6a0], [1, 14, 0x718], [1, 13, 0x670], [2, 14, 0x6f0], [3, 10, 0x640]], ch8: [[2, 10, 2350], [3, 8, 1850], [3, 5, 1400]] },
+  // 0x23: SFX_Cry23 (Vileplume, Aerodactyl)
+  { duty5: 2, duty6: 0, ch5: [[2, 15, 0x580], [2, 15, 0x620], [2, 14, 0x5c0], [4, 14, 0x670], [4, 10, 0x550]], ch6: [[2, 14, 0x5b0], [2, 14, 0x650], [2, 13, 0x5f0], [4, 13, 0x6a0], [4, 9, 0x580]], ch8: [[4, 9, 1400], [5, 7, 1050], [4, 4, 780]] },
+  // 0x24: SFX_Cry24 (Vulpix, Ninetales, Geodude, Graveler)
+  { duty5: 1, duty6: 2, ch5: [[1, 15, 0x5e0], [2, 15, 0x660], [2, 14, 0x600], [3, 14, 0x690], [4, 10, 0x5b0]], ch6: [[1, 14, 0x610], [2, 14, 0x690], [2, 13, 0x630], [3, 13, 0x6c0], [4, 9, 0x5e0]], ch8: [[3, 8, 1650], [4, 6, 1250], [3, 4, 920]] },
+  // 0x25: SFX_Cry25 (Weepinbell, Victreebel, Ponyta, Rapidash, Porygon)
+  { duty5: 2, duty6: 1, ch5: [[1, 15, 0x600], [2, 15, 0x690], [2, 14, 0x630], [3, 15, 0x6d0], [4, 10, 0x5e0]], ch6: [[1, 14, 0x630], [2, 14, 0x6c0], [2, 13, 0x660], [3, 14, 0x700], [4, 9, 0x610]], ch8: [[3, 8, 1800], [4, 6, 1400], [3, 4, 1050]] },
 ];
 
 // Authentic Game Boy 3-Channel Chiptune Synthesizer & Sound Effects Engine
@@ -106,6 +149,8 @@ export class GameBoyAudio {
     this.sfxTimers = [];
     this.activeOscillators = new Set();
     this.masterGain = null;
+    this.dutyWaves = null;
+    this.lfsrBuffer = null;
   }
 
   init() {
@@ -115,8 +160,9 @@ export class GameBoyAudio {
         if (!AudioCtx) return false;
         this.ctx = new AudioCtx();
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 0.14;
+        this.masterGain.gain.value = 0.16;
         this.masterGain.connect(this.ctx.destination);
+        this.buildHardwareTables();
       }
       if (this.ctx.state === "suspended") {
         this.ctx.resume().catch(() => {});
@@ -125,6 +171,36 @@ export class GameBoyAudio {
     } catch {
       return false;
     }
+  }
+
+  // Build authentic Game Boy Pulse Duty-Cycle PeriodicWaves (12.5%, 25%, 50%, 75%) & 15-bit LFSR Noise Buffer
+  buildHardwareTables() {
+    if (!this.ctx || this.dutyWaves) return;
+    try {
+      const duties = [0.125, 0.25, 0.5, 0.75];
+      const harmonics = 32;
+      this.dutyWaves = duties.map((d) => {
+        const real = new Float32Array(harmonics + 1);
+        const imag = new Float32Array(harmonics + 1);
+        for (let n = 1; n <= harmonics; n++) {
+          real[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * d);
+          imag[n] = (2 / (n * Math.PI)) * (1 - Math.cos(n * Math.PI * d));
+        }
+        return this.ctx.createPeriodicWave(real, imag);
+      });
+
+      // 15-bit Game Boy LFSR (Linear Feedback Shift Register: XOR bit 0 and bit 1)
+      const sr = this.ctx.sampleRate || 44100;
+      const len = Math.floor(sr * 1.2);
+      this.lfsrBuffer = this.ctx.createBuffer(1, len, sr);
+      const data = this.lfsrBuffer.getChannelData(0);
+      let lfsr = 0x7fff;
+      for (let i = 0; i < len; i++) {
+        const bit = ((lfsr >> 0) ^ (lfsr >> 1)) & 1;
+        lfsr = (lfsr >> 1) | (bit << 14);
+        data[i] = (lfsr & 1) ? 0.85 : -0.85;
+      }
+    } catch {}
   }
 
   toggle() {
@@ -299,60 +375,171 @@ export class GameBoyAudio {
     } catch {}
   }
 
-  // Synthesize authentic species-specific Gen I Pokémon Cry (PlayCry in home/audio.asm & data/pokemon/cries.asm)
-  playPokemonCry(species, options = {}) {
-    if (!this.init()) return false;
-    const sp = String(species || "PIKACHU").toUpperCase();
-    const faintFactor = options && options.faint ? 0.74 : 1.0;
+  // Convert 11-bit Game Boy APU frequency register + wFrequencyModifier (pitch byte) to Hz:
+  // f_Hz = 131072 / (2048 - ((reg + signedPitch) & 0x7FF))
+  gbRegToFreq(reg11, pitchByte, faintFactor = 1.0) {
+    const signedOffset = pitchByte > 127 ? pitchByte - 256 : pitchByte;
+    const modReg = Math.max(0x180, Math.min(0x7d8, reg11 + signedOffset));
+    const hz = (131072 / (2048 - modReg)) * faintFactor;
+    return Math.max(55, Math.min(6000, hz));
+  }
 
-    // Special Pikachu Yellow voice cry ("Pika-Pika!")
+  // Convert Game Boy note length (0..15) + wTempoModifier (length byte) to seconds at 59.7275 Hz
+  gbFramesToSec(noteLen, lengthByte, faintFactor = 1.0) {
+    const frames = (noteLen + 1) * ((lengthByte + 160) / 256);
+    const sec = (frames / 59.7275) / faintFactor;
+    return Math.max(0.018, Math.min(0.45, sec));
+  }
+
+  // Synthesize authentic 3-Channel Game Boy APU Pokémon Cry (Ch5 Pulse 1 + Ch6 Pulse 2 + Ch8 LFSR Noise)
+  playPokemonCry(species, options = {}) {
+    if (!this.init() || !this.ctx || !this.masterGain) return false;
+    const sp = String(species || "PIKACHU").toUpperCase();
+    const faintFactor = options && options.faint ? 0.76 : 1.0;
+
+    // Pokémon Yellow Pikachu 1-bit PCM vocal cry ("Pika-Pika!" dual-formant + consonant burst)
     if (sp === "PIKACHU") {
-      const pikaSeq = [
-        [1180, 1520, 58],
-        [1460, 1320, 54],
-        [1240, 1760, 85],
-      ];
-      let delay = 0;
-      pikaSeq.forEach(([f0, f1, dur]) => {
-        const id = setTimeout(() => {
-          const idx = this.sfxTimers.indexOf(id);
-          if (idx !== -1) this.sfxTimers.splice(idx, 1);
-          this.playSweepNote(f0 * faintFactor, f1 * faintFactor, dur, "square", 0.38);
-        }, delay);
-        this.sfxTimers.push(id);
-        delay += dur + 12;
-      });
+      try {
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain1 = this.ctx.createGain();
+        const gain2 = this.ctx.createGain();
+        if (this.dutyWaves && this.dutyWaves[1]) {
+          osc1.setPeriodicWave(this.dutyWaves[1]);
+          osc2.setPeriodicWave(this.dutyWaves[2]);
+        } else {
+          osc1.type = "square";
+          osc2.type = "triangle";
+        }
+        // "Pi" (high front vowel) -> "ka" (open mid vowel) -> "chuuu!" (rising-falling glide)
+        const syl = [
+          { t: 0.0, d: 0.08, f1: 1120 * faintFactor, f2: 2240 * faintFactor, v: 0.34 },
+          { t: 0.1, d: 0.09, f1: 880 * faintFactor, f2: 1560 * faintFactor, v: 0.32 },
+          { t: 0.21, d: 0.18, f1: 1280 * faintFactor, f2: 1920 * faintFactor, v: 0.36 },
+        ];
+        gain1.gain.setValueAtTime(0.001, now);
+        gain2.gain.setValueAtTime(0.001, now);
+        for (const s of syl) {
+          osc1.frequency.setValueAtTime(s.f1, now + s.t);
+          osc1.frequency.exponentialRampToValueAtTime(s.f1 * 1.18, now + s.t + s.d);
+          osc2.frequency.setValueAtTime(s.f2, now + s.t);
+          osc2.frequency.exponentialRampToValueAtTime(s.f2 * 0.92, now + s.t + s.d);
+          gain1.gain.setValueAtTime(s.v, now + s.t);
+          gain1.gain.exponentialRampToValueAtTime(0.002, now + s.t + s.d);
+          gain2.gain.setValueAtTime(s.v * 0.65, now + s.t);
+          gain2.gain.exponentialRampToValueAtTime(0.002, now + s.t + s.d);
+        }
+        osc1.connect(gain1);
+        osc2.connect(gain2);
+        gain1.connect(this.masterGain);
+        gain2.connect(this.masterGain);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.42);
+        osc2.stop(now + 0.42);
+        this.activeOscillators.add(osc1);
+        this.activeOscillators.add(osc2);
+        osc1.onended = () => {
+          this.activeOscillators.delete(osc1);
+          try { gain1.disconnect(); } catch {}
+        };
+        osc2.onended = () => {
+          this.activeOscillators.delete(osc2);
+          try { gain2.disconnect(); } catch {}
+        };
+      } catch {}
       return true;
     }
 
     const [baseCryId, pitchByte, lengthByte] =
       GEN1_CRY_DATA[sp] || [0x00, 0x40, 0x80];
-    const contour =
-      BASE_CRY_CONTOURS[baseCryId % BASE_CRY_CONTOURS.length] ||
-      BASE_CRY_CONTOURS[0];
+    const baseDef =
+      SFX_BASE_CRIES[baseCryId % SFX_BASE_CRIES.length] || SFX_BASE_CRIES[0];
 
-    // Map Gen I pitch byte (0x00..0xFF) & length byte (0x00..0xFF) to frequency & step timing
-    const signedPitch = pitchByte > 127 ? pitchByte - 256 : pitchByte;
-    const rootFreq = (340 + signedPitch * 1.45 + (baseCryId % 11) * 18) * faintFactor;
-    const segDurMs = Math.max(42, Math.min(135, 58 + (lengthByte / 255) * 68));
+    try {
+      const now = this.ctx.currentTime;
 
-    let offsetMs = 0;
-    contour.forEach(([m0, m1], idx) => {
-      const dur = idx === contour.length - 1 ? segDurMs * 1.25 : segDurMs;
-      const id = setTimeout(() => {
-        const pos = this.sfxTimers.indexOf(id);
-        if (pos !== -1) this.sfxTimers.splice(pos, 1);
-        this.playSweepNote(
-          rootFreq * m0,
-          rootFreq * m1,
-          dur,
-          idx % 2 === 0 ? "square" : "sawtooth",
-          0.36
-        );
-      }, offsetMs);
-      this.sfxTimers.push(id);
-      offsetMs += dur * 0.92;
-    });
+      // Schedule Pulse Channel (Ch5 or Ch6) on a single hardware-timed oscillator
+      const schedulePulseChannel = (seq, dutyIdx, volScale) => {
+        if (!Array.isArray(seq) || seq.length === 0) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        if (this.dutyWaves && this.dutyWaves[dutyIdx]) {
+          osc.setPeriodicWave(this.dutyWaves[dutyIdx]);
+        } else {
+          osc.type = "square";
+        }
+        let t = now;
+        for (let i = 0; i < seq.length; i++) {
+          const [len, vol, reg11] = seq[i];
+          const dur = this.gbFramesToSec(len, lengthByte, faintFactor);
+          const freq = this.gbRegToFreq(reg11, pitchByte, faintFactor);
+          const amp = Math.max(0.002, (vol / 15) * volScale);
+          osc.frequency.setValueAtTime(freq, t);
+          if (i + 1 < seq.length) {
+            const nextFreq = this.gbRegToFreq(seq[i + 1][2], pitchByte, faintFactor);
+            osc.frequency.exponentialRampToValueAtTime(
+              Math.max(55, (freq + nextFreq) * 0.5),
+              t + dur
+            );
+          }
+          gain.gain.setValueAtTime(amp, t);
+          gain.gain.exponentialRampToValueAtTime(Math.max(0.002, amp * 0.45), t + dur);
+          t += dur;
+        }
+        gain.gain.setValueAtTime(0.001, t);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(t + 0.015);
+        this.activeOscillators.add(osc);
+        osc.onended = () => {
+          this.activeOscillators.delete(osc);
+          try { gain.disconnect(); } catch {}
+        };
+      };
+
+      // Schedule Simultaneous Ch5 (Pulse 1) and Ch6 (Pulse 2)
+      schedulePulseChannel(baseDef.ch5, baseDef.duty5 ?? 2, 0.34);
+      schedulePulseChannel(baseDef.ch6, baseDef.duty6 ?? 1, 0.28);
+
+      // Schedule Simultaneous Ch8 (15-bit LFSR Polynomial Noise)
+      if (this.lfsrBuffer && Array.isArray(baseDef.ch8) && baseDef.ch8.length > 0) {
+        const noiseSrc = this.ctx.createBufferSource();
+        noiseSrc.buffer = this.lfsrBuffer;
+        noiseSrc.loop = true;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.Q.value = 2.2;
+        const nGain = this.ctx.createGain();
+        let nt = now;
+        for (const [len, vol, polyHz] of baseDef.ch8) {
+          const dur = this.gbFramesToSec(len, lengthByte, faintFactor);
+          const amp = Math.max(0.002, (vol / 15) * 0.22);
+          filter.frequency.setValueAtTime(
+            Math.max(200, Math.min(6000, polyHz * faintFactor)),
+            nt
+          );
+          nGain.gain.setValueAtTime(amp, nt);
+          nGain.gain.exponentialRampToValueAtTime(0.002, nt + dur);
+          nt += dur;
+        }
+        nGain.gain.setValueAtTime(0.001, nt);
+        noiseSrc.connect(filter);
+        filter.connect(nGain);
+        nGain.connect(this.masterGain);
+        noiseSrc.start(now);
+        noiseSrc.stop(nt + 0.015);
+        noiseSrc.onended = () => {
+          try {
+            noiseSrc.disconnect();
+            filter.disconnect();
+            nGain.disconnect();
+          } catch {}
+        };
+      }
+    } catch {}
     return true;
   }
 }

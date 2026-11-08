@@ -43,6 +43,10 @@ const state = {
     rescuedMrFuji: false, // EVENT_RESCUED_MR_FUJI (scripts/PokemonTower7F.asm)
     wokeRoute12Snorlax: false, // EVENT_FIGHT_ROUTE12_SNORLAX (scripts/Route12.asm)
     wokeRoute16Snorlax: false, // EVENT_FIGHT_ROUTE16_SNORLAX (scripts/Route16.asm)
+    gotDomeFossil: false, // Mt. Moon B2F Dome Fossil
+    gotHelixFossil: false, // Mt. Moon B2F Helix Fossil
+    gotHitmonlee: false, // Fighting Dojo Hitmonlee Poké Ball
+    gotHitmonchan: false, // Fighting Dojo Hitmonchan Poké Ball
   },
   party: [],
   bag: [], // Player starts with 0 items; items and HMs are acquired in-game!
@@ -821,6 +825,18 @@ function initZoneNpcs(zone) {
       if (o.name === "POKEMONTOWER7F_JESSIE" || o.name === "POKEMONTOWER7F_JAMES") {
         defaultVisible = !state.events.rescuedMrFuji;
       } else if (o.name === "POKEMONTOWER7F_MR_FUJI" && state.events.rescuedMrFuji) {
+        collected = true;
+      }
+    } else if (zone.constName === "MT_MOON_B2F") {
+      if (o.name === "MTMOONB2F_DOME_FOSSIL" && state.events.gotDomeFossil) {
+        collected = true;
+      } else if (o.name === "MTMOONB2F_HELIX_FOSSIL" && state.events.gotHelixFossil) {
+        collected = true;
+      }
+    } else if (zone.constName === "FIGHTING_DOJO") {
+      if (o.name === "FIGHTINGDOJO_HITMONLEE_POKE_BALL" && state.events.gotHitmonlee) {
+        collected = true;
+      } else if (o.name === "FIGHTINGDOJO_HITMONCHAN_POKE_BALL" && state.events.gotHitmonchan) {
         collected = true;
       }
     }
@@ -1663,10 +1679,16 @@ function checkInGameGiftOrEvent(npc, zone) {
     return giveGiftMon("EEVEE", 25); // scripts/CeladonMansionRoofHouse.asm:16
   }
   if (zone.constName === "FIGHTING_DOJO" && upName.includes("HITMONLEE")) {
-    return giveGiftMon("HITMONLEE", 30); // scripts/FightingDojo.asm:244
+    npc.collected = true;
+    state.events.gotHitmonlee = true;
+    renderAllCanvases(true);
+    return giveGiftMon("HITMONLEE", 30); // Both Hitmonlee and Hitmonchan can be obtained!
   }
   if (zone.constName === "FIGHTING_DOJO" && upName.includes("HITMONCHAN")) {
-    return giveGiftMon("HITMONCHAN", 30); // scripts/FightingDojo.asm:278
+    npc.collected = true;
+    state.events.gotHitmonchan = true;
+    renderAllCanvases(true);
+    return giveGiftMon("HITMONCHAN", 30); // Both Hitmonlee and Hitmonchan can be obtained!
   }
   // 3. Canonical Hidden Machine (HM01–HM05), Key Item & Ground Item Ball scripts:
   if (zone.constName === "SS_ANNE_CAPTAINS_ROOM" && upName.includes("CAPTAIN")) {
@@ -1713,19 +1735,43 @@ function checkInGameGiftOrEvent(npc, zone) {
   }
   if (zone.constName === "MT_MOON_B2F" && npc.sprite === "SPRITE_FOSSIL") {
     const isDome = upName.includes("DOME");
-    giveBagItem(isDome ? "DOME_FOSSIL" : "HELIX_FOSSIL", 1);
-    state.npcs.forEach((n) => {
-      if (n.sprite === "SPRITE_FOSSIL") n.collected = true;
-    });
+    npc.collected = true;
+    if (isDome) {
+      state.events.gotDomeFossil = true;
+      giveBagItem("DOME_FOSSIL", 1);
+    } else {
+      state.events.gotHelixFossil = true;
+      giveBagItem("HELIX_FOSSIL", 1);
+    }
+    renderAllCanvases(true);
     return `\n\nRED got the ${isDome ? "DOME FOSSIL" : "HELIX FOSSIL"}!`;
   }
   if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
-    if (state.bag.some((it) => it.id === "DOME_FOSSIL")) {
+    const hasDome = state.bag.some((it) => it.id === "DOME_FOSSIL");
+    const hasHelix = state.bag.some((it) => it.id === "HELIX_FOSSIL");
+    if (hasDome && hasHelix) {
+      state.bag = state.bag.filter(
+        (it) => it.id !== "DOME_FOSSIL" && it.id !== "HELIX_FOSSIL"
+      );
+      const msg1 = giveGiftMon("KABUTO", 30);
+      const msg2 = giveGiftMon("OMANYTE", 30);
+      return `\n\nYour DOME FOSSIL and HELIX FOSSIL are both back to life!${msg1}${msg2}`;
+    }
+    if (hasDome) {
       state.bag = state.bag.filter((it) => it.id !== "DOME_FOSSIL");
       return giveGiftMon("KABUTO", 30);
     }
-    state.bag = state.bag.filter((it) => it.id !== "HELIX_FOSSIL");
-    return giveGiftMon("OMANYTE", 30);
+    if (hasHelix) {
+      state.bag = state.bag.filter((it) => it.id !== "HELIX_FOSSIL");
+      return giveGiftMon("OMANYTE", 30);
+    }
+    if (!state.caughtPokemon.has("OMANYTE")) {
+      return giveGiftMon("OMANYTE", 30);
+    }
+    if (!state.caughtPokemon.has("KABUTO")) {
+      return giveGiftMon("KABUTO", 30);
+    }
+    return `\n\nBoth your OMANYTE and KABUTO fossils have been revived!`;
   }
   if (zone.constName === "MR_FUJIS_HOUSE" && upName.includes("MR_FUJI")) {
     giveBagItem("POKE_FLUTE", 1);
@@ -3313,7 +3359,7 @@ function executePartySwitch(targetPartyIdx) {
   b.activePlayerIdx = targetPartyIdx;
   b.forcedSwitch = false;
   b.moveCursor = 0;
-  audio.playSfx("warp");
+  audio.playPokemonCry(chosen.species);
 
   const msgs = [];
   if (!wasForced && prevMon.hp > 0) {
@@ -3592,6 +3638,8 @@ function handleBattleInput(input) {
       if (b.partySubCursor === 0) {
         executePartySwitch(b.partyCursor);
       } else if (b.partySubCursor === 1) {
+        const sMon = state.party[b.partyCursor] || state.party[0];
+        if (sMon) audio.playPokemonCry(sMon.species);
         b.menuState = "PARTY_STATS";
         renderBattleModal();
       } else {
@@ -4735,6 +4783,7 @@ export function handleStartMenuInput(input) {
           sm.partyActionOpen = false;
           renderStartMenu();
         } else if (act.type === "STATS") {
+          if (mon) audio.playPokemonCry(mon.species);
           sm.partyStatsOpen = true;
           renderStartMenu();
         } else if (act.type === "SWITCH") {
