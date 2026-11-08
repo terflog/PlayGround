@@ -352,6 +352,31 @@ export class SpriteRenderer {
         break;
       }
 
+      case TILE.CRYSTAL_SHRINE: {
+        ctx.fillStyle = '#4bb340';
+        ctx.fillRect(screenX, screenY, s, s);
+        // Stone pedestal
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(screenX + 6, screenY + 20, s - 12, 12);
+        // Wooden Ilex/Viridian Shrine roof & pillars
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(screenX + 8, screenY + 8, s - 16, 14);
+        ctx.fillStyle = '#92400e';
+        ctx.beginPath();
+        ctx.moveTo(screenX + 3, screenY + 10);
+        ctx.lineTo(screenX + s / 2, screenY + 2);
+        ctx.lineTo(screenX + s - 3, screenY + 10);
+        ctx.closePath();
+        ctx.fill();
+        // Glowing Golden GS Ball / Crystal Bell inside shrine hollow
+        const glow = 0.65 + 0.35 * Math.sin(timeMs * 0.006);
+        ctx.fillStyle = `rgba(250, 204, 21, ${glow.toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(screenX + s / 2, screenY + 15, 5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+
       default: {
         ctx.fillStyle = '#5ac54f';
         ctx.fillRect(screenX, screenY, s, s);
@@ -574,6 +599,155 @@ export class SpriteRenderer {
       ctx.fillRect(screenX + 5, drawY + 5, 12, 2);
     } else if (player.dir === 'right') {
       ctx.fillRect(screenX + 19, drawY + 5, 12, 2);
+    }
+  }
+
+  drawCrystalActor(ctx, actor, screenX, screenY, timeMs, isCompleted = false) {
+    const s = TILE_SIZE;
+    const bob = Math.sin(timeMs * 0.005 + (actor.x || 0)) * 2.5;
+
+    // Crystal aura ring beneath actor
+    ctx.strokeStyle = isCompleted ? 'rgba(34, 197, 94, 0.7)' : 'rgba(56, 189, 248, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(
+      screenX + s / 2,
+      screenY + s - 4,
+      14 + Math.sin(timeMs * 0.006) * 2,
+      6,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.stroke();
+
+    if (actor.type === 'suicune') {
+      // Iconic Pokémon Crystal Suicune Sprite
+      const y = screenY + bob;
+      // Twin white flowing ribbon tails
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(screenX + 10, y + 22);
+      ctx.quadraticCurveTo(screenX - 6, y + 10 - bob, screenX + 2, y + 4);
+      ctx.moveTo(screenX + 26, y + 22);
+      ctx.quadraticCurveTo(screenX + s + 6, y + 10 - bob, screenX + s - 2, y + 4);
+      ctx.stroke();
+
+      // Purple flowing aurora mane
+      ctx.fillStyle = '#a855f7';
+      ctx.beginPath();
+      ctx.ellipse(screenX + s / 2, y + 13, 13, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cyan body
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(screenX + 10, y + 16, 16, 11);
+      ctx.fillStyle = '#e0f2fe';
+      ctx.fillRect(screenX + 12, y + 19, 4, 4);
+      ctx.fillRect(screenX + 20, y + 19, 4, 4);
+
+      // Diamond Hexagonal Crystal Crest
+      ctx.fillStyle = '#7dd3fc';
+      ctx.beginPath();
+      ctx.moveTo(screenX + s / 2, y - 2);
+      ctx.lineTo(screenX + s / 2 + 7, y + 7);
+      ctx.lineTo(screenX + s / 2, y + 13);
+      ctx.lineTo(screenX + s / 2 - 7, y + 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Ruby eyes
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(screenX + 14, y + 12, 2, 2);
+      ctx.fillRect(screenX + 20, y + 12, 2, 2);
+      return;
+    }
+
+    if (actor.type === 'raikou') {
+      const y = screenY + bob;
+      ctx.fillStyle = '#7e22ce'; // Thundercloud cape
+      ctx.beginPath();
+      ctx.ellipse(screenX + s / 2, y + 12, 13, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#facc15'; // Golden body
+      ctx.fillRect(screenX + 9, y + 15, 18, 12);
+      ctx.fillStyle = '#0f172a'; // Tiger stripes
+      ctx.fillRect(screenX + 12, y + 17, 2, 7);
+      ctx.fillRect(screenX + 21, y + 17, 2, 7);
+      ctx.fillStyle = '#38bdf8'; // Faceplate
+      ctx.fillRect(screenX + 13, y + 9, 10, 6);
+      return;
+    }
+
+    if (actor.type === 'entei') {
+      const y = screenY + bob;
+      ctx.fillStyle = '#e2e8f0'; // Smoke cloud
+      ctx.beginPath();
+      ctx.ellipse(screenX + s / 2, y + 12, 14, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#b45309'; // Lion body
+      ctx.fillRect(screenX + 9, y + 15, 18, 12);
+      ctx.fillStyle = '#ef4444'; // Facial mask
+      ctx.fillRect(screenX + 12, y + 10, 12, 6);
+      ctx.fillStyle = '#facc15'; // Gold crest
+      ctx.fillRect(screenX + 14, y + 6, 8, 4);
+      return;
+    }
+
+    if (actor.type === 'celebi') {
+      const y = screenY - 4 + Math.sin(timeMs * 0.008) * 4;
+      // Translucent fairy wings
+      ctx.fillStyle = 'rgba(186, 230, 253, 0.8)';
+      ctx.beginPath();
+      ctx.ellipse(screenX + 9, y + 16, 7, 4, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(screenX + 27, y + 16, 7, 4, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      // Pale green body & onion-shaped head
+      ctx.fillStyle = '#86efac';
+      ctx.beginPath();
+      ctx.ellipse(screenX + s / 2, y + 20, 6, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.moveTo(screenX + s / 2, y + 2);
+      ctx.quadraticCurveTo(screenX + 28, y + 10, screenX + s / 2, y + 17);
+      ctx.quadraticCurveTo(screenX + 8, y + 10, screenX + s / 2, y + 2);
+      ctx.fill();
+      // Large blue eyes
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(screenX + 13, y + 11, 3, 4);
+      ctx.fillRect(screenX + 20, y + 11, 3, 4);
+      return;
+    }
+
+    if (actor.type === 'eusine') {
+      // MysticMan Eusine (Purple Suit, Magenta Cape, Top Hat)
+      ctx.fillStyle = '#c026d3'; // Flowing cape
+      ctx.fillRect(screenX + 6, screenY + 13, 24, 15);
+      ctx.fillStyle = '#6b21a8'; // Suit
+      ctx.fillRect(screenX + 10, screenY + 14, 16, 14);
+      ctx.fillStyle = '#fde68a'; // Face
+      ctx.fillRect(screenX + 11, screenY + 6, 14, 9);
+      ctx.fillStyle = '#fef3c7'; // Top hat
+      ctx.fillRect(screenX + 9, screenY + 2, 18, 5);
+      return;
+    }
+
+    if (actor.type === 'rocket') {
+      // Team Rocket Saboteur (Black uniform with Red 'R')
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(screenX + 9, screenY + 13, 18, 16);
+      ctx.fillStyle = '#fde68a';
+      ctx.fillRect(screenX + 11, screenY + 5, 14, 9);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(screenX + 9, screenY + 3, 18, 4);
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('R', screenX + s / 2, screenY + 24);
     }
   }
 }

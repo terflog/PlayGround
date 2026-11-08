@@ -9,6 +9,7 @@ import {
   GYM_BADGES,
   NPCS,
   SIGNS,
+  CRYSTAL_EVENTS,
 } from './kanto-data.js';
 
 export class KantoMap {
@@ -136,7 +137,8 @@ export class KantoMap {
     this.fillRect(41, 42, 43, 54, TILE.ROAD);
     this.fillRect(38, 44, 46, 46, TILE.TALL_GRASS);
     this.fillRect(38, 50, 46, 52, TILE.TALL_GRASS);
-    this.fillRect(41, 43, 43, 53, TILE.ROAD); // Ensure clean central path through forest
+    this.fillRect(40, 45, 44, 49, TILE.ROAD); // Clearing for GS Ball Celebi Shrine
+    this.setTile(42, 46, TILE.CRYSTAL_SHRINE); // GS Ball Shrine!
 
     // --- ROUTE 3 (Pewter City <-> Mt. Moon) ---
     this.fillRect(50, 26, 68, 33, TILE.GRASS);
@@ -167,6 +169,8 @@ export class KantoMap {
     this.fillRect(109, 14, 115, 15, TILE.FLOWER);
     // Bill's Sea Cottage at Cerulean Cape
     this.placeBuilding(118, 9, 5, 4, TILE.ROOF_BLUE, 'BILL’S COTTAGE', 'landmark');
+    this.fillRect(114, 11, 117, 13, TILE.PLAZA);
+    this.setTile(116, 10, TILE.CRYSTAL_SHRINE); // Crystal Clear Bell Sanctuary!
 
     // --- ROUTE 5 (Cerulean City <-> Saffron City) ---
     this.fillRect(100, 36, 108, 48, TILE.GRASS);
@@ -400,6 +404,11 @@ export class KantoMap {
     }
     for (const lm of LANDMARKS) {
       this.setTile(lm.spawn.x, lm.spawn.y, TILE.ROAD);
+    }
+    for (const evt of CRYSTAL_EVENTS) {
+      if (this.isSolid(evt.x, evt.y)) {
+        this.setTile(evt.x, evt.y, TILE.ROAD);
+      }
     }
     for (const npc of NPCS) {
       if (this.isSolid(npc.x, npc.y)) {

@@ -111,4 +111,18 @@ export class KantoAudio {
       this.playTone(n.f, n.d, 'square', 0.06, n.t);
     }
   }
+
+  playCrystalChime() {
+    // Shimmering Clear Bell / Suicune Aurora arpeggio
+    const notes = [
+      { f: 659.25, d: 0.14, t: 0.0 },
+      { f: 783.99, d: 0.14, t: 0.1 },
+      { f: 987.77, d: 0.16, t: 0.2 },
+      { f: 1318.51, d: 0.24, t: 0.31 },
+      { f: 1567.98, d: 0.38, t: 0.44 },
+    ];
+    for (const n of notes) {
+      this.playTone(n.f, n.d, 'sine', 0.075, n.t);
+    }
+  }
 }

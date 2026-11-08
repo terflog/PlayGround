@@ -1,61 +1,346 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#101c2d" />
-  <title>Pocket Trails — Yellow Day</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <main class="shell">
-    <header class="topbar">
-      <a class="brand" href="#" aria-label="Pocket Trails home"><span class="brand-mark">✦</span><span>POCKET <b>TRAILS</b></span></a>
-      <div class="edition"><span class="edition-dot"></span> YELLOW DAY <span class="edition-sep">/</span> A TINY MONSTER RPG</div>
-      <button id="sound-toggle" class="sound-toggle" aria-label="Toggle sound" title="Toggle sound">♫ <span>Sound on</span></button>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101c2d" />
+    <title>Pocket Trails — Team Rocket Grunt Chronicles</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23181820'/><text x='8' y='12' font-family='monospace' font-weight='bold' font-size='11' fill='%23e04848' text-anchor='middle'>R</text></svg>" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Pocket Trails home">
+          <span class="brand-mark">R</span>
+          <span>POCKET <b>ROCKET</b></span>
+        </a>
+        <div class="edition">
+          <span class="edition-dot"></span>RED &amp; YELLOW CHRONICLES <span class="edition-sep">/</span> RUNDOWN BASE TO ELITE 4
+        </div>
+        <div class="top-actions">
+          <button id="bike-toggle" class="sound-toggle" type="button" aria-label="Toggle stolen bicycle">
+            <span>🚲 Bike: Riding</span>
+          </button>
+          <button id="rename-toggle" class="sound-toggle" type="button" aria-label="Open character naming dossier">
+            <span>✎ Roster Names</span>
+          </button>
+          <button id="sound-toggle" class="sound-toggle" type="button" aria-label="Toggle sound">
+            <span>Sound on</span>
+          </button>
+        </div>
+      </header>
 
-    <section class="game-layout" aria-label="Pocket Trails game">
-      <div class="game-column">
-        <div class="game-frame">
-          <div class="screen-top"><span><i class="live-dot"></i> LIVE ADVENTURE</span><span id="area-label">SUNMEADOW TOWN</span></div>
-          <div class="canvas-wrap">
-            <canvas id="game" width="384" height="216" aria-label="Game screen"></canvas>
-            <div class="screen-grain"></div>
-          </div>
-          <div class="screen-bottom"><span id="status-line">A bright new day is waiting.</span><span class="pixel-heart">♥</span></div>
-        </div>
-        <div class="controls-row">
-          <div class="dpad" aria-label="Movement controls">
-            <button class="dpad-btn up" data-dir="up" aria-label="Move up">▲</button>
-            <button class="dpad-btn left" data-dir="left" aria-label="Move left">◀</button>
-            <button class="dpad-btn right" data-dir="right" aria-label="Move right">▶</button>
-            <button class="dpad-btn down" data-dir="down" aria-label="Move down">▼</button>
-            <span class="dpad-center"></span>
-          </div>
-          <div class="control-hint"><span class="keycap">WASD</span> or <span class="keycap">↑ ↓ ← →</span> to explore <span class="hint-dot">·</span> <span class="keycap">SPACE</span> talk / continue</div>
-          <button id="action-button" class="action-button"><span class="action-icon">✦</span><span id="action-label">START JOURNEY</span><span class="action-key">ENTER</span></button>
-        </div>
-      </div>
+      <section class="game-layout" aria-label="Pocket Trails game">
+        <div class="game-column">
+          <div class="game-frame">
+            <div class="screen-top">
+              <span>OUTPOST #07 TRANSMISSION <i class="live-dot"></i></span>
+              <span id="area-label">RUNDOWN ROCKET BASE</span>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="game" width="384" height="216" aria-label="Pixel art monster-catching adventure"></canvas>
+              <div class="screen-grain" aria-hidden="true"></div>
 
-      <aside class="side-panel">
-        <div class="panel-kicker">YOUR LITTLE TEAM</div>
-        <div class="partner-card">
-          <div class="partner-art" aria-hidden="true"><span class="spark spark-a">✦</span><span class="spark spark-b">✦</span><div class="buddy-icon"><i class="ear e1"></i><i class="ear e2"></i><i class="cheek c1"></i><i class="cheek c2"></i><i class="eye eye1"></i><i class="eye eye2"></i><i class="mouth"></i></div></div>
-          <div class="partner-info"><div class="partner-name">VOLTkit <span>Lv.<b id="level">3</b></span></div><div class="partner-type"><i></i> SPARK TYPE</div><div class="hp-track"><div id="hp-bar" class="hp-fill"></div></div><div class="hp-text"><span>VITALITY</span><b id="hp-text">28 / 28</b></div></div>
+              <!-- Introduction & Character Name Selection Overlay -->
+              <div id="intro-overlay" class="intro-overlay" role="dialog" aria-modal="true" aria-labelledby="intro-heading">
+                <form id="intro-form" class="intro-card">
+                  <div class="intro-kicker">
+                    <span>★ TEAM ROCKET INITIATION CEREMONY ★</span>
+                    <span>RUNDOWN BASE #07</span>
+                  </div>
+                  <h2 id="intro-heading" class="intro-title">Leave Initiation &amp; Steal the Protagonist’s Bike</h2>
+                  <p class="intro-copy">
+                    Complete your initiation at the <strong>Rundown Base</strong>! Upon leaving initiation, you’ll confront the <strong>Rival Protagonist</strong> and steal his bike—which carries <strong>1 Poké Ball</strong> containing a random <strong>Red Version Starter (1/3 chance: Bulbasaur, Charmander, or Squirtle)</strong>!
+                  </p>
+
+                  <div class="dossier-grid">
+                    <!-- 1. Player Name (Team Rocket Grunt) -->
+                    <div class="dossier-row">
+                      <div class="dossier-head">
+                        <label for="player-name-input" class="dossier-label">1. YOUR NAME (TEAM ROCKET GRUNT)</label>
+                        <span class="dossier-role">INITIATE GRUNT</span>
+                      </div>
+                      <div class="dossier-controls">
+                        <input
+                          id="player-name-input"
+                          class="name-input"
+                          type="text"
+                          maxlength="10"
+                          value="JESS"
+                          aria-label="Player Name"
+                          autocomplete="off"
+                        />
+                        <div class="preset-list" data-target="player-name-input">
+                          <button type="button" class="name-preset-btn active" data-name="JESS">JESS</button>
+                          <button type="button" class="name-preset-btn" data-name="JAMES">JAMES</button>
+                          <button type="button" class="name-preset-btn" data-name="CASSIDY">CASSIDY</button>
+                          <button type="button" class="name-preset-btn" data-name="SILVER">SILVER</button>
+                          <button type="button" class="name-preset-btn" data-name="ROBIN">ROBIN</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 2. Team Rocket Rival Name -->
+                    <div class="dossier-row">
+                      <div class="dossier-head">
+                        <label for="rocket-rival-input" class="dossier-label">2. TEAM ROCKET RIVAL (ORGANIZATION RIVAL)</label>
+                        <span class="dossier-role role-rocket">RIVAL GRUNT</span>
+                      </div>
+                      <div class="dossier-controls">
+                        <input
+                          id="rocket-rival-input"
+                          class="name-input"
+                          type="text"
+                          maxlength="10"
+                          value="VIPER"
+                          aria-label="Team Rocket Rival Name"
+                          autocomplete="off"
+                        />
+                        <div class="preset-list" data-target="rocket-rival-input">
+                          <button type="button" class="name-preset-btn active" data-name="VIPER">VIPER</button>
+                          <button type="button" class="name-preset-btn" data-name="BUTCH">BUTCH</button>
+                          <button type="button" class="name-preset-btn" data-name="DOMINO">DOMINO</button>
+                          <button type="button" class="name-preset-btn" data-name="MONDO">MONDO</button>
+                          <button type="button" class="name-preset-btn" data-name="SLADE">SLADE</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 3. Rival Protagonist Name -->
+                    <div class="dossier-row">
+                      <div class="dossier-head">
+                        <label for="hero-rival-input" class="dossier-label">3. RIVAL PROTAGONIST (BIKE OWNER / HERO)</label>
+                        <span class="dossier-role role-hero">PROTAGONIST RIVAL</span>
+                      </div>
+                      <div class="dossier-controls">
+                        <input
+                          id="hero-rival-input"
+                          class="name-input"
+                          type="text"
+                          maxlength="10"
+                          value="RED"
+                          aria-label="Rival Protagonist Name"
+                          autocomplete="off"
+                        />
+                        <div class="preset-list" data-target="hero-rival-input">
+                          <button type="button" class="name-preset-btn active" data-name="RED">RED</button>
+                          <button type="button" class="name-preset-btn" data-name="BLUE">BLUE</button>
+                          <button type="button" class="name-preset-btn" data-name="ASH">ASH</button>
+                          <button type="button" class="name-preset-btn" data-name="YELLOW">YELLOW</button>
+                          <button type="button" class="name-preset-btn" data-name="LEAF">LEAF</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="intro-footer">
+                    <span class="intro-hint">1/3 RED STARTER POKEBALL ON STOLEN BIKE: BULBASAUR / CHARMANDER / SQUIRTLE</span>
+                    <button id="confirm-name-btn" type="submit" class="name-confirm-btn">
+                      LEAVE INITIATION &amp; STEAL BIKE ▸
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div class="screen-bottom">
+              <span id="grunt-callsign">GRUNT JESS • PROBATIONARY GRUNT</span>
+              <span id="job-ledger">🚲 STOLEN BIKE • GYMS: 0/4 • ₽100</span>
+            </div>
+          </div>
+
+          <div class="controls-row">
+            <div class="dpad" role="group" aria-label="Movement controls">
+              <button class="dpad-btn up" data-dir="up" type="button" aria-label="Move up">▲</button>
+              <button class="dpad-btn left" data-dir="left" type="button" aria-label="Move left">◀</button>
+              <button class="dpad-btn dpad-center" tabindex="-1" aria-hidden="true">R</button>
+              <button class="dpad-btn right" data-dir="right" type="button" aria-label="Move right">▶</button>
+              <button class="dpad-btn down" data-dir="down" type="button" aria-label="Move down">▼</button>
+            </div>
+            <p class="control-hint">
+              MOVE <span class="keycap">WASD</span> / <span class="keycap">↑↓←→</span> • ACT <span class="keycap">SPACE</span><br />
+              CORNER <span class="keycap">G</span> • LAB <span class="keycap">C</span> • GYM <span class="keycap">M</span> • E4 <span class="keycap">V</span>
+            </p>
+            <div class="action-buttons-group">
+              <button id="work-corner-button" class="rank-button" type="button" title="Game Corner: Functional Slot Machine & Underground Fight Tournament">
+                <span>🎰 CORNER &amp; PIT</span>
+              </button>
+              <button id="work-daycare-button" class="rank-button" type="button" title="Daycare: Surface Shifts & Underground Breeding / Fusion Labs">
+                <span>🧬 DAYCARE LAB</span>
+              </button>
+              <button id="gym-battle-button" class="rank-button" type="button" title="Battle Kanto Gyms to put them under Team Rocket control">
+                <span>🏅 TAKE GYM</span>
+              </button>
+              <button id="victory-road-button" class="rank-button" type="button" title="Victory Road & Elite 4 (Unlocks at Top Rank: Rocket Executive)">
+                <span>🏆 VICTORY RD</span>
+              </button>
+              <button id="rank-up-button" class="rank-button" type="button" title="Report to Commander Vex for Promotion">
+                <span>★ PROMOTE</span>
+              </button>
+              <button id="action-button" class="action-button" type="button">
+                <span class="action-icon">A</span>
+                <span id="action-label">STEAL BIKE &amp; START</span>
+                <span class="action-key">SPACE</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dedicated Button Deck for All Operations Beyond Moving the Character -->
+          <div class="ops-deck" role="group" aria-label="Syndicate Operations, Labs, Tournament, Gyms & Management">
+            <button id="btn-spin-slots" class="ops-btn ops-highlight" type="button">🎰 SPIN SLOTS</button>
+            <button id="btn-rig-slots" class="ops-btn ops-highlight" type="button">🧲 WORK / RIG SLOTS</button>
+            <button id="btn-fight-tourney" class="ops-btn ops-danger" type="button">🥊 FIGHT TOURNAMENT</button>
+            <button id="btn-breed-lab" class="ops-btn ops-lab" type="button">🥚 BREEDING LAB</button>
+            <button id="btn-fusion-lab" class="ops-btn ops-lab" type="button">🧬 FUSION LAB</button>
+            <button id="btn-battle-rivals" class="ops-btn ops-danger" type="button">⚔️ BATTLE RIVAL</button>
+            <button id="btn-catch-wild" class="ops-btn ops-danger" type="button" title="Throw Unique Team Rocket R-Ball to Steal Trainer or Wild Pokémon">🔴 R-BALL STEAL</button>
+            <button id="btn-return-map" class="ops-btn" type="button">🗺️ OVERWORLD MAP</button>
+          </div>
         </div>
-        <div class="stats-grid">
-          <div class="stat-box"><span>TRAIL BUDDIES</span><b id="buddy-count">01</b><i>collected</i></div>
-          <div class="stat-box"><span>WINS</span><b id="win-count">00</b><i>good battles</i></div>
-        </div>
-        <div class="field-note"><div class="note-icon">✎</div><div><b id="note-title">FIELD NOTE #01</b><p id="field-note">Tall grass rustles with little creatures. Walk through it to meet a new friend.</p></div></div>
-        <div class="goal-box"><span class="goal-label">TODAY'S LITTLE QUEST</span><div class="goal-text"><span class="goal-check" id="goal-check">○</span><span id="goal-text">Find the trail beyond town</span></div><div class="goal-progress"><div id="goal-progress"></div></div></div>
-        <div class="side-footer"><span>✦</span> A pocket-sized adventure for curious hearts</div>
-      </aside>
-    </section>
-    <footer class="page-footer"><span>MADE FOR SLOW DAYS &amp; BIG ADVENTURES</span><span>NO RUSH. JUST WANDER. <b>✦</b></span></footer>
-  </main>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="game.js"></script>
-</body>
+
+        <aside class="side-panel">
+          <div class="panel-kicker">
+            <span><span class="pixel-heart">R</span> ROCKET DOSSIER</span>
+            <strong id="player-name-display">GRUNT JESS</strong>
+          </div>
+
+          <p id="status-line" class="status-line" aria-live="polite">
+            Leave Team Rocket Initiation in the Rundown Base and steal the Rival Protagonist’s bike outside!
+          </p>
+
+          <!-- Organization Rank Progression Card -->
+          <div class="rank-card">
+            <div class="rank-header">
+              <span>RANK PROMOTION LADDER</span>
+              <span id="rank-tier-pill">RANK 1 / 5</span>
+            </div>
+            <div class="rank-title-row">
+              <strong id="rank-display">PROBATIONARY GRUNT</strong>
+              <span id="merit-display">0 / 25 MERITS</span>
+            </div>
+            <div class="rank-track">
+              <div id="rank-bar" class="rank-fill" style="width: 8%"></div>
+            </div>
+          </div>
+
+          <!-- Promotion-Unlocked Upgrades: Player, Base & Business -->
+          <div class="upgrades-panel" aria-label="Organization Upgrades">
+            <div class="upgrades-header">
+              <span>★ RANK-UNLOCKED UPGRADES</span>
+              <span id="upgrade-summary-pill">P:LV.1 • B:LV.1 • $:LV.1</span>
+            </div>
+            <div class="upgrades-list">
+              <div class="upgrade-row">
+                <div class="upgrade-info">
+                  <span class="upgrade-cat">PLAYER UPGRADE (GEAR &amp; COMBAT)</span>
+                  <strong id="upgrade-player-name" class="upgrade-name">LV.1 STOLEN BIKE &amp; KIT</strong>
+                </div>
+                <button id="btn-upgrade-player" type="button" class="upgrade-btn">UPGRADE (₽80)</button>
+              </div>
+              <div class="upgrade-row">
+                <div class="upgrade-info">
+                  <span class="upgrade-cat">BASE UPGRADE (OUTPOST #07)</span>
+                  <strong id="upgrade-base-name" class="upgrade-name">LV.1 RUNDOWN BARRACKS</strong>
+                </div>
+                <button id="btn-upgrade-base" type="button" class="upgrade-btn">UPGRADE (₽90)</button>
+              </div>
+              <div class="upgrade-row">
+                <div class="upgrade-info">
+                  <span class="upgrade-cat">BUSINESS UPGRADE (SLOTS &amp; LABS)</span>
+                  <strong id="upgrade-biz-name" class="upgrade-name">LV.1 BACK-ALLEY HUSTLE</strong>
+                </div>
+                <button id="btn-upgrade-biz" type="button" class="upgrade-btn">UPGRADE (₽100)</button>
+              </div>
+            </div>
+            <div id="exec-mgmt-bar" class="exec-mgmt-bar">
+              <span id="exec-mgmt-status">🔒 TOP RANK: ADV. BASE, GYM &amp; BIZ MGMT</span>
+              <button id="btn-exec-mgmt" type="button" class="exec-mgmt-btn">EXEC MGMT</button>
+            </div>
+          </div>
+
+          <!-- Rivals & Territory Control Roster -->
+          <div class="rivals-strip">
+            <div class="rival-chip rocket-rival">
+              <span>ROCKET / HERO RIVALS</span>
+              <b id="rocket-rival-display">VIPER / RED</b>
+            </div>
+            <div class="rival-chip hero-rival">
+              <span>GYMS &amp; VICTORY ROAD</span>
+              <b id="hero-rival-display">0/4 GYMS • LOCKED</b>
+            </div>
+          </div>
+
+          <div class="partner-card">
+            <div class="partner-art" aria-hidden="true">
+              <div id="partner-badge-icon" class="buddy-icon">
+                <i class="ear e1"></i><i class="ear e2"></i>
+                <i class="eye eye1"></i><i class="eye eye2"></i>
+                <i class="cheek c1"></i><i class="cheek c2"></i>
+                <i class="mouth"></i>
+              </div>
+              <span class="spark spark-a">✦</span>
+              <span class="spark spark-b">✦</span>
+            </div>
+            <div class="partner-info">
+              <div class="partner-name">
+                <span id="starter-name">CHARMANDER (#004)</span>
+                <span>LV. <b id="level">5</b></span>
+              </div>
+              <div id="starter-origin" class="partner-type">
+                <i></i>1 POKÉ BALL ON STOLEN BIKE (1/3 RED STARTER)
+              </div>
+              <div class="hp-track"><div id="hp-bar" class="hp-fill"></div></div>
+              <div class="hp-text">
+                <span>VITALITY</span>
+                <b id="hp-text">30 / 30</b>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-box">
+              <span>GYMS CONTROLLED</span>
+              <b id="buddy-count">0 / 4</b><i>rocket turf</i>
+            </div>
+            <div class="stat-box">
+              <span>TOURNEY &amp; ELITE 4</span>
+              <b id="win-count">00</b><i>victories</i>
+            </div>
+          </div>
+
+          <div class="field-note">
+            <div class="note-icon">🏆</div>
+            <div>
+              <b id="note-title">SYNDICATE INTEL</b>
+              <p id="field-note">
+                Beat Gyms to put them under your control! Reach Top Rank (Rocket Executive) to unlock Victory Road leading to the Elite 4!
+              </p>
+            </div>
+          </div>
+
+          <div class="goal-box">
+            <div class="goal-label">CURRENT OBJECTIVE</div>
+            <div class="goal-text">
+              <span id="goal-check" class="goal-check">○</span>
+              <span id="goal-text">Take over Gyms &amp; reach Top Rank to unlock Victory Road</span>
+            </div>
+            <div class="goal-progress"><div id="goal-progress"></div></div>
+          </div>
+
+          <div class="side-footer">
+            <span><span>R</span> OUTPOST #07</span>
+            <span id="funds-readout">FUNDS: ₽100 • BALLS: 3</span>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="page-footer">
+        <span>POCKET TRAILS <b>— TEAM ROCKET EDITION</b></span>
+        <span>BIKE HEIST • UNDERGROUND LABS &amp; PIT • GYM TAKEOVER • VICTORY ROAD &amp; ELITE 4</span>
+      </footer>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="./game.js" defer></script>
+  </body>
 </html>
