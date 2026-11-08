@@ -4395,6 +4395,10 @@ export function toggleStartMenu() {
   state.startMenu.open = !state.startMenu.open;
   state.startMenu.subView = null;
   state.startMenu.selectedDexSpecies = null;
+  state.startMenu.dexModalMode = null; // null | "DATA" | "AREA"
+  state.startMenu.dexSideMenuOpen = false;
+  state.startMenu.dexCmdCursor = 0; // 0: DATA, 1: CRY, 2: AREA, 3: QUIT
+  state.startMenu.dexCryPlaying = false;
   state.startMenu.partyActionOpen = false;
   state.startMenu.partyActionCursor = 0;
   state.startMenu.partyStatsOpen = false;
@@ -4483,6 +4487,55 @@ function useBagItemInStartMenu(itemIndex) {
   }
 }
 
+function executePokedexCommand(cmdIdx, entry) {
+  const sm = state.startMenu;
+  const isSeen =
+    entry &&
+    (state.seenPokemon.has(entry.species) ||
+      state.caughtPokemon.has(entry.species));
+
+  if (cmdIdx === 3) {
+    // QUIT
+    audio.playSfx("blip");
+    sm.dexSideMenuOpen = false;
+    sm.selectedDexSpecies = null;
+    sm.dexModalMode = null;
+    sm.subView = null;
+    renderStartMenu();
+    return;
+  }
+
+  if (!isSeen) {
+    audio.playSfx("bump");
+    return;
+  }
+
+  if (cmdIdx === 0) {
+    // DATA
+    audio.playPokemonCry(entry.species, entry);
+    sm.selectedDexSpecies = entry.species;
+    sm.dexModalMode = "DATA";
+    renderStartMenu();
+  } else if (cmdIdx === 1) {
+    // CRY
+    audio.playPokemonCry(entry.species, entry);
+    sm.dexCryPlaying = true;
+    renderStartMenu();
+    setTimeout(() => {
+      if (state.startMenu.dexCryPlaying) {
+        state.startMenu.dexCryPlaying = false;
+        renderStartMenu();
+      }
+    }, 650);
+  } else if (cmdIdx === 2) {
+    // AREA (LoadTownMap_Nest in engine/items/town_map.asm)
+    audio.playSfx("blip");
+    sm.selectedDexSpecies = entry.species;
+    sm.dexModalMode = "AREA";
+    renderStartMenu();
+  }
+}
+
 export function handleStartMenuInput(input) {
   const sm = state.startMenu;
   if (!sm.open) return;
@@ -4494,10 +4547,39 @@ export function handleStartMenuInput(input) {
       if (input === "A" || input === "B" || input === "START") {
         audio.playSfx("blip");
         sm.selectedDexSpecies = null;
+        sm.dexModalMode = null;
         renderStartMenu();
       }
       return;
     }
+
+    // Right-side 4-item command menu (0: DATA, 1: CRY, 2: AREA, 3: QUIT)
+    if (sm.dexSideMenuOpen) {
+      if (input === "UP") {
+        sm.dexCmdCursor = (sm.dexCmdCursor + 3) % 4;
+        audio.playSfx("blip");
+        renderStartMenu();
+      } else if (input === "DOWN") {
+        sm.dexCmdCursor = (sm.dexCmdCursor + 1) % 4;
+        audio.playSfx("blip");
+        renderStartMenu();
+      } else if (input === "B" || input === "LEFT") {
+        audio.playSfx("blip");
+        sm.dexSideMenuOpen = false;
+        renderStartMenu();
+      } else if (input === "A") {
+        const chosen = allStats[sm.subCursor];
+        executePokedexCommand(sm.dexCmdCursor, chosen);
+      } else if (input === "START") {
+        audio.playSfx("blip");
+        sm.dexSideMenuOpen = false;
+        sm.subView = null;
+        renderStartMenu();
+      }
+      return;
+    }
+
+    // Left-side CONTENTS Pokémon list
     if (input === "UP") {
       sm.subCursor = (sm.subCursor - 1 + count) % count;
       audio.playSfx("blip");
@@ -4506,15 +4588,16 @@ export function handleStartMenuInput(input) {
       sm.subCursor = (sm.subCursor + 1) % count;
       audio.playSfx("blip");
       renderStartMenu();
-    } else if (input === "A") {
+    } else if (input === "RIGHT" || input === "A") {
       const chosen = allStats[sm.subCursor];
       const isSeen =
         chosen &&
         (state.seenPokemon.has(chosen.species) ||
           state.caughtPokemon.has(chosen.species));
-      if (isSeen) {
+      if (isSeen || input === "RIGHT") {
         audio.playSfx("blip");
-        sm.selectedDexSpecies = chosen.species;
+        sm.dexSideMenuOpen = true;
+        sm.dexCmdCursor = isSeen ? 0 : 3; // Default to DATA if seen, QUIT if unseen
         renderStartMenu();
       } else {
         audio.playSfx("bump");
@@ -4671,6 +4754,9 @@ export function handleStartMenuInput(input) {
       sm.subView = chosen;
       sm.subCursor = 0;
       sm.selectedDexSpecies = null;
+      sm.dexModalMode = null;
+      sm.dexSideMenuOpen = false;
+      sm.dexCmdCursor = 0;
       sm.partyActionOpen = false;
       sm.partyStatsOpen = false;
       sm.partySwitchIdx = null;
@@ -4711,6 +4797,85 @@ export function renderStartMenu() {
   if (sm.subView === "POKEDEX") {
     if (subTitle) subTitle.textContent = `POKéDEX — OWN: ${state.caughtPokemon.size}/151`;
     const allStats = getOrderedPokedexEntries();
+    if (sm.selectedDexSpecies && sm.dexModalMode === "AREA") {
+      // LoadTownMap_Nest (engine/items/town_map.asm): Kanto Nest Map for selected Pokémon
+      const sp = sm.selectedDexSpecies;
+      const cleanName = sp.replace(/_/g, " ");
+      const nestZones = engine.canonicalZones.filter((z) => {
+        const wildAll = [...(z.wild?.grass || []), ...(z.wild?.water || [])];
+        return wildAll.some(([, wSp]) => wSp === sp);
+      });
+      const nestCoords = new Set(
+        nestZones.map((z) => `${z.townMapX},${z.townMapY}`)
+      );
+      const regionNames = Array.from(
+        new Set(nestZones.map((z) => z.displayName))
+      );
+
+      const wrap = document.createElement("div");
+      wrap.className = "gb-pokedex-data";
+      wrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;padding:4px 8px;border-bottom:2px solid #111827;font-size:10px;font-weight:900">
+          <span>${cleanName}'s NEST</span>
+          <span>KANTO</span>
+        </div>
+        <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#162436;overflow:hidden">
+          <canvas id="start-dex-area-canvas" width="160" height="104" style="width:100%;height:100%;display:block"></canvas>
+          ${
+            nestZones.length === 0
+              ? `<div class="gb-poke-box" style="position:absolute;padding:4px 10px;font-size:10px;font-weight:900">AREA UNKNOWN</div>`
+              : ""
+          }
+        </div>
+        <div class="gb-poke-box" style="padding:4px 8px;font-size:9px;font-weight:900;min-height:36px;display:flex;align-items:center;justify-content:space-between">
+          <span>${
+            regionNames.length > 0
+              ? regionNames.slice(0, 4).join(", ") +
+                (regionNames.length > 4 ? ` (+${regionNames.length - 4} more)` : "")
+              : "Not found in the wild (Gift / Evolution / Special)."
+          }</span>
+          <span class="gb-prompt-arrow">▼</span>
+        </div>
+      `;
+      wrap.onclick = () => {
+        audio.playSfx("blip");
+        sm.selectedDexSpecies = null;
+        sm.dexModalMode = null;
+        renderStartMenu();
+      };
+      subBody.appendChild(wrap);
+
+      const areaCanvas = document.getElementById("start-dex-area-canvas");
+      if (areaCanvas) {
+        const ctx = areaCanvas.getContext("2d");
+        const W = areaCanvas.width;
+        const H = areaCanvas.height;
+        const cellW = W / 16;
+        const cellH = H / 16;
+        ctx.fillStyle = "#fcfaff";
+        ctx.fillRect(0, 0, W, H);
+        // Draw Kanto map nodes
+        for (const z of engine.canonicalZones) {
+          const px = z.townMapX * cellW;
+          const py = z.townMapY * cellH;
+          ctx.fillStyle = z.category === "town" ? "#94a3b8" : "#cbd5e1";
+          ctx.fillRect(px + 2, py + 2, cellW - 4, cellH - 4);
+        }
+        // Highlight nest coordinates
+        for (const key of nestCoords) {
+          const [gx, gy] = key.split(",").map(Number);
+          const px = gx * cellW;
+          const py = gy * cellH;
+          ctx.fillStyle = "#111827";
+          ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
+          ctx.strokeStyle = "#facc15";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(px + 1.5, py + 1.5, cellW - 3, cellH - 3);
+        }
+      }
+      return;
+    }
+
     if (sm.selectedDexSpecies) {
       // ShowPokedexDataInternal (engine/menus/pokedex.asm): Authentic Gen I 2-half Data Screen
       const sp = sm.selectedDexSpecies;
@@ -4753,6 +4918,7 @@ export function renderStartMenu() {
       wrap.onclick = () => {
         audio.playSfx("blip");
         sm.selectedDexSpecies = null;
+        sm.dexModalMode = null;
         renderStartMenu();
       };
       subBody.appendChild(wrap);
@@ -4767,7 +4933,9 @@ export function renderStartMenu() {
     dexMenu.className = "gb-pokedex-menu";
     const leftCol = document.createElement("div");
     leftCol.className = "gb-pokedex-left";
-    leftCol.innerHTML = `<div class="gb-pokedex-title">CONTENTS</div>`;
+    leftCol.innerHTML = `<div class="gb-pokedex-title">${
+      sm.dexCryPlaying ? "♪ CRY PLAYING ♪" : "CONTENTS"
+    }</div>`;
     const listWrap = document.createElement("div");
     listWrap.className = "gb-pokedex-list";
 
@@ -4775,26 +4943,35 @@ export function renderStartMenu() {
       const owned = state.caughtPokemon.has(st.species);
       const seen = owned || state.seenPokemon.has(st.species);
       const isSelected = idx === sm.subCursor;
+      const curSymbol = isSelected ? (sm.dexSideMenuOpen ? "▷" : "▶") : " ";
       const row = document.createElement("button");
       row.type = "button";
       row.className = `gb-dex-row ${isSelected ? "active" : ""}`;
       row.innerHTML = `
         <div class="gb-dex-num">${String(idx + 1).padStart(3, "0")}</div>
         <div class="gb-dex-name-line">
-          <span class="bcursor">${isSelected ? "▶" : " "}</span>
+          <span class="bcursor">${curSymbol}</span>
           <span style="width:11px;display:inline-block">${owned ? "◓" : " "}</span>
           <span>${seen ? st.species.replace(/_/g, " ") : "----------"}</span>
         </div>
       `;
       row.onclick = () => {
+        const wasAlreadySelected = sm.subCursor === idx && sm.dexSideMenuOpen;
         sm.subCursor = idx;
         if (seen) {
           audio.playSfx("blip");
-          sm.selectedDexSpecies = st.species;
+          if (wasAlreadySelected) {
+            executePokedexCommand(0, st);
+          } else {
+            sm.dexSideMenuOpen = true;
+            sm.dexCmdCursor = 0;
+            renderStartMenu();
+          }
         } else {
           audio.playSfx("bump");
+          sm.dexSideMenuOpen = false;
+          renderStartMenu();
         }
-        renderStartMenu();
       };
       listWrap.appendChild(row);
     });
@@ -4803,47 +4980,28 @@ export function renderStartMenu() {
     const rightCol = document.createElement("div");
     rightCol.className = "gb-pokedex-right";
     const seenCount = Math.max(state.caughtPokemon.size, state.seenPokemon.size);
+    const cmds = ["DATA", "CRY", "AREA", "QUIT"];
     rightCol.innerHTML = `
       <div class="gb-pokedex-counts">
         <div>SEEN<div class="gb-pokedex-count-num">${Math.min(151, seenCount)}</div></div>
         <div>OWN<div class="gb-pokedex-count-num">${state.caughtPokemon.size}</div></div>
       </div>
       <div class="gb-pokedex-cmds">
-        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="DATA">▶DATA</button>
-        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="CRY"> CRY</button>
-        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="AREA"> AREA</button>
-        <button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd="QUIT"> QUIT</button>
+        ${cmds
+          .map((cmd, cIdx) => {
+            const cur =
+              sm.dexSideMenuOpen && sm.dexCmdCursor === cIdx ? "▶" : " ";
+            return `<button type="button" class="gb-pokedex-cmd-btn" data-dex-cmd-idx="${cIdx}"><span class="bcursor">${cur}</span>${cmd}</button>`;
+          })
+          .join("")}
       </div>
     `;
-    rightCol.querySelectorAll("[data-dex-cmd]").forEach((btn) => {
+    rightCol.querySelectorAll("[data-dex-cmd-idx]").forEach((btn) => {
+      const cIdx = Number(btn.dataset.dexCmdIdx);
       btn.onclick = () => {
-        const cmd = btn.dataset.dexCmd;
-        const cur = allStats[sm.subCursor];
-        const isSeen =
-          cur &&
-          (state.seenPokemon.has(cur.species) ||
-            state.caughtPokemon.has(cur.species));
-        if (cmd === "DATA") {
-          if (isSeen) {
-            audio.playSfx("blip");
-            sm.selectedDexSpecies = cur.species;
-            renderStartMenu();
-          } else {
-            audio.playSfx("bump");
-          }
-        } else if (cmd === "CRY") {
-          if (isSeen) {
-            audio.playSfx("pika");
-          } else {
-            audio.playSfx("bump");
-          }
-        } else if (cmd === "AREA") {
-          audio.playSfx("blip");
-        } else if (cmd === "QUIT") {
-          audio.playSfx("blip");
-          sm.subView = null;
-          renderStartMenu();
-        }
+        sm.dexSideMenuOpen = true;
+        sm.dexCmdCursor = cIdx;
+        executePokedexCommand(cIdx, allStats[sm.subCursor]);
       };
     });
 
