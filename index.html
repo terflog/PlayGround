@@ -136,8 +136,32 @@
                   <span class="gb-bezel-label">GAME BOY COLOR • POKéMON YELLOW</span>
                 </div>
 
-                <div class="gb-lcd-wrap">
+                <div class="gb-lcd-wrap" id="gb-lcd-wrap">
                   <canvas id="gb-screen-canvas" width="160" height="144"></canvas>
+                  <div id="gb-warp-fade" class="gb-warp-fade"></div>
+
+                  <!-- Authentic Generation I Title Screen & Title Menu (engine/movie/title.asm & engine/menus/main_menu.asm) -->
+                  <div id="title-screen-overlay" class="title-screen-overlay">
+                    <!-- Phase 1: Title Screen -->
+                    <div id="title-splash-view" class="title-splash-view">
+                      <div class="title-logo-box">
+                        <div class="title-logo-main">POKéMON</div>
+                        <div class="title-logo-sub">YELLOW VERSION</div>
+                        <div class="title-logo-tag">SPECIAL PIKACHU EDITION</div>
+                      </div>
+                      <div class="title-pika-stage">
+                        <canvas id="title-pika-canvas" width="56" height="56"></canvas>
+                      </div>
+                      <div class="title-press-start">PRESS START</div>
+                      <div class="title-copy">'95.'96.'98 GAME FREAK inc.</div>
+                    </div>
+
+                    <!-- Phase 2: Title Menu (CONTINUE / NEW GAME / OPTION) -->
+                    <div id="title-menu-view" class="title-menu-view hidden">
+                      <div id="title-menu-box" class="gb-poke-box title-menu-box" role="menu"></div>
+                      <div id="title-save-summary" class="gb-poke-box title-save-summary hidden"></div>
+                    </div>
+                  </div>
 
                   <!-- Authentic Game Boy Dialogue / Pikachu Mood Overlay (home/textbox.asm MESSAGE_BOX 0,12..19,17) -->
                   <div id="dialogue-overlay" class="gb-overlay hidden">

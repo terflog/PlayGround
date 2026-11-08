@@ -521,6 +521,132 @@ button {
   display: block;
 }
 
+/* Authentic 4-Step Game Boy Warp Palette Fade (home/palettes.asm GBFadeOutToWhite) */
+.gb-warp-fade {
+  position: absolute;
+  inset: 0;
+  background: #fcfaff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 17;
+  transition: opacity 0.11s steps(3, end);
+}
+
+.gb-warp-fade.active {
+  opacity: 0.92;
+}
+
+/* Authentic Pokémon Yellow Title Screen & Title Menu (engine/movie/title.asm & engine/menus/main_menu.asm) */
+.title-screen-overlay {
+  position: absolute;
+  inset: 0;
+  background: #fcfaff;
+  color: #111827;
+  font-family: var(--font-mono);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+.title-splash-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 7px 8px;
+  cursor: pointer;
+}
+
+.title-logo-box {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.title-logo-main {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #111827;
+  text-shadow: 2px 2px 0 #facc15;
+}
+
+.title-logo-sub {
+  font-size: 9.5px;
+  font-weight: 900;
+  background: #111827;
+  color: #facc15;
+  padding: 2px 8px;
+  letter-spacing: 0.08em;
+}
+
+.title-logo-tag {
+  font-size: 7.5px;
+  font-weight: 900;
+  color: #111827;
+  margin-top: 1px;
+}
+
+.title-pika-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #111827;
+  background: #fef08a;
+  padding: 4px;
+}
+
+#title-pika-canvas {
+  width: 84px;
+  height: 84px;
+  display: block;
+}
+
+.title-press-start {
+  font-size: 10px;
+  font-weight: 900;
+  color: #dc2626;
+  animation: gbPromptBlink 0.75s steps(2, start) infinite;
+}
+
+.title-copy {
+  font-size: 8px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.title-menu-view {
+  width: 100%;
+  height: 100%;
+  background: #fcfaff;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.title-menu-box {
+  width: 68%;
+  padding: 7px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.title-save-summary {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 9px;
+  line-height: 1.5;
+  font-weight: 900;
+}
+
 /* Authentic Game Boy Overlays (home/textbox.asm MESSAGE_BOX at 0,12..19,17) */
 .gb-overlay {
   position: absolute;

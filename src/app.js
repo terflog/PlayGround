@@ -87,6 +87,12 @@ const state = {
     subCursor: 0,
     selectedDexSpecies: null,
   },
+  titleScreen: {
+    open: true,
+    phase: "SPLASH", // "SPLASH" | "MENU"
+    cursor: 0,
+    hasSave: false,
+  },
   selectedElevatorDest: {},
 };
 
@@ -792,6 +798,18 @@ function initZoneNpcs(zone) {
   });
 }
 
+let warpFadeTimer = null;
+
+function triggerWarpFade() {
+  const fadeEl = document.getElementById("gb-warp-fade");
+  if (!fadeEl) return;
+  fadeEl.classList.add("active");
+  if (warpFadeTimer) clearTimeout(warpFadeTimer);
+  warpFadeTimer = setTimeout(() => {
+    fadeEl.classList.remove("active");
+  }, 150);
+}
+
 export function loadZone(target, options = {}) {
   let zone = null;
   if (typeof target === "object" && target !== null) {
@@ -816,6 +834,11 @@ export function loadZone(target, options = {}) {
   }
   if (!zone) return null;
 
+  if (!options.keepTitleScreen && state.titleScreen && state.titleScreen.open) {
+    state.titleScreen.open = false;
+    renderTitleScreen();
+  }
+
   // Record outdoor map for LAST_MAP indoor exit warps
   if (state.currentZone && state.currentZone.romId < 0x25) {
     state.lastOutdoorMap = {
@@ -838,7 +861,9 @@ export function loadZone(target, options = {}) {
       matchFloor || ELEVATOR_FLOORS[zone.constName][0];
   }
 
-  heldDirs.clear();
+  if (!options.preserveHeldDirs) {
+    heldDirs.clear();
+  }
   engine.loadMapIntoWRAM(zone);
   state.currentZone = zone;
   state.strengthActive = false;
@@ -884,31 +909,44 @@ export function loadZone(target, options = {}) {
     state.player.mode = "walk";
   }
 
-  // Place Pikachu 1 step behind Red (if tile is dry land)
-  const behindOffsets = {
-    DOWN: [0, -1],
-    UP: [0, 1],
-    LEFT: [1, 0],
-    RIGHT: [-1, 0],
-  };
-  const [bx, by] = behindOffsets[state.player.dir] || [0, -1];
-  const px = Math.max(0, Math.min(zone.width * 2 - 1, spawn.x + bx));
-  const py = Math.max(0, Math.min(zone.height * 2 - 1, spawn.y + by));
-  const pikaTile = engine.getCollisionTileAtStep(zone, px, py);
-  const pikaOnWater = isWaterTile(zone, pikaTile);
-  state.pikachu.x = pikaOnWater ? spawn.x : px;
-  state.pikachu.y = pikaOnWater ? spawn.y : py;
-  state.pikachu.renderX = state.pikachu.x;
-  state.pikachu.renderY = state.pikachu.y;
-  state.pikachu.dir = state.player.dir;
-  state.pikachu.walking = false;
-  state.pikachu.moveAnim = null;
-  state.pikachu.spawnDelayed = false;
+  if (
+    options.pikachuX !== undefined &&
+    options.pikachuY !== undefined
+  ) {
+    state.pikachu.x = options.pikachuX;
+    state.pikachu.y = options.pikachuY;
+    state.pikachu.renderX = options.pikachuX;
+    state.pikachu.renderY = options.pikachuY;
+    state.pikachu.dir = state.player.dir;
+    state.pikachu.walking = false;
+    state.pikachu.moveAnim = null;
+  } else {
+    // Place Pikachu 1 step behind Red (if tile is dry land)
+    const behindOffsets = {
+      DOWN: [0, -1],
+      UP: [0, 1],
+      LEFT: [1, 0],
+      RIGHT: [-1, 0],
+    };
+    const [bx, by] = behindOffsets[state.player.dir] || [0, -1];
+    const px = Math.max(0, Math.min(zone.width * 2 - 1, spawn.x + bx));
+    const py = Math.max(0, Math.min(zone.height * 2 - 1, spawn.y + by));
+    const pikaTile = engine.getCollisionTileAtStep(zone, px, py);
+    const pikaOnWater = isWaterTile(zone, pikaTile);
+    state.pikachu.x = pikaOnWater ? spawn.x : px;
+    state.pikachu.y = pikaOnWater ? spawn.y : py;
+    state.pikachu.renderX = state.pikachu.x;
+    state.pikachu.renderY = state.pikachu.y;
+    state.pikachu.dir = state.player.dir;
+    state.pikachu.walking = false;
+    state.pikachu.moveAnim = null;
+    state.pikachu.spawnDelayed = false;
+  }
   syncPikachuOverworldState();
 
   audio.playTrack(zone.music);
   updateUIForCurrentZone();
-  renderAllCanvases();
+  renderAllCanvases(true);
 
   // ViridianMartDefaultScript (scripts/ViridianMart.asm:19-46):
   // Entering Viridian Mart for the first time automatically triggers Clerk's Oak's Parcel callout!
@@ -1193,7 +1231,14 @@ export function useFieldMove(moveId, options = {}) {
 }
 
 function attemptStep(dir) {
-  if (state.dialogue || state.battle || state.startMenu.open) return;
+  if (
+    state.titleScreen?.open ||
+    state.dialogue ||
+    state.battle ||
+    state.startMenu.open
+  ) {
+    return;
+  }
   if (state.player.moveAnim) return;
 
   const zone = state.currentZone;
@@ -1203,6 +1248,7 @@ function attemptStep(dir) {
   const dy = dir === "UP" ? -1 : dir === "DOWN" ? 1 : 0;
   const targetX = state.player.x + dx;
   const targetY = state.player.y + dy;
+  const dur = state.player.mode === "bike" ? 105 : 165;
 
   // 1. Check if standing on a warp tile at the edge of an indoor room and pressing outward
   const standingWarp = checkWarpAtStep(zone, state.player.x, state.player.y);
@@ -1225,6 +1271,7 @@ function attemptStep(dir) {
         standingWarp.warp
       );
       audio.playSfx("warp");
+      triggerWarpFade();
       loadZone(destConst, {
         warpIndex: destWarpIdx,
         fromOutdoorWarpIndex: standingWarp.warpIdx,
@@ -1233,8 +1280,18 @@ function attemptStep(dir) {
     }
   }
 
-  // 2. Check map border connections (North / South / West / East seamless transition!)
+  // 2. Check map border connections (North / South / West / East seamless 16px step across pre-stitched wOverworldMap border!)
   const conns = zone.connections || {};
+  const canStepBorderTile = (tx, ty) => {
+    const bTile = engine.getCollisionTileAtStep(zone, tx, ty);
+    const bWater = isWaterTile(zone, bTile);
+    return (
+      state.noClip ||
+      engine.isStepPassable(zone, state.player.x, state.player.y, tx, ty) ||
+      (bWater && (state.player.mode === "surf" || state.autoSurf))
+    );
+  };
+
   if (targetY < 0 && conns.north) {
     if (zone.constName === "PALLET_TOWN" && !state.events.gotStarterPikachu) {
       triggerOakIntroGrassEvent();
@@ -1242,10 +1299,23 @@ function attemptStep(dir) {
     }
     const targetZone = engine.zonesByConst[conns.north.targetConst];
     if (targetZone) {
-      const newX = targetX - conns.north.offset * 2;
-      const newY = targetZone.height * 2 - 1;
-      if (newX >= 0 && newX < targetZone.width * 2) {
-        loadZone(targetZone, { x: newX, y: newY, dir: "UP" });
+      const shiftX = -conns.north.offset * 2;
+      const shiftY = targetZone.height * 2;
+      const newX = targetX + shiftX;
+      const newY = targetY + shiftY;
+      if (
+        newX >= 0 &&
+        newX < targetZone.width * 2 &&
+        canStepBorderTile(targetX, targetY)
+      ) {
+        startPlayerMove(targetX, targetY, "UP", dur, false, {
+          targetZone,
+          newX,
+          newY,
+          dir: "UP",
+          shiftX,
+          shiftY,
+        });
         return;
       }
     }
@@ -1253,10 +1323,23 @@ function attemptStep(dir) {
   if (targetY >= zone.height * 2 && conns.south) {
     const targetZone = engine.zonesByConst[conns.south.targetConst];
     if (targetZone) {
-      const newX = targetX - conns.south.offset * 2;
-      const newY = 0;
-      if (newX >= 0 && newX < targetZone.width * 2) {
-        loadZone(targetZone, { x: newX, y: newY, dir: "DOWN" });
+      const shiftX = -conns.south.offset * 2;
+      const shiftY = -zone.height * 2;
+      const newX = targetX + shiftX;
+      const newY = targetY + shiftY;
+      if (
+        newX >= 0 &&
+        newX < targetZone.width * 2 &&
+        canStepBorderTile(targetX, targetY)
+      ) {
+        startPlayerMove(targetX, targetY, "DOWN", dur, false, {
+          targetZone,
+          newX,
+          newY,
+          dir: "DOWN",
+          shiftX,
+          shiftY,
+        });
         return;
       }
     }
@@ -1264,10 +1347,23 @@ function attemptStep(dir) {
   if (targetX < 0 && conns.west) {
     const targetZone = engine.zonesByConst[conns.west.targetConst];
     if (targetZone) {
-      const newX = targetZone.width * 2 - 1;
-      const newY = targetY - conns.west.offset * 2;
-      if (newY >= 0 && newY < targetZone.height * 2) {
-        loadZone(targetZone, { x: newX, y: newY, dir: "LEFT" });
+      const shiftX = targetZone.width * 2;
+      const shiftY = -conns.west.offset * 2;
+      const newX = targetX + shiftX;
+      const newY = targetY + shiftY;
+      if (
+        newY >= 0 &&
+        newY < targetZone.height * 2 &&
+        canStepBorderTile(targetX, targetY)
+      ) {
+        startPlayerMove(targetX, targetY, "LEFT", dur, false, {
+          targetZone,
+          newX,
+          newY,
+          dir: "LEFT",
+          shiftX,
+          shiftY,
+        });
         return;
       }
     }
@@ -1275,10 +1371,23 @@ function attemptStep(dir) {
   if (targetX >= zone.width * 2 && conns.east) {
     const targetZone = engine.zonesByConst[conns.east.targetConst];
     if (targetZone) {
-      const newX = 0;
-      const newY = targetY - conns.east.offset * 2;
-      if (newY >= 0 && newY < targetZone.height * 2) {
-        loadZone(targetZone, { x: newX, y: newY, dir: "RIGHT" });
+      const shiftX = -zone.width * 2;
+      const shiftY = -conns.east.offset * 2;
+      const newX = targetX + shiftX;
+      const newY = targetY + shiftY;
+      if (
+        newY >= 0 &&
+        newY < targetZone.height * 2 &&
+        canStepBorderTile(targetX, targetY)
+      ) {
+        startPlayerMove(targetX, targetY, "RIGHT", dur, false, {
+          targetZone,
+          newX,
+          newY,
+          dir: "RIGHT",
+          shiftX,
+          shiftY,
+        });
         return;
       }
     }
@@ -1411,11 +1520,17 @@ function attemptStep(dir) {
     syncPikachuOverworldState();
   }
 
-  const dur = state.player.mode === "bike" ? 105 : 165;
   startPlayerMove(targetX, targetY, dir, dur, false);
 }
 
-function startPlayerMove(destX, destY, dir, durationMs, isLedgeJump = false) {
+function startPlayerMove(
+  destX,
+  destY,
+  dir,
+  durationMs,
+  isLedgeJump = false,
+  pendingConnection = null
+) {
   const prevPlayerX = state.player.x;
   const prevPlayerY = state.player.y;
 
@@ -1429,6 +1544,7 @@ function startPlayerMove(destX, destY, dir, durationMs, isLedgeJump = false) {
     startTime: performance.now(),
     duration: durationMs,
     isLedgeJump,
+    pendingConnection,
   };
 
   // Move Pikachu to Red's previous step
@@ -1457,7 +1573,19 @@ function startPlayerMove(destX, destY, dir, durationMs, isLedgeJump = false) {
   }
 }
 
-function onPlayerStepCompleted() {
+function onPlayerStepCompleted(pendingConnection = null) {
+  if (pendingConnection) {
+    const { targetZone, newX, newY, dir, shiftX, shiftY } = pendingConnection;
+    loadZone(targetZone, {
+      x: newX,
+      y: newY,
+      dir,
+      pikachuX: state.pikachu.x + shiftX,
+      pikachuY: state.pikachu.y + shiftY,
+      preserveHeldDirs: true,
+    });
+  }
+
   const zone = state.currentZone;
   const sx = state.player.x;
   const sy = state.player.y;
@@ -1529,6 +1657,7 @@ function onPlayerStepCompleted() {
         hitWarp.warp
       );
       audio.playSfx("warp");
+      triggerWarpFade();
       loadZone(destConst, {
         warpIndex: destWarpIdx,
         fromOutdoorWarpIndex: hitWarp.warpIdx,
@@ -5330,10 +5459,11 @@ function gameLoop(now) {
           state.pikachu.moveAnim = null;
         }
 
-        onPlayerStepCompleted();
+        onPlayerStepCompleted(anim.pendingConnection || null);
       }
     } else if (
       heldDirs.size > 0 &&
+      !state.titleScreen?.open &&
       !state.dialogue &&
       !state.battle &&
       !state.startMenu.open
@@ -5445,6 +5575,163 @@ function gameLoop(now) {
   requestAnimationFrame(gameLoop);
 }
 
+// Authentic Pokémon Yellow Title Screen & Title Menu (engine/movie/title.asm & engine/menus/main_menu.asm)
+function getTitleMenuItems() {
+  return state.titleScreen.hasSave
+    ? ["CONTINUE", "NEW GAME", "OPTION"]
+    : ["NEW GAME", "OPTION"];
+}
+
+export function renderTitleScreen() {
+  const overlay = document.getElementById("title-screen-overlay");
+  if (!overlay) return;
+  if (!state.titleScreen.open) {
+    overlay.classList.add("hidden");
+    return;
+  }
+  overlay.classList.remove("hidden");
+
+  const splashView = document.getElementById("title-splash-view");
+  const menuView = document.getElementById("title-menu-view");
+
+  if (state.titleScreen.phase === "SPLASH") {
+    splashView?.classList.remove("hidden");
+    menuView?.classList.add("hidden");
+    const pikaCanvas = document.getElementById("title-pika-canvas");
+    const spr = engine.pokemonSprites.PIKACHU;
+    engine.render2BitGraphicToCanvas(pikaCanvas, spr, "PAL_YELLOWMON");
+    return;
+  }
+
+  splashView?.classList.add("hidden");
+  menuView?.classList.remove("hidden");
+
+  const items = getTitleMenuItems();
+  if (state.titleScreen.cursor >= items.length) {
+    state.titleScreen.cursor = 0;
+  }
+  const menuBox = document.getElementById("title-menu-box");
+  if (menuBox) {
+    menuBox.innerHTML = "";
+    items.forEach((lbl, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "bmenu-item";
+      btn.innerHTML = `<span class="bcursor">${
+        idx === state.titleScreen.cursor ? "▶" : " "
+      }</span><span>${lbl}</span>`;
+      btn.onmouseenter = () => {
+        state.titleScreen.cursor = idx;
+        renderTitleScreen();
+      };
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        state.titleScreen.cursor = idx;
+        handleTitleScreenInput("A");
+      };
+      menuBox.appendChild(btn);
+    });
+  }
+
+  const summaryBox = document.getElementById("title-save-summary");
+  if (summaryBox) {
+    if (state.titleScreen.hasSave && items[state.titleScreen.cursor] === "CONTINUE") {
+      summaryBox.classList.remove("hidden");
+      summaryBox.innerHTML = `
+        <div>PLAYER &nbsp;RED</div>
+        <div>BADGES &nbsp;${state.badges.size}</div>
+        <div>POKéDEX ${state.caughtPokemon.size}</div>
+      `;
+    } else {
+      summaryBox.classList.add("hidden");
+    }
+  }
+}
+
+export function startNewGameFromTitle() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
+  state.visitedZones = new Set(["PALLET_TOWN"]);
+  state.seenPokemon = new Set();
+  state.caughtPokemon = new Set();
+  state.defeatedTrainers = new Set();
+  state.badges = new Set();
+  for (const k of Object.keys(state.events)) {
+    state.events[k] = false;
+  }
+  state.party = [];
+  state.bag = [];
+  state.pikachu.visible = false;
+  state.pikachu.friendship = 90;
+  engine.cutTrees.clear();
+  engine.flashIlluminated = false;
+
+  state.titleScreen.open = false;
+  renderTitleScreen();
+  triggerWarpFade();
+  loadZone("PALLET_TOWN", { x: 5, y: 6, dir: "DOWN" });
+  audio.playSfx("pika");
+  openDialogue(
+    "PROF. OAK",
+    "OAK: Hello there! Welcome to the world of POKéMON!\n\nMy name is OAK! People call me the POKéMON PROF!\n\nYour very own POKéMON legend is about to unfold! Let's go!"
+  );
+}
+
+export function continueGameFromTitle() {
+  state.titleScreen.open = false;
+  renderTitleScreen();
+  triggerWarpFade();
+  audio.playSfx("blip");
+  renderAllCanvases(true);
+}
+
+export function handleTitleScreenInput(input) {
+  if (!state.titleScreen.open) return;
+
+  if (state.titleScreen.phase === "SPLASH") {
+    if (input === "A" || input === "START" || input === "SELECT") {
+      audio.playSfx("pika");
+      state.titleScreen.phase = "MENU";
+      state.titleScreen.cursor = 0;
+      renderTitleScreen();
+    }
+    return;
+  }
+
+  // phase === "MENU"
+  const items = getTitleMenuItems();
+  if (input === "UP") {
+    state.titleScreen.cursor =
+      (state.titleScreen.cursor - 1 + items.length) % items.length;
+    audio.playSfx("blip");
+    renderTitleScreen();
+  } else if (input === "DOWN") {
+    state.titleScreen.cursor = (state.titleScreen.cursor + 1) % items.length;
+    audio.playSfx("blip");
+    renderTitleScreen();
+  } else if (input === "B") {
+    audio.playSfx("blip");
+    state.titleScreen.phase = "SPLASH";
+    renderTitleScreen();
+  } else if (input === "A" || input === "START") {
+    const chosen = items[state.titleScreen.cursor];
+    if (chosen === "CONTINUE") {
+      continueGameFromTitle();
+    } else if (chosen === "NEW GAME") {
+      startNewGameFromTitle();
+    } else if (chosen === "OPTION") {
+      state.titleScreen.open = false;
+      renderTitleScreen();
+      state.startMenu.open = true;
+      state.startMenu.cursor = 5;
+      state.startMenu.subView = "OPTION";
+      audio.playSfx("blip");
+      renderStartMenu();
+    }
+  }
+}
+
 function setupControlsAndEvents() {
   // Keyboard controls
   const keyToDir = {
@@ -5464,6 +5751,23 @@ function setupControlsAndEvents() {
       (document.activeElement.tagName === "INPUT" ||
         document.activeElement.tagName === "SELECT")
     ) {
+      return;
+    }
+    if (state.titleScreen.open) {
+      if (keyToDir[e.code]) {
+        e.preventDefault();
+        handleTitleScreenInput(keyToDir[e.code]);
+      } else if (
+        e.code === "Space" ||
+        e.code === "Enter" ||
+        e.code === "KeyZ"
+      ) {
+        e.preventDefault();
+        handleTitleScreenInput("A");
+      } else if (e.code === "KeyX" || e.code === "Backspace" || e.code === "Escape") {
+        e.preventDefault();
+        handleTitleScreenInput("B");
+      }
       return;
     }
     if (state.battle) {
@@ -5561,6 +5865,10 @@ function setupControlsAndEvents() {
     const dir = btn.dataset.dpad;
     const startHold = (e) => {
       e.preventDefault();
+      if (state.titleScreen.open) {
+        handleTitleScreenInput(dir);
+        return;
+      }
       if (state.battle) {
         handleBattleInput(dir);
         return;
@@ -5582,7 +5890,9 @@ function setupControlsAndEvents() {
   });
 
   document.getElementById("btn-gb-a")?.addEventListener("click", () => {
-    if (state.battle) {
+    if (state.titleScreen.open) {
+      handleTitleScreenInput("A");
+    } else if (state.battle) {
       handleBattleInput("A");
     } else if (state.startMenu.open) {
       handleStartMenuInput("A");
@@ -5591,7 +5901,9 @@ function setupControlsAndEvents() {
     }
   });
   document.getElementById("btn-gb-b")?.addEventListener("click", () => {
-    if (state.dialogue) {
+    if (state.titleScreen.open) {
+      handleTitleScreenInput("B");
+    } else if (state.dialogue) {
       state.dialogue = null;
       renderDialogueModal();
     } else if (state.battle) {
@@ -5611,17 +5923,27 @@ function setupControlsAndEvents() {
     }
   });
   document.getElementById("btn-gb-start")?.addEventListener("click", () => {
-    if (state.startMenu.open) {
+    if (state.titleScreen.open) {
+      handleTitleScreenInput("START");
+    } else if (state.startMenu.open) {
       handleStartMenuInput("START");
     } else {
       toggleStartMenu();
     }
   });
   document.getElementById("btn-gb-select")?.addEventListener("click", () => {
-    if (state.battle) {
+    if (state.titleScreen.open) {
+      handleTitleScreenInput("SELECT");
+    } else if (state.battle) {
       handleBattleInput("SELECT");
     } else {
       openPikachuInteraction();
+    }
+  });
+
+  document.getElementById("title-splash-view")?.addEventListener("click", () => {
+    if (state.titleScreen.open && state.titleScreen.phase === "SPLASH") {
+      handleTitleScreenInput("START");
     }
   });
 
@@ -5970,14 +6292,26 @@ window.POKEYELLOW = {
   triggerViridianOldManTutorial,
   startScriptedCatchScene,
   awardStarterPikachuInLab,
+  handleTitleScreenInput,
+  startNewGameFromTitle,
+  continueGameFromTitle,
 };
 
 window.addEventListener("DOMContentLoaded", () => {
   loadProgress();
+  try {
+    state.titleScreen.hasSave = Boolean(
+      localStorage.getItem(STORAGE_KEY) &&
+        (state.events.gotStarterPikachu || state.visitedZones.size > 1)
+    );
+  } catch {
+    state.titleScreen.hasSave = false;
+  }
   setupControlsAndEvents();
   if (state.viewMode !== "gb") {
     renderZoneList();
   }
-  loadZone("PALLET_TOWN");
+  loadZone("PALLET_TOWN", { keepTitleScreen: true });
+  renderTitleScreen();
   requestAnimationFrame(gameLoop);
 });
