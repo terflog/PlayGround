@@ -5,6 +5,29 @@ import { GameBoyAudio } from "./audio.js";
 const engine = new PokeYellowEngine(POKEYELLOW_DATA);
 const audio = new GameBoyAudio(POKEYELLOW_DATA.music);
 
+// Global error boundaries to prevent unhandled exceptions from crashing the preview WebView
+window.addEventListener("error", (e) => {
+  e.preventDefault();
+});
+window.addEventListener("unhandledrejection", (e) => {
+  e.preventDefault();
+});
+
+// Persistent Canvas Pool so menu re-renders never allocate/orphan GPU 2D canvas contexts
+const _canvasPool = new Map();
+function getPooledCanvas(poolKey, width = 16, height = 16, className = "", id = "") {
+  let c = _canvasPool.get(poolKey);
+  if (!c) {
+    c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    _canvasPool.set(poolKey, c);
+  }
+  if (className) c.className = className;
+  if (id) c.id = id;
+  return c;
+}
+
 // State
 const state = {
   currentZone: engine.zonesByConst.PALLET_TOWN,
@@ -3453,7 +3476,7 @@ function executePartySwitch(targetPartyIdx) {
   b.activePlayerIdx = targetPartyIdx;
   b.forcedSwitch = false;
   b.moveCursor = 0;
-  audio.playSfx("warp");
+  audio.playPokemonCry(chosen.species);
 
   const msgs = [];
   if (!wasForced && prevMon.hp > 0) {
@@ -3732,6 +3755,8 @@ function handleBattleInput(input) {
       if (b.partySubCursor === 0) {
         executePartySwitch(b.partyCursor);
       } else if (b.partySubCursor === 1) {
+        const sMon = state.party[b.partyCursor];
+        if (sMon) audio.playPokemonCry(sMon.species);
         b.menuState = "PARTY_STATS";
         renderBattleModal();
       } else {
@@ -3909,26 +3934,38 @@ function renderBattleModal() {
     pMon.hp
   ).padStart(2, " ")}/${String(pMon.maxHp).padStart(2, " ")}`;
 
-  // 3. Draw Front & Back Sprites
+  // 3. Draw Front & Back Sprites (only redraw when sprite or palette changes)
   const foeCanvas = document.getElementById("battle-foe-canvas");
-  if (b.showTrainerSprite && b.trainerSprite && engine.trainerSprites[b.trainerSprite]) {
-    engine.render2BitGraphicToCanvas(
-      foeCanvas,
-      engine.trainerSprites[b.trainerSprite],
-      state.currentZone.palette
-    );
-  } else {
-    const foeSpr =
-      engine.pokemonSprites[foe.species] || engine.pokemonSprites.PIDGEY;
-    engine.render2BitGraphicToCanvas(foeCanvas, foeSpr, state.currentZone.palette);
+  if (foeCanvas) {
+    const foeDrawSig = `${b.showTrainerSprite ? b.trainerSprite : foe.species}|${state.currentZone.palette}|${engine.paletteMode}`;
+    if (foeCanvas._lastDrawSig !== foeDrawSig) {
+      foeCanvas._lastDrawSig = foeDrawSig;
+      if (b.showTrainerSprite && b.trainerSprite && engine.trainerSprites[b.trainerSprite]) {
+        engine.render2BitGraphicToCanvas(
+          foeCanvas,
+          engine.trainerSprites[b.trainerSprite],
+          state.currentZone.palette
+        );
+      } else {
+        const foeSpr =
+          engine.pokemonSprites[foe.species] || engine.pokemonSprites.PIDGEY;
+        engine.render2BitGraphicToCanvas(foeCanvas, foeSpr, state.currentZone.palette);
+      }
+    }
   }
 
   const backCanvas = document.getElementById("battle-player-canvas");
-  const backSpr =
-    (pMon.trainerSpriteKey && engine.trainerSprites[pMon.trainerSpriteKey]) ||
-    engine.pokemonSprites[`${pMon.species}_BACK`] ||
-    engine.pokemonSprites.PIKACHU_BACK;
-  engine.render2BitGraphicToCanvas(backCanvas, backSpr, "PAL_YELLOWMON");
+  if (backCanvas) {
+    const backDrawSig = `${pMon.trainerSpriteKey || pMon.species}|${engine.paletteMode}`;
+    if (backCanvas._lastDrawSig !== backDrawSig) {
+      backCanvas._lastDrawSig = backDrawSig;
+      const backSpr =
+        (pMon.trainerSpriteKey && engine.trainerSprites[pMon.trainerSpriteKey]) ||
+        engine.pokemonSprites[`${pMon.species}_BACK`] ||
+        engine.pokemonSprites.PIKACHU_BACK;
+      engine.render2BitGraphicToCanvas(backCanvas, backSpr, "PAL_YELLOWMON");
+    }
+  }
 
   // 4. Bottom MESSAGE_BOX text & blinking prompt
   const logEl = document.getElementById("battle-log-text");
@@ -4131,7 +4168,7 @@ function renderBattleModal() {
             : " ";
         row.innerHTML = `
           <span class="bcursor">${curChar}</span>
-          <canvas class="bparty-icon-canvas" width="16" height="16"></canvas>
+          <span class="bparty-icon-slot"></span>
           <div class="bparty-main">
             <div class="bparty-top">
               <span>${mon.nickname}${idx === b.activePlayerIdx ? " ★" : ""}</span>
@@ -4144,7 +4181,8 @@ function renderBattleModal() {
           </div>
           <span class="bparty-nums">${mon.hp}/${mon.maxHp}</span>
         `;
-        const iconCanvas = row.querySelector(".bparty-icon-canvas");
+        const iconCanvas = getPooledCanvas(`bparty_icon_${idx}`, 16, 16, "bparty-icon-canvas");
+        row.querySelector(".bparty-icon-slot")?.replaceWith(iconCanvas);
         engine.renderPartyMonIcon(iconCanvas, mon);
         row.onclick = (e) => {
           e.stopPropagation();
@@ -4188,7 +4226,7 @@ function renderBattleModal() {
           const content = document.getElementById("battle-stats-content");
           content.innerHTML = `
             <div class="stats-top-grid">
-              <canvas id="party-stats-canvas" width="40" height="40" style="width:48px;height:48px"></canvas>
+              <span id="party-stats-slot"></span>
               <div>
                 <div><strong>${sMon.nickname}</strong> &nbsp;:L${sMon.level}</div>
                 <div>HP: ${sMon.hp}/${sMon.maxHp} &nbsp;TYPE/${sMon.types.join("/")}</div>
@@ -4208,7 +4246,10 @@ function renderBattleModal() {
                 .join("")}
             </div>
           `;
-          const stCanvas = document.getElementById("party-stats-canvas");
+          const stCanvas = getPooledCanvas("battle_party_stats", 56, 56, "", "party-stats-canvas");
+          stCanvas.style.width = "48px";
+          stCanvas.style.height = "48px";
+          content.querySelector("#party-stats-slot")?.replaceWith(stCanvas);
           const spr =
             engine.pokemonSprites[sMon.species] || engine.pokemonSprites.PIKACHU;
           engine.render2BitGraphicToCanvas(stCanvas, spr, "PAL_YELLOWMON");
@@ -4400,9 +4441,10 @@ function updateUIForCurrentZone() {
   }
 
   updateCoordinatesUI();
-  if (state.viewMode !== "gb") {
-    renderKantoTownMap();
+  if (state.viewMode === "gb") {
+    return;
   }
+  renderKantoTownMap();
 
   // Highlight active row in zone list
   document.querySelectorAll(".zone-item").forEach((el) => {
@@ -4874,6 +4916,7 @@ export function handleStartMenuInput(input) {
           sm.partyActionOpen = false;
           renderStartMenu();
         } else if (act.type === "STATS") {
+          audio.playPokemonCry(mon.species);
           sm.partyStatsOpen = true;
           renderStartMenu();
         } else if (act.type === "SWITCH") {
@@ -5083,7 +5126,7 @@ export function renderStartMenu() {
           <span>KANTO</span>
         </div>
         <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#162436;overflow:hidden">
-          <canvas id="start-dex-area-canvas" width="160" height="104" style="width:100%;height:100%;display:block"></canvas>
+          <span id="start-dex-area-slot"></span>
           ${
             nestZones.length === 0
               ? `<div class="gb-poke-box" style="position:absolute;padding:4px 10px;font-size:10px;font-weight:900">AREA UNKNOWN</div>`
@@ -5108,7 +5151,11 @@ export function renderStartMenu() {
       };
       subBody.appendChild(wrap);
 
-      const areaCanvas = document.getElementById("start-dex-area-canvas");
+      const areaCanvas = getPooledCanvas("start_dex_area", 160, 104, "", "start-dex-area-canvas");
+      areaCanvas.style.width = "100%";
+      areaCanvas.style.height = "100%";
+      areaCanvas.style.display = "block";
+      wrap.querySelector("#start-dex-area-slot")?.replaceWith(areaCanvas);
       if (areaCanvas) {
         const ctx = areaCanvas.getContext("2d");
         const W = areaCanvas.width;
@@ -5160,7 +5207,7 @@ export function renderStartMenu() {
       wrap.innerHTML = `
         <div class="gb-dex-data-top">
           <div class="gb-dex-sprite-col">
-            <canvas id="start-dex-canvas" width="56" height="56" style="width:56px;height:56px"></canvas>
+            <span id="start-dex-sprite-slot"></span>
             <span>No.${String(Math.max(1, dexIdx)).padStart(3, "0")}</span>
           </div>
           <div class="gb-dex-info-col">
@@ -5185,13 +5232,16 @@ export function renderStartMenu() {
         renderStartMenu();
       };
       subBody.appendChild(wrap);
-      const c = document.getElementById("start-dex-canvas");
+      const c = getPooledCanvas("start_dex_sprite", 56, 56, "", "start-dex-canvas");
+      c.style.width = "56px";
+      c.style.height = "56px";
+      wrap.querySelector("#start-dex-sprite-slot")?.replaceWith(c);
       const spr = engine.pokemonSprites[sp] || engine.pokemonSprites.PIKACHU;
       engine.render2BitGraphicToCanvas(c, spr, "PAL_YELLOWMON");
       return;
     }
 
-    // ShowPokedexMenu (engine/menus/pokedex.asm): CONTENTS list on left, SEEN/OWN + DATA/CRY/AREA/QUIT on right
+    // ShowPokedexMenu (engine/menus/pokedex.asm): 7-row virtualized CONTENTS window on left, SEEN/OWN + DATA/CRY/AREA/QUIT on right
     const dexMenu = document.createElement("div");
     dexMenu.className = "gb-pokedex-menu";
     const leftCol = document.createElement("div");
@@ -5202,7 +5252,13 @@ export function renderStartMenu() {
     const listWrap = document.createElement("div");
     listWrap.className = "gb-pokedex-list";
 
-    allStats.forEach((st, idx) => {
+    const windowSize = 7;
+    const maxStart = Math.max(0, allStats.length - windowSize);
+    const startIdx = Math.max(0, Math.min(maxStart, sm.subCursor - 3));
+    const endIdx = Math.min(allStats.length, startIdx + windowSize);
+
+    for (let idx = startIdx; idx < endIdx; idx++) {
+      const st = allStats[idx];
       const owned = state.caughtPokemon.has(st.species);
       const seen = owned || state.seenPokemon.has(st.species);
       const isSelected = idx === sm.subCursor;
@@ -5237,7 +5293,7 @@ export function renderStartMenu() {
         }
       };
       listWrap.appendChild(row);
-    });
+    }
     leftCol.appendChild(listWrap);
 
     const rightCol = document.createElement("div");
@@ -5310,7 +5366,7 @@ export function renderStartMenu() {
             : " ";
         row.innerHTML = `
           <span class="bcursor">${curChar}</span>
-          <canvas class="bparty-icon-canvas" width="16" height="16"></canvas>
+          <span class="bparty-icon-slot"></span>
           <div class="bparty-main">
             <div class="bparty-top">
               <span>${mon.nickname}</span>
@@ -5323,7 +5379,8 @@ export function renderStartMenu() {
           </div>
           <span class="bparty-nums">${String(mon.hp).padStart(2, " ")}/${String(mon.maxHp).padStart(2, " ")}</span>
         `;
-        const iconCanvas = row.querySelector(".bparty-icon-canvas");
+        const iconCanvas = getPooledCanvas(`sparty_icon_${idx}`, 16, 16, "bparty-icon-canvas");
+        row.querySelector(".bparty-icon-slot")?.replaceWith(iconCanvas);
         engine.renderPartyMonIcon(iconCanvas, mon);
         row.onclick = () => {
           audio.playSfx("blip");
@@ -5390,7 +5447,7 @@ export function renderStartMenu() {
         <div class="battle-stats-content">
           <div class="stats-top-grid">
             <div style="display:flex;flex-direction:column;align-items:center">
-              <canvas id="start-party-stats-canvas" width="56" height="56" style="width:48px;height:48px"></canvas>
+              <span id="start-party-stats-slot"></span>
               <span>No.${String(Math.max(1, dexNum)).padStart(3, "0")}</span>
             </div>
             <div>
@@ -5420,12 +5477,13 @@ export function renderStartMenu() {
         renderStartMenu();
       };
       partyScreen.appendChild(statsModal);
-      setTimeout(() => {
-        const stCanvas = document.getElementById("start-party-stats-canvas");
-        const spr =
-          engine.pokemonSprites[sMon.species] || engine.pokemonSprites.PIKACHU;
-        engine.render2BitGraphicToCanvas(stCanvas, spr, "PAL_YELLOWMON");
-      }, 0);
+      const stCanvas = getPooledCanvas("start_party_stats", 56, 56, "", "start-party-stats-canvas");
+      stCanvas.style.width = "48px";
+      stCanvas.style.height = "48px";
+      statsModal.querySelector("#start-party-stats-slot")?.replaceWith(stCanvas);
+      const spr =
+        engine.pokemonSprites[sMon.species] || engine.pokemonSprites.PIKACHU;
+      engine.render2BitGraphicToCanvas(stCanvas, spr, "PAL_YELLOWMON");
     }
 
     subBody.appendChild(partyScreen);
@@ -5498,7 +5556,7 @@ export function renderStartMenu() {
           <div class="gb-trainer-info-row"><span>TIME/</span><span>${timeStr}</span></div>
         </div>
         <div class="gb-trainer-pic-wrap">
-          <canvas id="start-red-canvas" width="16" height="16"></canvas>
+          <span id="start-red-slot"></span>
         </div>
       </div>
       <div class="gb-badges-box">
@@ -5508,7 +5566,7 @@ export function renderStartMenu() {
             (b, idx) => `
             <div class="gb-badge-slot" title="${b.name} (${b.leader})">
               <span class="gb-badge-num">${idx + 1}</span>
-              <canvas class="gb-badge-canvas" data-badge-idx="${idx}" width="24" height="24"></canvas>
+              <span class="gb-badge-slot-holder" data-badge-idx="${idx}"></span>
             </div>
           `
           ).join("")}
@@ -5516,10 +5574,14 @@ export function renderStartMenu() {
       </div>
     `;
     subBody.appendChild(cardWrap);
-    const rc = document.getElementById("start-red-canvas");
+    const rc = getPooledCanvas("start_red_pic", 16, 16, "", "start-red-canvas");
+    cardWrap.querySelector("#start-red-slot")?.replaceWith(rc);
     engine.renderRedTrainerCardSprite(rc);
-    cardWrap.querySelectorAll(".gb-badge-canvas").forEach((bCanvas) => {
-      const idx = Number(bCanvas.dataset.badgeIdx);
+    cardWrap.querySelectorAll(".gb-badge-slot-holder").forEach((holder) => {
+      const idx = Number(holder.dataset.badgeIdx);
+      const bCanvas = getPooledCanvas(`badge_slot_${idx}`, 24, 24, "gb-badge-canvas");
+      bCanvas.dataset.badgeIdx = String(idx);
+      holder.replaceWith(bCanvas);
       const badgeDef = KANTO_GYM_BADGES[idx];
       if (badgeDef) {
         engine.renderTrainerCardBadgeSlot(
@@ -5540,7 +5602,7 @@ export function renderStartMenu() {
         <span>TOWN MAP</span>
       </div>
       <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#fcfaff;overflow:hidden">
-        <canvas id="start-town-map-canvas" width="160" height="104" style="width:100%;height:100%;display:block"></canvas>
+        <span id="start-town-map-slot"></span>
       </div>
       <div class="gb-poke-box" style="padding:4px 8px;font-size:9px;font-weight:900;min-height:32px;display:flex;align-items:center;justify-content:space-between">
         <span>CURRENT: ${curZ.displayName}</span>
@@ -5553,7 +5615,11 @@ export function renderStartMenu() {
       renderStartMenu();
     };
     subBody.appendChild(wrap);
-    const tmCanvas = document.getElementById("start-town-map-canvas");
+    const tmCanvas = getPooledCanvas("start_town_map", 160, 104, "", "start-town-map-canvas");
+    tmCanvas.style.width = "100%";
+    tmCanvas.style.height = "100%";
+    tmCanvas.style.display = "block";
+    wrap.querySelector("#start-town-map-slot")?.replaceWith(tmCanvas);
     if (tmCanvas) {
       const ctx = tmCanvas.getContext("2d");
       const W = tmCanvas.width;

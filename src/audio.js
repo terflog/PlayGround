@@ -53,46 +53,85 @@ const GEN1_CRY_DATA = {
   MEW: [0x1e, 0xee, 0xff],
 };
 
-// 38 Base Cry Contour Templates (relative frequency multipliers & sweep directions matching audio/cry_commands.asm)
+// 38 Distinct Base Cry Synthesis Profiles (matching SFX_Cry00..SFX_Cry25 in audio/cry_commands.asm)
+// Each entry: { steps: [[m0, m1, durWeight, wave], ...], detune: ratio, noise: [freqHz, gain] }
 const BASE_CRY_CONTOURS = [
-  [[1.0, 1.35], [1.28, 0.82], [0.95, 0.72]],
-  [[1.15, 0.9], [0.92, 1.32], [1.25, 0.88]],
-  [[0.85, 1.12], [1.08, 0.78], [0.82, 0.65]],
-  [[0.78, 1.18], [1.14, 0.84], [0.9, 1.05]],
-  [[1.22, 0.86], [0.95, 1.4], [1.3, 0.76]],
-  [[0.72, 0.92], [0.88, 0.64], [0.68, 0.55]],
-  [[1.45, 1.85], [1.75, 1.2], [1.55, 1.92]],
-  [[0.68, 1.05], [0.98, 0.62], [0.74, 0.88]],
-  [[1.32, 1.68], [1.52, 1.15], [1.28, 1.55]],
-  [[0.92, 1.42], [1.36, 0.88], [1.04, 1.24]],
-  [[0.88, 1.25], [1.18, 0.76], [0.94, 0.68]],
-  [[1.38, 1.1], [1.15, 1.52], [1.44, 1.05]],
-  [[1.05, 1.48], [1.38, 1.12], [1.18, 0.86]],
-  [[0.96, 0.74], [0.82, 1.18], [1.12, 0.78]],
-  [[1.28, 1.62], [1.48, 1.18], [1.35, 1.72]],
-  [[1.12, 1.54], [1.42, 0.96], [1.08, 1.36]],
-  [[1.42, 1.08], [1.18, 1.64], [1.5, 1.12]],
-  [[0.76, 1.14], [1.06, 0.7], [0.82, 0.62]],
-  [[0.84, 1.22], [1.12, 0.8], [0.9, 1.1]],
-  [[0.74, 1.08], [1.02, 0.68], [0.78, 0.92]],
-  [[1.18, 1.58], [1.46, 1.04], [1.22, 0.88]],
-  [[1.52, 1.18], [1.26, 1.68], [1.44, 1.08]],
-  [[1.35, 1.72], [1.58, 1.22], [1.4, 1.65]],
-  [[0.9, 1.32], [1.24, 0.78], [0.86, 1.08]],
-  [[1.08, 0.82], [0.9, 1.34], [1.26, 0.86]],
-  [[1.25, 1.62], [1.5, 1.14], [1.32, 1.54]],
-  [[1.16, 0.88], [0.96, 1.42], [1.34, 0.92]],
-  [[0.94, 1.36], [1.28, 1.02], [1.08, 0.82]],
-  [[1.38, 0.96], [1.08, 1.56], [1.46, 1.02]],
-  [[1.02, 1.44], [1.32, 0.88], [0.98, 1.22]],
-  [[1.28, 0.92], [1.04, 1.48], [1.38, 1.1]],
-  [[0.86, 1.26], [1.18, 0.82], [0.92, 1.14]],
-  [[1.2, 0.84], [0.94, 1.38], [1.28, 0.88]],
-  [[1.06, 1.46], [1.36, 0.94], [1.04, 0.78]],
-  [[1.44, 1.12], [1.22, 1.66], [1.52, 1.18]],
-  [[0.98, 1.38], [1.28, 0.84], [0.94, 1.18]],
-  [[0.82, 1.18], [1.1, 0.74], [0.86, 1.02]],
-  [[1.14, 1.52], [1.4, 0.98], [1.12, 1.38]],
+  // 0x00: NidoranM / Charizard / Sandshrew (2-part rising roar + gritty tail)
+  { steps: [[0.75, 1.35, 1.1, "square"], [1.3, 0.95, 0.7, "sawtooth"], [0.95, 1.48, 1.4, "square"], [1.4, 0.62, 1.6, "sawtooth"]], detune: 1.018, noise: [950, 0.14] },
+  // 0x01: NidoranF / Nidorina (3-chirp staccato squeak)
+  { steps: [[1.25, 1.65, 0.6, "square"], [0.9, 1.35, 0.5, "square"], [1.35, 1.85, 0.7, "square"], [1.7, 1.05, 1.1, "triangle"]], detune: 1.012, noise: [1800, 0.08] },
+  // 0x02: Slowpoke (long, slow, sleepy downward drawl)
+  { steps: [[0.82, 0.76, 2.2, "triangle"], [0.76, 0.92, 1.8, "square"], [0.9, 0.58, 2.8, "triangle"]], detune: 1.006, noise: [520, 0.06] },
+  // 0x03: Kangaskhan (deep double-stomp bellow)
+  { steps: [[0.62, 0.95, 1.2, "sawtooth"], [0.55, 0.85, 0.9, "square"], [0.85, 1.18, 1.5, "sawtooth"], [1.1, 0.52, 1.9, "sawtooth"]], detune: 0.985, noise: [680, 0.18] },
+  // 0x04: Charmander / Rhyhorn / Magmar (bright lizards chirp -> raspy tail)
+  { steps: [[1.1, 1.72, 0.75, "square"], [1.65, 1.15, 0.55, "square"], [1.18, 1.88, 0.95, "sawtooth"], [1.8, 0.88, 1.35, "square"]], detune: 1.022, noise: [1450, 0.12] },
+  // 0x05: Grimer / Snorlax (low, heavy, rumbling bass yawn)
+  { steps: [[0.52, 0.68, 1.9, "sawtooth"], [0.66, 0.48, 1.7, "triangle"], [0.58, 0.42, 2.4, "sawtooth"]], detune: 0.988, noise: [420, 0.16] },
+  // 0x06: Voltorb / Electrode / Electabuzz (rapid electric buzz-trill)
+  { steps: [[1.4, 1.95, 0.4, "sawtooth"], [1.1, 1.85, 0.4, "square"], [1.45, 2.05, 0.4, "sawtooth"], [1.15, 1.9, 0.4, "square"], [1.5, 2.15, 0.45, "sawtooth"], [2.0, 0.9, 0.9, "square"]], detune: 1.035, noise: [2600, 0.15] },
+  // 0x07: Muk / Gengar (menacing dark vibrato descent)
+  { steps: [[0.95, 0.65, 1.1, "sawtooth"], [0.72, 1.08, 0.9, "square"], [1.05, 0.58, 1.3, "sawtooth"], [0.68, 0.45, 1.8, "sawtooth"]], detune: 0.978, noise: [760, 0.17] },
+  // 0x08: Oddish / Gloom / Marowak (clear 2-syllable whistle)
+  { steps: [[1.15, 1.55, 0.8, "triangle"], [1.5, 1.85, 0.9, "square"], [1.3, 0.95, 1.2, "triangle"]], detune: 1.01, noise: [1200, 0.05] },
+  // 0x09: Raichu / Nidoking / Articuno / Moltres (majestic sweeping legendary cry)
+  { steps: [[0.9, 1.45, 1.0, "square"], [1.4, 1.82, 1.1, "triangle"], [1.75, 1.25, 0.9, "square"], [1.3, 1.92, 1.3, "sawtooth"], [1.85, 0.85, 1.6, "triangle"]], detune: 1.016, noise: [1650, 0.11] },
+  // 0x0A: Nidoqueen / Mankey / Primeape (screeching Simian bark)
+  { steps: [[1.35, 0.85, 0.65, "sawtooth"], [0.95, 1.55, 0.7, "square"], [1.45, 0.78, 0.8, "sawtooth"], [0.88, 1.42, 1.1, "sawtooth"]], detune: 1.028, noise: [1900, 0.18] },
+  // 0x0B: Diglett / Doduo / Exeggcute (fast 4-pip chattering chirp)
+  { steps: [[1.3, 1.7, 0.42, "square"], [1.1, 1.55, 0.42, "square"], [1.35, 1.8, 0.42, "square"], [1.2, 1.65, 0.42, "square"], [1.5, 1.05, 0.75, "triangle"]], detune: 1.015, noise: [2100, 0.07] },
+  // 0x0C: Seel / Dewgong / Hitmonchan / Lickitung (smooth barking arpeggio)
+  { steps: [[0.88, 1.22, 0.9, "triangle"], [1.2, 1.52, 0.9, "square"], [1.48, 0.92, 1.4, "triangle"]], detune: 1.008, noise: [980, 0.08] },
+  // 0x0D: Fearow / Drowzee / Exeggutor / Jynx (warbling hypnotic vibrato)
+  { steps: [[1.15, 0.92, 0.6, "square"], [0.92, 1.22, 0.6, "triangle"], [1.22, 0.88, 0.6, "square"], [0.88, 1.28, 0.6, "triangle"], [1.25, 0.75, 1.2, "square"]], detune: 1.02, noise: [1100, 0.09] },
+  // 0x0E: Pidgey / Jigglypuff / Poliwag / Ditto (rapid fluttering bird/fairy trill)
+  { steps: [[1.25, 1.68, 0.48, "triangle"], [1.62, 1.28, 0.48, "square"], [1.3, 1.78, 0.52, "triangle"], [1.72, 1.18, 0.65, "square"]], detune: 1.009, noise: [1750, 0.06] },
+  // 0x0F: Bulbasaur / Ivysaur / Venusaur / Dratini / Dragonite (iconic 2-phrase frog/dragon cry!)
+  { steps: [[0.92, 1.38, 1.0, "square"], [1.32, 0.82, 0.75, "sawtooth"], [0.78, 0.78, 0.35, "triangle"], [0.88, 1.48, 1.25, "square"], [1.42, 0.68, 1.55, "sawtooth"]], detune: 1.014, noise: [1050, 0.13] },
+  // 0x10: Spearow / Farfetch'd (sharp avian squawk)
+  { steps: [[1.55, 1.05, 0.5, "sawtooth"], [1.1, 1.85, 0.65, "square"], [1.75, 0.95, 0.95, "sawtooth"]], detune: 1.024, noise: [2300, 0.14] },
+  // 0x11: Rhydon (heavy armored horn blast)
+  { steps: [[0.58, 0.92, 1.3, "sawtooth"], [0.88, 0.64, 0.9, "sawtooth"], [0.7, 1.15, 1.5, "square"], [1.08, 0.52, 1.8, "sawtooth"]], detune: 0.982, noise: [620, 0.19] },
+  // 0x12: Golem / Hitmonlee / Koffing / Tangela (percussive martial/rock crunch)
+  { steps: [[0.72, 1.18, 0.7, "sawtooth"], [1.12, 0.68, 0.7, "square"], [0.78, 1.28, 0.8, "sawtooth"], [1.22, 0.58, 1.4, "sawtooth"]], detune: 0.99, noise: [840, 0.2] },
+  // 0x13: Blastoise / Kakuna / Beedrill (buzzing cannon/insect drone)
+  { steps: [[0.82, 1.12, 0.75, "sawtooth"], [1.08, 0.85, 0.65, "square"], [0.88, 1.25, 0.9, "sawtooth"], [1.2, 0.62, 1.5, "sawtooth"]], detune: 1.026, noise: [1300, 0.16] },
+  // 0x14: Pidgeotto / Pidgeot / Chansey / Pinsir (sweeping crest call)
+  { steps: [[1.05, 1.58, 0.95, "square"], [1.52, 1.18, 0.8, "triangle"], [1.22, 1.72, 1.1, "square"], [1.65, 0.88, 1.4, "triangle"]], detune: 1.012, noise: [1500, 0.1] },
+  // 0x15: Weedle / Arcanine (high-to-low howl/squeak)
+  { steps: [[1.48, 1.92, 0.65, "square"], [1.85, 1.25, 0.85, "sawtooth"], [1.3, 0.78, 1.35, "square"]], detune: 1.015, noise: [1600, 0.11] },
+  // 0x16: Caterpie / Butterfree / Goldeen / Scyther / Kabuto (delicate fluttering wing-trill)
+  { steps: [[1.35, 1.75, 0.38, "triangle"], [1.65, 1.25, 0.38, "square"], [1.4, 1.85, 0.38, "triangle"], [1.75, 1.3, 0.38, "square"], [1.5, 1.95, 0.65, "triangle"]], detune: 1.007, noise: [2400, 0.05] },
+  // 0x17: Ekans / Arbok / Onix / Magikarp / Gyarados (hissing serpent/leviathan roar!)
+  { steps: [[0.68, 1.22, 1.1, "sawtooth"], [1.18, 0.75, 0.95, "sawtooth"], [0.82, 1.38, 1.25, "square"], [1.32, 0.55, 1.85, "sawtooth"]], detune: 0.984, noise: [1150, 0.22] },
+  // 0x18: Wartortle / Shellder / Cloyster / Kabutops / Zapdos (sharp crackling shell/lightning burst)
+  { steps: [[1.28, 1.88, 0.55, "sawtooth"], [1.12, 1.72, 0.5, "square"], [1.35, 1.98, 0.65, "sawtooth"], [1.9, 0.85, 1.2, "square"]], detune: 1.03, noise: [2200, 0.17] },
+  // 0x19: Clefairy / Meowth / Cubone / Horsea (cute bell-like 3-note chime)
+  { steps: [[1.18, 1.48, 0.65, "triangle"], [1.45, 1.12, 0.55, "square"], [1.22, 1.68, 1.05, "triangle"]], detune: 1.005, noise: [1400, 0.04] },
+  // 0x1A: Venonat / Tentacool / Eevee / Vaporeon / Jolteon / Flareon (lyrical fox/aquatic trill)
+  { steps: [[1.08, 1.52, 0.7, "triangle"], [1.48, 1.18, 0.6, "square"], [1.24, 1.74, 0.85, "triangle"], [1.68, 0.96, 1.1, "square"]], detune: 1.011, noise: [1550, 0.07] },
+  // 0x1B: Lapras (whale song harmonic glide)
+  { steps: [[0.85, 1.28, 1.6, "triangle"], [1.25, 1.48, 1.4, "triangle"], [1.42, 0.92, 2.1, "square"]], detune: 1.004, noise: [650, 0.05] },
+  // 0x1C: Metapod / Abra / Kadabra / Alakazam / Magnemite / Gastly (psychic/metallic phase pulse)
+  { steps: [[1.45, 0.95, 0.5, "square"], [0.98, 1.55, 0.5, "sawtooth"], [1.5, 0.88, 0.5, "square"], [0.92, 1.62, 0.5, "sawtooth"], [1.58, 0.72, 1.1, "square"]], detune: 1.038, noise: [1950, 0.1] },
+  // 0x1D: Squirtle / Zubat / Golbat / Tauros (bubbly/ultrasonic 4-bounce cry)
+  { steps: [[1.15, 1.58, 0.58, "square"], [1.5, 1.08, 0.52, "triangle"], [1.18, 1.68, 0.68, "square"], [1.62, 0.92, 1.05, "triangle"]], detune: 1.016, noise: [1680, 0.09] },
+  // 0x1E: Paras / Staryu / Starmie / Mewtwo / Mew (cosmic resonant shimmer)
+  { steps: [[1.22, 1.78, 0.7, "triangle"], [1.72, 1.32, 0.65, "square"], [1.38, 1.92, 0.85, "triangle"], [1.85, 1.12, 0.8, "square"], [1.45, 2.05, 1.35, "triangle"]], detune: 1.019, noise: [2050, 0.08] },
+  // 0x1F: Growlithe / Machop / Machoke / Machamp / Omanyte (brawling double-bark)
+  { steps: [[0.95, 1.42, 0.65, "sawtooth"], [1.35, 0.82, 0.55, "square"], [0.98, 1.52, 0.85, "sawtooth"], [1.45, 0.72, 1.15, "sawtooth"]], detune: 1.021, noise: [1250, 0.15] },
+  // 0x20: Krabby / Kingler / Mr. Mime (clicking pincer/clown arpeggio)
+  { steps: [[1.32, 0.92, 0.45, "square"], [0.95, 1.45, 0.45, "square"], [1.4, 0.88, 0.45, "square"], [0.92, 1.55, 0.85, "triangle"]], detune: 1.025, noise: [2250, 0.12] },
+  // 0x21: Psyduck / Golduck / Bellsprout (quacking 3-honk cadence)
+  { steps: [[1.02, 1.32, 0.7, "sawtooth"], [0.92, 1.25, 0.7, "square"], [1.08, 1.48, 0.95, "sawtooth"], [1.4, 0.82, 1.1, "triangle"]], detune: 1.017, noise: [1350, 0.13] },
+  // 0x22: Rattata / Raticate (fast, scratchy rodent double-squeak)
+  { steps: [[1.38, 1.92, 0.48, "sawtooth"], [1.8, 1.12, 0.42, "square"], [1.28, 1.98, 0.68, "sawtooth"]], detune: 1.028, noise: [2500, 0.16] },
+  // 0x23: Vileplume / Aerodactyl (soaring prehistoric shriek)
+  { steps: [[1.12, 1.75, 0.9, "sawtooth"], [1.68, 1.22, 0.75, "square"], [1.28, 1.88, 1.1, "sawtooth"], [1.8, 0.78, 1.65, "sawtooth"]], detune: 1.022, noise: [1750, 0.18] },
+  // 0x24: Vulpix / Ninetales / Geodude / Graveler (yip / rocky resonance)
+  { steps: [[0.92, 1.36, 0.75, "square"], [1.3, 0.88, 0.65, "sawtooth"], [0.96, 1.44, 1.15, "square"]], detune: 1.014, noise: [1100, 0.14] },
+  // 0x25: Weepinbell / Victreebel / Ponyta / Rapidash / Porygon (cyber/whinnying glissando)
+  { steps: [[0.98, 1.58, 0.7, "square"], [1.52, 1.15, 0.65, "triangle"], [1.2, 1.78, 0.8, "square"], [1.72, 0.92, 1.3, "sawtooth"]], detune: 1.02, noise: [1600, 0.11] },
 ];
 
 // Authentic Game Boy 3-Channel Chiptune Synthesizer & Sound Effects Engine
@@ -104,8 +143,22 @@ export class GameBoyAudio {
     this.currentTrackName = null;
     this.timers = [];
     this.sfxTimers = [];
+    this.cryTimers = [];
     this.activeOscillators = new Set();
     this.masterGain = null;
+    this.noiseBuffer = null;
+
+    // Automatically unlock AudioContext on first user interaction so cries always play
+    if (typeof window !== "undefined") {
+      const unlock = () => {
+        if (this.ctx && this.ctx.state === "suspended") {
+          this.ctx.resume().catch(() => {});
+        }
+      };
+      window.addEventListener("pointerdown", unlock, { passive: true });
+      window.addEventListener("keydown", unlock, { passive: true });
+      window.addEventListener("touchstart", unlock, { passive: true });
+    }
   }
 
   init() {
@@ -299,59 +352,120 @@ export class GameBoyAudio {
     } catch {}
   }
 
+  // Game Boy Channel 4 LFSR Noise Burst for authentic Pokémon cry texture
+  playNoiseBurst(filterFreq, durMs, volume = 0.12) {
+    if (!this.ctx || !this.masterGain) return;
+    try {
+      if (!this.noiseBuffer) {
+        const sr = this.ctx.sampleRate;
+        const len = Math.floor(sr * 0.5);
+        this.noiseBuffer = this.ctx.createBuffer(1, len, sr);
+        const data = this.noiseBuffer.getChannelData(0);
+        let lfsr = 0x7fff;
+        for (let i = 0; i < len; i++) {
+          const bit = ((lfsr >> 0) ^ (lfsr >> 1)) & 1;
+          lfsr = (lfsr >> 1) | (bit << 14);
+          data[i] = (lfsr & 1) ? 0.8 : -0.8;
+        }
+      }
+      const now = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(Math.max(120, Math.min(6000, filterFreq || 1000)), now);
+      filter.Q.setValueAtTime(2.2, now);
+      const gain = this.ctx.createGain();
+      const durSec = Math.max(0.02, (Number(durMs) || 80) / 1000);
+      gain.gain.setValueAtTime(Math.max(0.005, Math.min(0.4, volume)), now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + durSec);
+
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      src.start(now);
+      src.stop(now + durSec + 0.01);
+    } catch {}
+  }
+
   // Synthesize authentic species-specific Gen I Pokémon Cry (PlayCry in home/audio.asm & data/pokemon/cries.asm)
   playPokemonCry(species, options = {}) {
     if (!this.init()) return false;
+    for (const t of this.cryTimers) clearTimeout(t);
+    this.cryTimers = [];
+
     const sp = String(species || "PIKACHU").toUpperCase();
-    const faintFactor = options && options.faint ? 0.74 : 1.0;
+    const faintFactor = options && options.faint ? 0.72 : 1.0;
 
     // Special Pikachu Yellow voice cry ("Pika-Pika!")
     if (sp === "PIKACHU") {
       const pikaSeq = [
-        [1180, 1520, 58],
-        [1460, 1320, 54],
-        [1240, 1760, 85],
+        [1180, 1560, 62, "square"],
+        [1480, 1310, 56, "triangle"],
+        [1260, 1820, 95, "square"],
       ];
       let delay = 0;
-      pikaSeq.forEach(([f0, f1, dur]) => {
+      pikaSeq.forEach(([f0, f1, dur, w]) => {
         const id = setTimeout(() => {
-          const idx = this.sfxTimers.indexOf(id);
-          if (idx !== -1) this.sfxTimers.splice(idx, 1);
-          this.playSweepNote(f0 * faintFactor, f1 * faintFactor, dur, "square", 0.38);
+          const idx = this.cryTimers.indexOf(id);
+          if (idx !== -1) this.cryTimers.splice(idx, 1);
+          this.playSweepNote(f0 * faintFactor, f1 * faintFactor, dur, w, 0.36);
+          this.playSweepNote(f0 * 1.012 * faintFactor, f1 * 1.012 * faintFactor, dur, "triangle", 0.2);
         }, delay);
-        this.sfxTimers.push(id);
-        delay += dur + 12;
+        this.cryTimers.push(id);
+        delay += dur + 14;
       });
       return true;
     }
 
     const [baseCryId, pitchByte, lengthByte] =
       GEN1_CRY_DATA[sp] || [0x00, 0x40, 0x80];
-    const contour =
+    const profile =
       BASE_CRY_CONTOURS[baseCryId % BASE_CRY_CONTOURS.length] ||
       BASE_CRY_CONTOURS[0];
 
-    // Map Gen I pitch byte (0x00..0xFF) & length byte (0x00..0xFF) to frequency & step timing
-    const signedPitch = pitchByte > 127 ? pitchByte - 256 : pitchByte;
-    const rootFreq = (340 + signedPitch * 1.45 + (baseCryId % 11) * 18) * faintFactor;
-    const segDurMs = Math.max(42, Math.min(135, 58 + (lengthByte / 255) * 68));
+    // Map unsigned Gen I pitchByte (0x00..0xFF) across a wide 165 Hz .. 1,180 Hz range
+    // and unsigned lengthByte (0x00..0xFF) across 30ms .. 145ms base step duration
+    let speciesSalt = 0;
+    for (let i = 0; i < sp.length; i++) {
+      speciesSalt = (speciesSalt * 17 + sp.charCodeAt(i)) & 0xff;
+    }
+    const rootFreq =
+      (165 + (pitchByte / 255) * 760 + (baseCryId % 9) * 24 + (speciesSalt % 37)) *
+      faintFactor;
+    const baseStepMs = Math.max(28, Math.min(155, 34 + (lengthByte / 255) * 96));
+    const detune = profile.detune || 1.015;
+    const [noiseFreq, noiseVol] = profile.noise || [1100, 0.1];
 
     let offsetMs = 0;
-    contour.forEach(([m0, m1], idx) => {
-      const dur = idx === contour.length - 1 ? segDurMs * 1.25 : segDurMs;
+    profile.steps.forEach(([m0, m1, durWeight, wave], idx) => {
+      const dur = Math.max(24, baseStepMs * (durWeight || 1.0));
       const id = setTimeout(() => {
-        const pos = this.sfxTimers.indexOf(id);
-        if (pos !== -1) this.sfxTimers.splice(pos, 1);
+        const pos = this.cryTimers.indexOf(id);
+        if (pos !== -1) this.cryTimers.splice(pos, 1);
+        // Channel 1: Lead Pulse
         this.playSweepNote(
           rootFreq * m0,
           rootFreq * m1,
           dur,
-          idx % 2 === 0 ? "square" : "sawtooth",
-          0.36
+          wave || "square",
+          0.34
         );
+        // Channel 2: Detuned Harmony / Counter-Sweep Pulse
+        this.playSweepNote(
+          rootFreq * m0 * detune,
+          rootFreq * m1 * (2 - detune),
+          dur * 0.95,
+          idx % 2 === 0 ? "sawtooth" : "square",
+          0.2
+        );
+        // Channel 4: LFSR Noise rasp on accented cry steps
+        if (idx === 0 || idx === profile.steps.length - 1) {
+          this.playNoiseBurst(noiseFreq * faintFactor, dur * 0.85, noiseVol);
+        }
       }, offsetMs);
-      this.sfxTimers.push(id);
-      offsetMs += dur * 0.92;
+      this.cryTimers.push(id);
+      offsetMs += dur * 0.88;
     });
     return true;
   }
