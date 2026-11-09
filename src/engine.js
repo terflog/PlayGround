@@ -112,7 +112,12 @@ export class PokeYellowEngine {
         (conns.east ? 1 : 0);
       const romBank = (idx % 63) + 1; // Banks 0x01..0x3F in MBC3 0x4000-0x7FFF window
       const romAddress = 0x4000 + ((idx * 184) & 0x3fff);
-      const copy = { ...z, connectionsByte, romBank, romAddress };
+      // Strip conditional _DEBUG warps from REDS_HOUSE_2F (data/maps/objects/RedsHouse2F.asm:8-13)
+      const cleanWarps =
+        z.constName === "REDS_HOUSE_2F" && Array.isArray(z.warps)
+          ? z.warps.slice(0, 1)
+          : z.warps;
+      const copy = { ...z, warps: cleanWarps, connectionsByte, romBank, romAddress };
       Object.defineProperty(copy, "blockBytes", {
         enumerable: true,
         configurable: true,

@@ -93,10 +93,14 @@ const state = {
   },
   titleMenu: {
     open: true,
-    screen: "TITLE", // "TITLE" | "MAIN_MENU" | "OPTION"
+    screen: "TITLE", // "TITLE" | "MAIN_MENU" | "OPTION" | "OAK_SPEECH"
     cursor: 0,
     optionCursor: 0,
+    oakStep: 0,
+    nameCursor: 0,
   },
+  playerName: "RED",
+  rivalName: "BLUE",
   options: {
     textSpeed: "FAST", // "FAST" | "MEDIUM" | "SLOW"
     battleAnimation: "ON", // "ON" | "OFF"
@@ -419,6 +423,7 @@ export function healParty() {
 }
 
 function saveProgress() {
+  if (state.titleMenu?.open) return;
   try {
     const payload = {
       visitedZones: Array.from(state.visitedZones),
@@ -4575,6 +4580,19 @@ export function openTitleScreen(screen = "TITLE") {
   renderTitleScreen();
 }
 
+const PLAYER_PRESET_NAMES = ["RED", "YELLOW", "ASH", "JACK"];
+const RIVAL_PRESET_NAMES = ["BLUE", "GARY", "JOHN"];
+
+function finishOakSpeechAndSpawn() {
+  const tm = state.titleMenu;
+  tm.open = false;
+  tm.screen = "TITLE";
+  renderTitleScreen();
+  // InitPlayerData spawns Red in REDS_HOUSE_2F at (3, 6) with PALLET_TOWN as parent outdoor map
+  state.lastOutdoorMap = { mapConst: "PALLET_TOWN", warpIndex: 0 };
+  loadZone("REDS_HOUSE_2F", { x: 3, y: 6, dir: "DOWN" });
+}
+
 export function handleTitleMenuInput(input) {
   const tm = state.titleMenu;
   if (!tm.open) return;
@@ -4584,6 +4602,69 @@ export function handleTitleMenuInput(input) {
       audio.playPokemonCry("PIKACHU");
       tm.screen = "MAIN_MENU";
       tm.cursor = 0;
+      renderTitleScreen();
+    }
+    return;
+  }
+
+  if (tm.screen === "OAK_SPEECH") {
+    // Step 5: ChoosePlayerName (DefaultNamesPlayerList)
+    if (tm.oakStep === 5) {
+      if (input === "UP") {
+        tm.nameCursor =
+          (tm.nameCursor - 1 + PLAYER_PRESET_NAMES.length) %
+          PLAYER_PRESET_NAMES.length;
+        audio.playSfx("blip");
+        renderTitleScreen();
+      } else if (input === "DOWN") {
+        tm.nameCursor = (tm.nameCursor + 1) % PLAYER_PRESET_NAMES.length;
+        audio.playSfx("blip");
+        renderTitleScreen();
+      } else if (input === "A" || input === "START") {
+        state.playerName = PLAYER_PRESET_NAMES[tm.nameCursor] || "RED";
+        audio.playSfx("blip");
+        tm.oakStep = 6;
+        renderTitleScreen();
+      }
+      return;
+    }
+
+    // Step 8: ChooseRivalName (DefaultNamesRivalList)
+    if (tm.oakStep === 8) {
+      if (input === "UP") {
+        tm.nameCursor =
+          (tm.nameCursor - 1 + RIVAL_PRESET_NAMES.length) %
+          RIVAL_PRESET_NAMES.length;
+        audio.playSfx("blip");
+        renderTitleScreen();
+      } else if (input === "DOWN") {
+        tm.nameCursor = (tm.nameCursor + 1) % RIVAL_PRESET_NAMES.length;
+        audio.playSfx("blip");
+        renderTitleScreen();
+      } else if (input === "A" || input === "START") {
+        state.rivalName = RIVAL_PRESET_NAMES[tm.nameCursor] || "BLUE";
+        audio.playSfx("blip");
+        tm.oakStep = 9;
+        renderTitleScreen();
+      }
+      return;
+    }
+
+    if (input === "A" || input === "B" || input === "START") {
+      tm.oakStep++;
+      if (tm.oakStep === 2) {
+        // Pikachu pops out of Poké Ball during OakSpeechText2A!
+        audio.playPokemonCry("PIKACHU");
+      } else {
+        audio.playSfx("blip");
+      }
+      if (tm.oakStep === 5 || tm.oakStep === 8) {
+        tm.nameCursor = 0;
+      }
+      if (tm.oakStep > 10) {
+        finishOakSpeechAndSpawn();
+        return;
+      }
       renderTitleScreen();
     }
     return;
@@ -4668,9 +4749,12 @@ export function handleTitleMenuInput(input) {
       }
       state.pikachu.visible = false;
       state.pikachu.friendship = 90;
-      tm.open = false;
+      state.playerName = "RED";
+      state.rivalName = "BLUE";
+      tm.screen = "OAK_SPEECH";
+      tm.oakStep = 0;
+      tm.nameCursor = 0;
       renderTitleScreen();
-      loadZone("PALLET_TOWN", { x: 5, y: 6, dir: "DOWN" });
     } else if (chosen === "OPTION") {
       tm.screen = "OPTION";
       tm.optionCursor = 0;
@@ -4821,6 +4905,98 @@ export function renderTitleScreen() {
       engine.pikachuFaces[frameKey] || engine.pokemonSprites.PIKACHU,
       "PAL_PIKACHU_PORTRAIT"
     );
+    return;
+  }
+
+  if (tm.screen === "OAK_SPEECH") {
+    // Authentic OakSpeech Intro Sequence (engine/movie/oak_speech/oak_speech.asm & oak_speech2.asm)
+    const step = tm.oakStep || 0;
+    const oakPages = [
+      { sprite: "OAK", text: "Hello there!\nWelcome to the\nworld of POKéMON!" },
+      { sprite: "OAK", text: "My name is OAK!\nPeople call me\nthe POKéMON PROF!" },
+      { sprite: "PIKACHU", text: "This world is\ninhabited by\ncreatures called\nPOKéMON!" },
+      { sprite: "PIKACHU", text: "For some people,\nPOKéMON are pets.\nOthers use them\nfor fights." },
+      { sprite: "RED", text: "First, what is\nyour name?" },
+      { sprite: "RED_RIGHT", text: "Choose your\nname:", menu: PLAYER_PRESET_NAMES, menuTitle: "NAME" },
+      { sprite: "RED", text: `Right! So your\nname is ${state.playerName}!` },
+      { sprite: "RIVAL", text: "This is my grand-\nson. He's been\nyour rival since\nyou were a baby.\n...Erm, what is\nhis name again?" },
+      { sprite: "RIVAL_RIGHT", text: "Choose his\nname:", menu: RIVAL_PRESET_NAMES, menuTitle: "NAME" },
+      { sprite: "RIVAL", text: `That's right! I\nremember now! His\nname is ${state.rivalName}!` },
+      { sprite: "RED_SHRINK", text: `${state.playerName}!\nYour very own\nPOKéMON legend is\nabout to unfold!\nA world of dreams\nand adventures\nwith POKéMON\nawaits! Let's go!` },
+    ];
+    const curPage = oakPages[step] || oakPages[0];
+    const isRightShifted =
+      curPage.sprite === "RED_RIGHT" || curPage.sprite === "RIVAL_RIGHT";
+
+    const wrap = document.createElement("div");
+    wrap.className = "gb-oakspeech-screen";
+    wrap.innerHTML = `
+      <div class="gb-oakspeech-stage ${isRightShifted ? "shifted-right" : ""}">
+        ${
+          curPage.menu
+            ? `
+          <div class="gb-poke-box gb-name-menu-box">
+            <div class="gb-name-menu-title">${curPage.menuTitle}</div>
+            ${curPage.menu
+              .map(
+                (nm, nIdx) =>
+                  `<button type="button" class="smenu-item" data-oak-name-idx="${nIdx}"><span class="bcursor">${
+                    nIdx === tm.nameCursor ? "▶" : " "
+                  }</span>${nm}</button>`
+              )
+              .join("")}
+          </div>
+        `
+            : ""
+        }
+        <canvas id="oakspeech-canvas" width="56" height="56"></canvas>
+      </div>
+      <div class="gb-textbox gb-poke-box" id="oakspeech-textbox" style="height:33.33%;width:100%">
+        <p class="gb-dialogue-text">${curPage.text}</p>
+        ${!curPage.menu ? '<span class="gb-prompt-arrow">▼</span>' : ""}
+      </div>
+    `;
+
+    wrap.querySelectorAll("[data-oak-name-idx]").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        tm.nameCursor = Number(btn.dataset.oakNameIdx);
+        handleTitleMenuInput("A");
+      };
+    });
+    if (!curPage.menu) {
+      wrap.onclick = () => handleTitleMenuInput("A");
+    }
+    overlay.appendChild(wrap);
+
+    const canvas = document.getElementById("oakspeech-canvas");
+    if (canvas) {
+      if (curPage.sprite === "OAK") {
+        engine.render2BitGraphicToCanvas(
+          canvas,
+          engine.trainerSprites.PROF_OAK,
+          "PAL_BROWNMON"
+        );
+      } else if (curPage.sprite === "PIKACHU") {
+        engine.render2BitGraphicToCanvas(
+          canvas,
+          engine.pokemonSprites.PIKACHU,
+          "PAL_YELLOWMON"
+        );
+      } else if (curPage.sprite === "RIVAL" || curPage.sprite === "RIVAL_RIGHT") {
+        engine.render2BitGraphicToCanvas(
+          canvas,
+          engine.trainerSprites.RIVAL1,
+          "PAL_REDMON"
+        );
+      } else {
+        engine.renderRedTrainerCardSprite(canvas);
+        if (curPage.sprite === "RED_SHRINK") {
+          canvas.style.width = "36px";
+          canvas.style.height = "36px";
+        }
+      }
+    }
     return;
   }
 
