@@ -1472,4 +1472,251 @@ export class PokeYellowEngine {
     }
     ctx.putImageData(imgData, 0, 0);
   }
+
+  // Canonical Kanto TownMapOrder (data/maps/town_map_order.asm & data/maps/town_map_entries.asm)
+  getTownMapOrder() {
+    if (this._townMapOrder) return this._townMapOrder;
+    this._townMapOrder = [
+      { x: 2, y: 11, name: "PALLET TOWN", kind: "town" },
+      { x: 2, y: 10, name: "ROUTE 1", kind: "route" },
+      { x: 2, y: 8, name: "VIRIDIAN CITY", kind: "town" },
+      { x: 2, y: 6, name: "ROUTE 2", kind: "route" },
+      { x: 2, y: 4, name: "VIRIDIAN FOREST", kind: "dungeon" },
+      { x: 3, y: 4, name: "DIGLETT's CAVE", kind: "dungeon" },
+      { x: 2, y: 3, name: "PEWTER CITY", kind: "town" },
+      { x: 4, y: 3, name: "ROUTE 3", kind: "route" },
+      { x: 6, y: 2, name: "MT.MOON", kind: "dungeon" },
+      { x: 8, y: 2, name: "ROUTE 4", kind: "route" },
+      { x: 10, y: 2, name: "CERULEAN CITY", kind: "town" },
+      { x: 10, y: 1, name: "ROUTE 24", kind: "route" },
+      { x: 11, y: 0, name: "ROUTE 25", kind: "route" },
+      { x: 12, y: 0, name: "SEA COTTAGE", kind: "dungeon" },
+      { x: 10, y: 3, name: "ROUTE 5", kind: "route" },
+      { x: 10, y: 5, name: "SAFFRON CITY", kind: "town" },
+      { x: 10, y: 8, name: "ROUTE 6", kind: "route" },
+      { x: 10, y: 9, name: "VERMILION CITY", kind: "town" },
+      { x: 9, y: 10, name: "S.S.ANNE", kind: "dungeon" },
+      { x: 13, y: 2, name: "ROUTE 9", kind: "route" },
+      { x: 14, y: 3, name: "ROCK TUNNEL", kind: "dungeon" },
+      { x: 14, y: 4, name: "ROUTE 10", kind: "route" },
+      { x: 15, y: 4, name: "POWER PLANT", kind: "dungeon" },
+      { x: 14, y: 5, name: "LAVENDER TOWN", kind: "town" },
+      { x: 15, y: 5, name: "POKéMON TOWER", kind: "dungeon" },
+      { x: 13, y: 5, name: "ROUTE 8", kind: "route" },
+      { x: 8, y: 5, name: "ROUTE 7", kind: "route" },
+      { x: 7, y: 5, name: "CELADON CITY", kind: "town" },
+      { x: 5, y: 5, name: "ROUTE 16", kind: "route" },
+      { x: 4, y: 8, name: "ROUTE 17", kind: "route" },
+      { x: 6, y: 13, name: "ROUTE 18", kind: "route" },
+      { x: 8, y: 13, name: "FUCHSIA CITY", kind: "town" },
+      { x: 8, y: 12, name: "SAFARI ZONE", kind: "dungeon" },
+      { x: 10, y: 13, name: "ROUTE 15", kind: "route" },
+      { x: 11, y: 12, name: "ROUTE 14", kind: "route" },
+      { x: 13, y: 11, name: "ROUTE 13", kind: "route" },
+      { x: 14, y: 9, name: "ROUTE 12", kind: "route" },
+      { x: 12, y: 9, name: "ROUTE 11", kind: "route" },
+      { x: 6, y: 15, name: "SEA ROUTE 19", kind: "route" },
+      { x: 5, y: 15, name: "SEAFOAM ISLANDS", kind: "dungeon" },
+      { x: 4, y: 15, name: "SEA ROUTE 20", kind: "route" },
+      { x: 2, y: 15, name: "CINNABAR ISLAND", kind: "town" },
+      { x: 2, y: 13, name: "SEA ROUTE 21", kind: "route" },
+      { x: 0, y: 8, name: "ROUTE 22", kind: "route" },
+      { x: 0, y: 6, name: "ROUTE 23", kind: "route" },
+      { x: 0, y: 4, name: "VICTORY ROAD", kind: "dungeon" },
+      { x: 0, y: 2, name: "INDIGO PLATEAU", kind: "town" },
+      { x: 9, y: 1, name: "CERULEAN CAVE", kind: "dungeon" },
+    ];
+    return this._townMapOrder;
+  }
+
+  // Render authentic Generation I Kanto Town Map (LoadTownMap / DisplayTownMap / LoadTownMap_Nest in engine/items/town_map.asm)
+  renderKantoTownMapScreen(canvas, options = {}) {
+    if (!canvas) return;
+    const {
+      playerX = 2,
+      playerY = 11,
+      cursorX = null,
+      cursorY = null,
+      nestCoords = null,
+      showPlayer = true,
+    } = options;
+
+    const W = 160;
+    const H = 128;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const imgData = this.getOrCreateImageData(canvas, ctx, W, H);
+    const buf = imgData.data;
+    const pal = this.getPaletteColors("PAL_ROUTE");
+
+    const setPx = (x, y, c) => {
+      if (x < 0 || x >= W || y < 0 || y >= H) return;
+      const off = (y * W + x) * 4;
+      buf[off] = c[0];
+      buf[off + 1] = c[1];
+      buf[off + 2] = c[2];
+      buf[off + 3] = 255;
+    };
+
+    const fillRect = (x0, y0, w, h, c) => {
+      for (let y = y0; y < y0 + h; y++) {
+        for (let x = x0; x < x0 + w; x++) setPx(x, y, c);
+      }
+    };
+
+    // 1. Fill Sea/Ocean background with Gen I wave pattern
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const wave = ((x + (y >> 1) * 3) % 8 === 0 && (y & 3) === 1);
+        setPx(x, y, wave ? pal[2] : pal[1]);
+      }
+    }
+
+    // 2. Kanto Landmass polygons (16x16 grid mapped to 8px cells with 16px left margin & 0px top margin)
+    const cellX = (gx) => 16 + gx * 8;
+    const cellY = (gy) => gy * 8;
+
+    // Main Kanto landmass blocks
+    fillRect(cellX(0) - 4, cellY(1), 16 * 8 - 4, 11 * 8 + 4, pal[0]);
+    // Northeast Cape (Route 24/25)
+    fillRect(cellX(9), cellY(0), 5 * 8, 3 * 8, pal[0]);
+    // Southern Fuchsia peninsula & Silence Bridge
+    fillRect(cellX(5), cellY(11), 10 * 8, 3 * 8 + 2, pal[0]);
+    // Cinnabar Island & Seafoam Islands
+    fillRect(cellX(2) - 1, cellY(15) - 1, 10, 10, pal[0]);
+    fillRect(cellX(5) - 1, cellY(15) - 1, 10, 10, pal[0]);
+    // Vermilion Bay water cutout
+    for (let y = cellY(10); y < cellY(12); y++) {
+      for (let x = cellX(7); x < cellX(12); x++) {
+        const wave = ((x + (y >> 1) * 3) % 8 === 0 && (y & 3) === 1);
+        setPx(x, y, wave ? pal[2] : pal[1]);
+      }
+    }
+
+    // 3. Mountain Ridges (Indigo/Mt. Moon/Rock Tunnel)
+    const mountainCells = [
+      [0, 1], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5],
+      [5, 1], [6, 1], [7, 1], [5, 2], [7, 2],
+      [13, 1], [14, 1], [14, 2], [15, 2], [15, 3],
+    ];
+    for (const [mx, my] of mountainCells) {
+      const px = cellX(mx);
+      const py = cellY(my);
+      for (let r = 0; r < 6; r++) {
+        for (let c = 3 - Math.floor(r / 2); c <= 4 + Math.floor(r / 2); c++) {
+          setPx(px + c, py + r + 1, r % 2 === 0 ? pal[2] : pal[1]);
+        }
+      }
+    }
+
+    // 4. Connected Kanto Route Road Segments ([x1, y1, x2, y2])
+    const routeSegments = [
+      [2, 11, 2, 3],   // Pallet -> Viridian -> Route 2 -> Pewter
+      [2, 3, 6, 3],    // Pewter -> Route 3
+      [6, 3, 6, 2],    // Route 3 -> Mt. Moon
+      [6, 2, 10, 2],   // Mt. Moon -> Route 4 -> Cerulean
+      [10, 2, 10, 0],  // Cerulean -> Route 24
+      [10, 0, 12, 0],  // Route 25 -> Sea Cottage
+      [10, 2, 10, 9],  // Cerulean -> Route 5 -> Saffron -> Route 6 -> Vermilion
+      [10, 2, 14, 2],  // Cerulean -> Route 9
+      [14, 2, 14, 11], // Rock Tunnel -> Route 10 -> Lavender -> Route 12 -> Route 13
+      [7, 5, 14, 5],   // Celadon -> Route 7 -> Saffron -> Route 8 -> Lavender
+      [10, 9, 14, 9],  // Vermilion -> Route 11 -> Route 12
+      [4, 5, 7, 5],    // Route 16 -> Celadon
+      [4, 5, 4, 13],   // Cycling Road (Route 17)
+      [4, 13, 8, 13],  // Route 18 -> Fuchsia
+      [8, 13, 11, 13], // Fuchsia -> Route 15
+      [11, 13, 11, 12],// Route 15 -> Route 14
+      [11, 12, 14, 11],// Route 14 -> Route 13
+      [8, 13, 8, 15],  // Fuchsia -> Sea Route 19
+      [2, 15, 8, 15],  // Cinnabar -> Sea Route 20 -> Seafoam -> Route 19
+      [2, 11, 2, 15],  // Pallet -> Sea Route 21 -> Cinnabar
+      [0, 8, 2, 8],    // Viridian -> Route 22
+      [0, 2, 0, 8],    // Route 22 -> Route 23 -> Victory Road -> Indigo Plateau
+    ];
+
+    for (const [x1, y1, x2, y2] of routeSegments) {
+      const px1 = cellX(Math.min(x1, x2)) + 2;
+      const py1 = cellY(Math.min(y1, y2)) + 2;
+      const px2 = cellX(Math.max(x1, x2)) + 6;
+      const py2 = cellY(Math.max(y1, y2)) + 6;
+      for (let y = py1; y < py2; y++) {
+        for (let x = px1; x < px2; x++) {
+          const border = x === px1 || x === px2 - 1 || y === py1 || y === py2 - 1;
+          const checker = ((x + y) & 1) === 0;
+          setPx(x, y, border ? pal[3] : checker ? pal[1] : pal[0]);
+        }
+      }
+    }
+
+    // 5. Draw Cities/Towns (8x8 framed squares) & Dungeons (6x6 markers)
+    for (const loc of this.getTownMapOrder()) {
+      const px = cellX(loc.x);
+      const py = cellY(loc.y);
+      if (loc.kind === "town") {
+        fillRect(px, py, 8, 8, pal[3]);
+        fillRect(px + 1, py + 1, 6, 6, pal[0]);
+        fillRect(px + 2, py + 2, 4, 4, pal[2]);
+      } else if (loc.kind === "dungeon") {
+        fillRect(px + 1, py + 1, 6, 6, pal[3]);
+        fillRect(px + 2, py + 2, 4, 4, pal[1]);
+      }
+    }
+
+    // 6. Highlight Pokédex AREA Nest Coordinates (LoadTownMap_Nest)
+    if (nestCoords && nestCoords.size > 0) {
+      const blink = (this.animCounter & 1) === 0;
+      for (const key of nestCoords) {
+        const [gx, gy] = key.split(",").map(Number);
+        const px = cellX(gx) - 1;
+        const py = cellY(gy) - 1;
+        fillRect(px, py, 10, 10, pal[3]);
+        fillRect(px + 1, py + 1, 8, 8, blink ? pal[0] : pal[2]);
+        fillRect(px + 3, py + 3, 4, 4, pal[3]);
+      }
+    }
+
+    // 7. Draw Red's 16x16 Overworld Sprite at Player's Current Position
+    if (showPlayer) {
+      this.drawSprite16x16(
+        buf,
+        W,
+        H,
+        cellX(playerX) - 4,
+        cellY(playerY) - 4,
+        "red",
+        "DOWN",
+        false,
+        false,
+        pal,
+        false
+      );
+    }
+
+    // 8. Draw Blinking Town Map Corner-Bracket Cursor (TownMapCursor.cel)
+    if (cursorX !== null && cursorY !== null) {
+      const spread = (this.animCounter & 1) === 0 ? 3 : 2;
+      const cx0 = cellX(cursorX) - spread;
+      const cy0 = cellY(cursorY) - spread;
+      const cw = 8 + spread * 2;
+      const ch = 8 + spread * 2;
+      // 4 L-shaped corner brackets
+      for (let d = 0; d < 4; d++) {
+        // Top-left
+        setPx(cx0 + d, cy0, pal[3]);
+        setPx(cx0, cy0 + d, pal[3]);
+        // Top-right
+        setPx(cx0 + cw - 1 - d, cy0, pal[3]);
+        setPx(cx0 + cw - 1, cy0 + d, pal[3]);
+        // Bottom-left
+        setPx(cx0 + d, cy0 + ch - 1, pal[3]);
+        setPx(cx0, cy0 + ch - 1 - d, pal[3]);
+        // Bottom-right
+        setPx(cx0 + cw - 1 - d, cy0 + ch - 1, pal[3]);
+        setPx(cx0 + cw - 1, cy0 + ch - 1 - d, pal[3]);
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  }
 }
