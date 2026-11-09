@@ -394,6 +394,7 @@ export class GameBoyAudio {
   // Synthesize authentic 3-Channel Game Boy APU Pokémon Cry (Ch5 Pulse 1 + Ch6 Pulse 2 + Ch8 LFSR Noise)
   playPokemonCry(species, options = {}) {
     if (!this.init() || !this.ctx || !this.masterGain) return false;
+    if (this.activeOscillators.size >= 12) return false;
     const sp = String(species || "PIKACHU").toUpperCase();
     const faintFactor = options && options.faint ? 0.76 : 1.0;
 
