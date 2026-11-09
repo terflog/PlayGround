@@ -426,10 +426,22 @@ function saveProgress() {
   if (state.titleMenu?.open) return;
   try {
     const payload = {
+      inGameStarted: true,
+      currentZone: state.currentZone?.constName || "PALLET_TOWN",
+      player: {
+        x: state.player.x,
+        y: state.player.y,
+        dir: state.player.dir,
+        mode: state.player.mode,
+      },
+      lastOutdoorMap: state.lastOutdoorMap,
+      playerName: state.playerName || "RED",
+      rivalName: state.rivalName || "BLUE",
       visitedZones: Array.from(state.visitedZones),
       seenPokemon: Array.from(state.seenPokemon),
       caughtPokemon: Array.from(state.caughtPokemon),
       defeatedTrainers: Array.from(state.defeatedTrainers),
+      cutTrees: Array.from(engine.cutTrees || []),
       friendship: state.pikachu.friendship,
       events: { ...state.events },
       paletteMode: engine.paletteMode,
@@ -462,9 +474,26 @@ function saveProgress() {
 function loadProgress() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || typeof data !== "object") return;
+    if (!data || typeof data !== "object") return null;
+    if (typeof data.playerName === "string" && data.playerName.trim()) {
+      state.playerName = data.playerName.trim().slice(0, 10);
+    }
+    if (typeof data.rivalName === "string" && data.rivalName.trim()) {
+      state.rivalName = data.rivalName.trim().slice(0, 10);
+    }
+    if (data.lastOutdoorMap && typeof data.lastOutdoorMap.mapConst === "string") {
+      state.lastOutdoorMap = {
+        mapConst: data.lastOutdoorMap.mapConst,
+        warpIndex: Number(data.lastOutdoorMap.warpIndex) || 0,
+      };
+    }
+    if (Array.isArray(data.cutTrees)) {
+      data.cutTrees.forEach((k) => {
+        if (typeof k === "string") engine.cutTrees.add(k);
+      });
+    }
     if (Array.isArray(data.visitedZones)) {
       data.visitedZones.forEach((z) => {
         if (typeof z === "string" && engine.zonesByConst[z]) {
@@ -561,8 +590,10 @@ function loadProgress() {
           qty: Math.max(1, Math.min(99, Number(it.qty) || 1)),
         }));
     }
+    return data;
   } catch {
     // Ignore malformed saved state
+    return null;
   }
 }
 
@@ -946,7 +977,6 @@ export function loadZone(target, options = {}) {
     engine.flashIlluminated = false;
   }
   state.visitedZones.add(zone.constName);
-  saveProgress();
   state.npcs = initZoneNpcs(zone);
   if (state.dialogue) {
     state.dialogue = null;
@@ -1002,6 +1032,7 @@ export function loadZone(target, options = {}) {
   state.pikachu.moveAnim = null;
   state.pikachu.spawnDelayed = false;
   syncPikachuOverworldState();
+  saveProgress();
 
   audio.playTrack(zone.music);
   updateUIForCurrentZone();
@@ -1557,6 +1588,7 @@ function onPlayerStepCompleted() {
     modifyPikachuHappiness("WALKING");
   }
 
+  saveProgress();
   updateCoordinatesUI();
 
   // Area-Specific Step Triggers:
@@ -4741,9 +4773,20 @@ export function handleTitleMenuInput(input) {
     const chosen = items[tm.cursor];
     audio.playSfx("blip");
     if (chosen === "CONTINUE") {
-      loadProgress();
+      const resumed = loadProgress();
       tm.open = false;
       renderTitleScreen();
+      if (
+        resumed &&
+        resumed.currentZone &&
+        engine.zonesByConst[resumed.currentZone]
+      ) {
+        loadZone(resumed.currentZone, {
+          x: resumed.player?.x,
+          y: resumed.player?.y,
+          dir: resumed.player?.dir,
+        });
+      }
       renderAllCanvases(true);
     } else if (chosen === "NEW GAME") {
       try {
@@ -5725,7 +5768,15 @@ export function renderStartMenu() {
     const listWrap = document.createElement("div");
     listWrap.className = "gb-pokedex-list";
 
-    allStats.forEach((st, idx) => {
+    // Render a 7-row sliding viewport window around sm.subCursor (matching Gen I's 7 visible Pokédex rows and avoiding 151-row DOM churn!)
+    const windowSize = 7;
+    const startIdx = Math.max(
+      0,
+      Math.min(allStats.length - windowSize, sm.subCursor - 3)
+    );
+    const endIdx = Math.min(allStats.length, startIdx + windowSize);
+    for (let idx = startIdx; idx < endIdx; idx++) {
+      const st = allStats[idx];
       const owned = state.caughtPokemon.has(st.species);
       const seen = owned || state.seenPokemon.has(st.species);
       const isSelected = idx === sm.subCursor;
@@ -5760,7 +5811,7 @@ export function renderStartMenu() {
         }
       };
       listWrap.appendChild(row);
-    });
+    }
     leftCol.appendChild(listWrap);
 
     const rightCol = document.createElement("div");
@@ -6318,12 +6369,23 @@ function gameLoop(now) {
           );
         }
       }
-      if (
-        state.startMenu.open &&
-        (state.startMenu.subView === "TOWN_MAP" ||
-          state.startMenu.dexModalMode === "AREA")
-      ) {
-        renderStartMenu();
+      if (state.startMenu.open && state.startMenu.subView === "TOWN_MAP") {
+        const tmCanvas = document.getElementById("start-town-map-canvas");
+        if (tmCanvas) {
+          const tmOrder = engine.getTownMapOrder();
+          const curLoc = tmOrder[state.startMenu.townMapCursor ?? 0] || {
+            x: state.currentZone.townMapX,
+            y: state.currentZone.townMapY,
+          };
+          engine.renderKantoTownMapScreen(tmCanvas, {
+            playerX: state.currentZone.townMapX,
+            playerY: state.currentZone.townMapY,
+            cursorX: curLoc.x,
+            cursorY: curLoc.y,
+            nestCoords: null,
+            showPlayer: true,
+          });
+        }
       }
       if (state.dialogue && state.dialogue.pikachuMood) {
         const faceCanvas = document.getElementById("dialogue-pika-canvas");
@@ -6636,10 +6698,19 @@ function setupControlsAndEvents() {
     }
   });
 
-  // On-screen D-pad & A/B buttons
+  // On-screen D-pad & A/B buttons (with touch/mouse deduplication)
+  let lastTouchEventTime = 0;
   document.querySelectorAll("[data-dpad]").forEach((btn) => {
     const dir = btn.dataset.dpad;
     const startHold = (e) => {
+      if (e.type.startsWith("touch")) {
+        lastTouchEventTime = performance.now();
+      } else if (
+        e.type === "mousedown" &&
+        performance.now() - lastTouchEventTime < 450
+      ) {
+        return;
+      }
       e.preventDefault();
       if (state.titleMenu?.open) {
         handleTitleMenuInput(dir);
@@ -6686,7 +6757,10 @@ function setupControlsAndEvents() {
       handleBattleInput("B");
     } else if (state.startMenu.open) {
       handleStartMenuInput("B");
-    } else {
+    } else if (
+      state.bag.some((it) => it.id === "BICYCLE") &&
+      state.currentZone.romId < 0x25
+    ) {
       state.player.mode = state.player.mode === "bike" ? "walk" : "bike";
       if (state.player.mode === "walk") {
         state.pikachu.spawnDelayed = false;
@@ -7069,12 +7143,31 @@ window.POKEYELLOW = {
 };
 
 window.addEventListener("DOMContentLoaded", () => {
-  loadProgress();
+  const resumed = loadProgress();
   setupControlsAndEvents();
   if (state.viewMode !== "gb") {
     renderZoneList();
   }
-  loadZone("PALLET_TOWN", { keepTitleOpen: true });
-  renderTitleScreen();
+  if (
+    resumed &&
+    resumed.inGameStarted &&
+    resumed.currentZone &&
+    engine.zonesByConst[resumed.currentZone]
+  ) {
+    state.titleMenu.open = false;
+    loadZone(resumed.currentZone, {
+      x: resumed.player?.x,
+      y: resumed.player?.y,
+      dir: resumed.player?.dir,
+    });
+    if (resumed.player?.mode === "surf" || resumed.player?.mode === "bike") {
+      state.player.mode = resumed.player.mode;
+      syncPikachuOverworldState();
+    }
+    renderTitleScreen();
+  } else {
+    loadZone("PALLET_TOWN", { keepTitleOpen: true });
+    renderTitleScreen();
+  }
   requestAnimationFrame(gameLoop);
 });
