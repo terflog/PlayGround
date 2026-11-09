@@ -88,6 +88,19 @@ const state = {
     subView: null, // null | "POKEDEX" | "POKEMON" | "ITEM" | "RED" | "SAVE" | "OPTION"
     subCursor: 0,
     selectedDexSpecies: null,
+    saveYesNoCursor: 0, // 0: YES, 1: NO
+    saveCompleted: false,
+  },
+  titleMenu: {
+    open: true,
+    screen: "TITLE", // "TITLE" | "MAIN_MENU" | "OPTION"
+    cursor: 0,
+    optionCursor: 0,
+  },
+  options: {
+    textSpeed: "FAST", // "FAST" | "MEDIUM" | "SLOW"
+    battleAnimation: "ON", // "ON" | "OFF"
+    battleStyle: "SHIFT", // "SHIFT" | "SET"
   },
   selectedElevatorDest: {},
 };
@@ -832,6 +845,11 @@ function initZoneNpcs(zone) {
         collected = true;
       } else if (o.name === "MTMOONB2F_HELIX_FOSSIL" && state.events.gotHelixFossil) {
         collected = true;
+      } else if (
+        o.name === "MTMOONB2F_SUPER_NERD" &&
+        (state.events.gotDomeFossil || state.events.gotHelixFossil)
+      ) {
+        collected = true;
       }
     } else if (zone.constName === "FIGHTING_DOJO") {
       if (o.name === "FIGHTINGDOJO_HITMONLEE_POKE_BALL" && state.events.gotHitmonlee) {
@@ -909,6 +927,10 @@ export function loadZone(target, options = {}) {
   }
 
   heldDirs.clear();
+  if (!options.keepTitleOpen && state.titleMenu?.open) {
+    state.titleMenu.open = false;
+    renderTitleScreen();
+  }
   engine.loadMapIntoWRAM(zone);
   state.currentZone = zone;
   state.strengthActive = false;
@@ -1743,8 +1765,15 @@ function checkInGameGiftOrEvent(npc, zone) {
       state.events.gotHelixFossil = true;
       giveBagItem("HELIX_FOSSIL", 1);
     }
+    const nerd = state.npcs.find((n) => n.name === "MTMOONB2F_SUPER_NERD");
+    let nerdSuffix = "";
+    if (nerd && !nerd.collected) {
+      nerd.collected = true;
+      nerdSuffix = `\n\nSUPER NERD: Actually, I'm a dumbass who doesn't need these fossils anyway! Keep the other one too, I'm leaving!\n\nSUPER NERD left without taking the other fossil!`;
+    }
+    saveProgress();
     renderAllCanvases(true);
-    return `\n\nRED got the ${isDome ? "DOME FOSSIL" : "HELIX FOSSIL"}!`;
+    return `\n\nRED got the ${isDome ? "DOME FOSSIL" : "HELIX FOSSIL"}!${nerdSuffix}`;
   }
   if (zone.constName === "CINNABAR_LAB_FOSSIL_ROOM" && upName.includes("SCIENTIST1")) {
     const hasDome = state.bag.some((it) => it.id === "DOME_FOSSIL");
@@ -2195,6 +2224,10 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
 }
 
 export function awardStarterPikachuInLab() {
+  if (state.titleMenu?.open) {
+    state.titleMenu.open = false;
+    renderTitleScreen();
+  }
   state.events.oakRescuedInGrass = true;
   state.events.gotStarterPikachu = true;
   if (!state.party.some((m) => m.species === "PIKACHU")) {
@@ -4490,8 +4523,16 @@ const START_MENU_SECTIONS = [
 
 export function toggleStartMenu() {
   if (state.battle || state.dialogue) return;
+  if (state.titleMenu?.open) {
+    state.titleMenu.open = false;
+    renderTitleScreen();
+  }
   heldDirs.clear();
+  const hasDex = isPokedexUnlockedInStartMenu();
   state.startMenu.open = !state.startMenu.open;
+  if (state.startMenu.open && !hasDex && state.startMenu.cursor === 0) {
+    state.startMenu.cursor = 1;
+  }
   state.startMenu.subView = null;
   state.startMenu.selectedDexSpecies = null;
   state.startMenu.dexModalMode = null; // null | "DATA" | "AREA"
@@ -4502,8 +4543,350 @@ export function toggleStartMenu() {
   state.startMenu.partyActionCursor = 0;
   state.startMenu.partyStatsOpen = false;
   state.startMenu.partySwitchIdx = null;
+  state.startMenu.saveYesNoCursor = 0;
+  state.startMenu.saveCompleted = false;
   audio.playSfx("blip");
   renderStartMenu();
+}
+
+function isPokedexUnlockedInStartMenu() {
+  // CheckEvent EVENT_GOT_POKEDEX in engine/menus/draw_start_menu.asm
+  return Boolean(
+    state.events.gotPokedex ||
+      state.party.length > 0 ||
+      state.seenPokemon.size > 0 ||
+      state.caughtPokemon.size > 0
+  );
+}
+
+export function hasSavedGame() {
+  try {
+    return Boolean(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+export function openTitleScreen(screen = "TITLE") {
+  state.titleMenu.open = true;
+  state.titleMenu.screen = screen;
+  state.titleMenu.cursor = 0;
+  state.titleMenu.optionCursor = 0;
+  renderTitleScreen();
+}
+
+export function handleTitleMenuInput(input) {
+  const tm = state.titleMenu;
+  if (!tm.open) return;
+
+  if (tm.screen === "TITLE") {
+    if (input === "A" || input === "START") {
+      audio.playPokemonCry("PIKACHU");
+      tm.screen = "MAIN_MENU";
+      tm.cursor = 0;
+      renderTitleScreen();
+    }
+    return;
+  }
+
+  if (tm.screen === "OPTION") {
+    if (input === "UP") {
+      tm.optionCursor = (tm.optionCursor + 3) % 4;
+      audio.playSfx("blip");
+      renderTitleScreen();
+    } else if (input === "DOWN") {
+      tm.optionCursor = (tm.optionCursor + 1) % 4;
+      audio.playSfx("blip");
+      renderTitleScreen();
+    } else if (input === "LEFT" || input === "RIGHT" || input === "A") {
+      if (tm.optionCursor === 0) {
+        const speeds = ["FAST", "MEDIUM", "SLOW"];
+        const d = input === "LEFT" ? 2 : 1;
+        state.options.textSpeed =
+          speeds[(speeds.indexOf(state.options.textSpeed) + d) % 3];
+        audio.playSfx("blip");
+      } else if (tm.optionCursor === 1) {
+        state.options.battleAnimation =
+          state.options.battleAnimation === "ON" ? "OFF" : "ON";
+        audio.playSfx("blip");
+      } else if (tm.optionCursor === 2) {
+        const modes = ["reference", "sgb", "cgb", "dmg"];
+        const d = input === "LEFT" ? 3 : 1;
+        engine.paletteMode =
+          modes[(modes.indexOf(engine.paletteMode) + d) % modes.length];
+        audio.playSfx("blip");
+        renderAllCanvases(true);
+      } else if (tm.optionCursor === 3 && (input === "A" || input === "START")) {
+        audio.playSfx("blip");
+        tm.screen = "MAIN_MENU";
+      }
+      renderTitleScreen();
+    } else if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      tm.screen = "MAIN_MENU";
+      renderTitleScreen();
+    }
+    return;
+  }
+
+  // MAIN_MENU: [CONTINUE (if save exists)], NEW GAME, OPTION
+  const hasSave = hasSavedGame();
+  const items = hasSave
+    ? ["CONTINUE", "NEW GAME", "OPTION"]
+    : ["NEW GAME", "OPTION"];
+  if (input === "UP") {
+    tm.cursor = Math.max(0, tm.cursor - 1);
+    audio.playSfx("blip");
+    renderTitleScreen();
+  } else if (input === "DOWN") {
+    tm.cursor = Math.min(items.length - 1, tm.cursor + 1);
+    audio.playSfx("blip");
+    renderTitleScreen();
+  } else if (input === "B") {
+    audio.playSfx("blip");
+    tm.screen = "TITLE";
+    renderTitleScreen();
+  } else if (input === "A" || input === "START") {
+    const chosen = items[tm.cursor];
+    audio.playSfx("blip");
+    if (chosen === "CONTINUE") {
+      loadProgress();
+      tm.open = false;
+      renderTitleScreen();
+      renderAllCanvases(true);
+    } else if (chosen === "NEW GAME") {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
+      state.party = [];
+      state.bag = [];
+      state.seenPokemon.clear();
+      state.caughtPokemon.clear();
+      state.defeatedTrainers.clear();
+      for (const k of Object.keys(state.events)) {
+        state.events[k] = false;
+      }
+      state.pikachu.visible = false;
+      state.pikachu.friendship = 90;
+      tm.open = false;
+      renderTitleScreen();
+      loadZone("PALLET_TOWN", { x: 5, y: 6, dir: "DOWN" });
+    } else if (chosen === "OPTION") {
+      tm.screen = "OPTION";
+      tm.optionCursor = 0;
+      renderTitleScreen();
+    }
+  }
+}
+
+function buildOptionsMenuDOM(cursorIdx, onSelectRow, onCancel) {
+  // Authentic DisplayOptionMenu (engine/menus/options.asm):
+  // 3 double-bordered option boxes + bottom CANCEL row
+  const wrap = document.createElement("div");
+  wrap.className = "gb-options-screen";
+
+  const speeds = ["FAST", "MEDIUM", "SLOW"];
+  const box1 = document.createElement("div");
+  box1.className = "gb-opt-box";
+  box1.innerHTML = `
+    <div>TEXT SPEED</div>
+    <div class="gb-opt-choices">
+      ${speeds
+        .map(
+          (sp) =>
+            `<button type="button" class="gb-opt-choice-btn" data-opt-row="0" data-opt-val="${sp}">${
+              state.options.textSpeed === sp
+                ? cursorIdx === 0
+                  ? "▶"
+                  : "▷"
+                : " "
+            }${sp}</button>`
+        )
+        .join("")}
+    </div>
+  `;
+
+  const anims = ["ON", "OFF"];
+  const box2 = document.createElement("div");
+  box2.className = "gb-opt-box";
+  box2.innerHTML = `
+    <div>BATTLE ANIMATION</div>
+    <div class="gb-opt-choices" style="justify-content:flex-start;gap:28px">
+      ${anims
+        .map(
+          (an) =>
+            `<button type="button" class="gb-opt-choice-btn" data-opt-row="1" data-opt-val="${an}">${
+              state.options.battleAnimation === an
+                ? cursorIdx === 1
+                  ? "▶"
+                  : "▷"
+                : " "
+            }${an}</button>`
+        )
+        .join("")}
+    </div>
+  `;
+
+  const pals = ["reference", "sgb", "cgb", "dmg"];
+  const palLabels = { reference: "CLASSIC", sgb: "SGB", cgb: "CGB", dmg: "DMG" };
+  const box3 = document.createElement("div");
+  box3.className = "gb-opt-box";
+  box3.innerHTML = `
+    <div style="display:flex;justify-content:space-between">
+      <span>PALETTE &amp; SOUND</span>
+      <span>BGM:${audio.enabled ? "ON" : "OFF"}</span>
+    </div>
+    <div class="gb-opt-choices">
+      ${pals
+        .map(
+          (pm) =>
+            `<button type="button" class="gb-opt-choice-btn" data-opt-row="2" data-opt-val="${pm}">${
+              engine.paletteMode === pm
+                ? cursorIdx === 2
+                  ? "▶"
+                  : "▷"
+                : " "
+            }${palLabels[pm]}</button>`
+        )
+        .join("")}
+    </div>
+  `;
+
+  const cancelBox = document.createElement("button");
+  cancelBox.type = "button";
+  cancelBox.className = "gb-opt-box";
+  cancelBox.style.textAlign = "left";
+  cancelBox.style.cursor = "pointer";
+  cancelBox.innerHTML = `<span>${cursorIdx === 3 ? "▶" : " "}CANCEL</span>`;
+  cancelBox.onclick = () => onCancel();
+
+  wrap.appendChild(box1);
+  wrap.appendChild(box2);
+  wrap.appendChild(box3);
+  wrap.appendChild(cancelBox);
+
+  wrap.querySelectorAll("[data-opt-row]").forEach((btn) => {
+    btn.onclick = () => {
+      const r = Number(btn.dataset.optRow);
+      const val = btn.dataset.optVal;
+      if (r === 0) state.options.textSpeed = val;
+      if (r === 1) state.options.battleAnimation = val;
+      if (r === 2) {
+        engine.paletteMode = val;
+        renderAllCanvases(true);
+      }
+      audio.playSfx("blip");
+      onSelectRow(r);
+    };
+  });
+
+  return wrap;
+}
+
+export function renderTitleScreen() {
+  const overlay = document.getElementById("title-screen-overlay");
+  if (!overlay) return;
+  const tm = state.titleMenu;
+  if (!tm || !tm.open) {
+    overlay.classList.add("hidden");
+    return;
+  }
+  overlay.classList.remove("hidden");
+  overlay.innerHTML = "";
+
+  if (tm.screen === "TITLE") {
+    const screen = document.createElement("div");
+    screen.className = "gb-title-screen";
+    screen.innerHTML = `
+      <div class="gb-title-logo-box">
+        <div class="gb-title-main">POKéMON</div>
+        <div class="gb-title-sub">YELLOW VERSION • SPECIAL PIKACHU EDITION</div>
+      </div>
+      <div class="gb-title-pika-stage">
+        <canvas id="title-pika-canvas" width="40" height="40"></canvas>
+      </div>
+      <div class="gb-title-footer">
+        <div class="gb-title-press-start">PRESS START</div>
+        <div>©1995,96,98 GAME FREAK inc.</div>
+      </div>
+    `;
+    screen.onclick = () => handleTitleMenuInput("START");
+    overlay.appendChild(screen);
+
+    const pikaCanvas = document.getElementById("title-pika-canvas");
+    const frameKey =
+      (engine.animCounter & 1) === 0 ? "pikachu_happy_1" : "pikachu_excited_1";
+    engine.render2BitGraphicToCanvas(
+      pikaCanvas,
+      engine.pikachuFaces[frameKey] || engine.pokemonSprites.PIKACHU,
+      "PAL_PIKACHU_PORTRAIT"
+    );
+    return;
+  }
+
+  if (tm.screen === "OPTION") {
+    const optEl = buildOptionsMenuDOM(
+      tm.optionCursor,
+      (r) => {
+        tm.optionCursor = r;
+        renderTitleScreen();
+      },
+      () => {
+        audio.playSfx("blip");
+        tm.screen = "MAIN_MENU";
+        renderTitleScreen();
+      }
+    );
+    overlay.appendChild(optEl);
+    return;
+  }
+
+  // MAIN_MENU: CONTINUE / NEW GAME / OPTION + DisplayContinueGameInfo
+  const hasSave = hasSavedGame();
+  const items = hasSave
+    ? ["CONTINUE", "NEW GAME", "OPTION"]
+    : ["NEW GAME", "OPTION"];
+  const wrap = document.createElement("div");
+  wrap.className = "gb-main-menu-screen";
+
+  const menuBox = document.createElement("div");
+  menuBox.className = "gb-poke-box gb-main-menu-box";
+  items.forEach((lbl, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "smenu-item";
+    btn.innerHTML = `<span class="bcursor">${
+      idx === tm.cursor ? "▶" : " "
+    }</span>${lbl}`;
+    btn.onclick = () => {
+      tm.cursor = idx;
+      handleTitleMenuInput("A");
+    };
+    menuBox.appendChild(btn);
+  });
+  wrap.appendChild(menuBox);
+
+  if (hasSave && tm.cursor === 0) {
+    const elapsedMinTotal = Math.max(
+      1,
+      Math.floor((Date.now() - (state.playTimeStartMs || Date.now())) / 60000) +
+        state.visitedZones.size
+    );
+    const timeStr = `${Math.floor(elapsedMinTotal / 60)}:${String(
+      elapsedMinTotal % 60
+    ).padStart(2, "0")}`;
+    const infoBox = document.createElement("div");
+    infoBox.className = "gb-poke-box gb-continue-info-box";
+    infoBox.innerHTML = `
+      <div class="gb-trainer-info-row"><span>PLAYER</span><span>RED</span></div>
+      <div class="gb-trainer-info-row"><span>BADGES</span><span>${getEarnedBadges().length}</span></div>
+      <div class="gb-trainer-info-row"><span>POKéDEX</span><span>${state.caughtPokemon.size}</span></div>
+      <div class="gb-trainer-info-row"><span>TIME</span><span>${timeStr}</span></div>
+    `;
+    wrap.appendChild(infoBox);
+  }
+
+  overlay.appendChild(wrap);
 }
 
 function getPartyActionItems(mon) {
@@ -4853,17 +5236,63 @@ export function handleStartMenuInput(input) {
     return;
   }
 
+  if (sm.subView === "SAVE") {
+    if (sm.saveCompleted) {
+      if (input === "A" || input === "B" || input === "START") {
+        audio.playSfx("blip");
+        sm.saveCompleted = false;
+        sm.subView = null;
+        sm.open = false;
+        renderStartMenu();
+      }
+      return;
+    }
+    if (input === "UP" || input === "DOWN") {
+      sm.saveYesNoCursor = sm.saveYesNoCursor === 0 ? 1 : 0;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "B" || input === "START") {
+      audio.playSfx("blip");
+      sm.subView = null;
+      renderStartMenu();
+    } else if (input === "A") {
+      if (sm.saveYesNoCursor === 0) {
+        saveProgress();
+        audio.playSfx("warp");
+        sm.saveCompleted = true;
+        renderStartMenu();
+      } else {
+        audio.playSfx("blip");
+        sm.subView = null;
+        renderStartMenu();
+      }
+    }
+    return;
+  }
+
   if (sm.subView === "OPTION") {
     if (input === "UP") {
-      sm.subCursor = (sm.subCursor + 2) % 3;
+      sm.subCursor = (sm.subCursor + 3) % 4;
       audio.playSfx("blip");
       renderStartMenu();
     } else if (input === "DOWN") {
-      sm.subCursor = (sm.subCursor + 1) % 3;
+      sm.subCursor = (sm.subCursor + 1) % 4;
       audio.playSfx("blip");
       renderStartMenu();
     } else if (input === "A" || input === "LEFT" || input === "RIGHT") {
       if (sm.subCursor === 0) {
+        const speeds = ["FAST", "MEDIUM", "SLOW"];
+        const d = input === "LEFT" ? 2 : 1;
+        state.options.textSpeed =
+          speeds[(speeds.indexOf(state.options.textSpeed) + d) % 3];
+        audio.playSfx("blip");
+        renderStartMenu();
+      } else if (sm.subCursor === 1) {
+        state.options.battleAnimation =
+          state.options.battleAnimation === "ON" ? "OFF" : "ON";
+        audio.playSfx("blip");
+        renderStartMenu();
+      } else if (sm.subCursor === 2) {
         const modes = ["reference", "sgb", "cgb", "dmg"];
         const dirDelta = input === "LEFT" ? 3 : 1;
         engine.paletteMode =
@@ -4872,13 +5301,9 @@ export function handleStartMenuInput(input) {
         saveProgress();
         renderAllCanvases(true);
         renderStartMenu();
-      } else if (sm.subCursor === 1) {
-        audio.toggle();
-        renderStartMenu();
-      } else if (sm.subCursor === 2) {
-        state.wildEncountersEnabled = !state.wildEncountersEnabled;
+      } else if (sm.subCursor === 3 && input === "A") {
         audio.playSfx("blip");
-        saveProgress();
+        sm.subView = null;
         renderStartMenu();
       }
     } else if (input === "B" || input === "START") {
@@ -4898,15 +5323,19 @@ export function handleStartMenuInput(input) {
     return;
   }
 
-  // Top-level DrawStartMenu (home/start_menu.asm:14-85)
+  // Top-level DrawStartMenu (home/start_menu.asm:14-85 & engine/menus/draw_start_menu.asm)
+  const hasDex = isPokedexUnlockedInStartMenu();
+  const minIdx = hasDex ? 0 : 1;
+  if (sm.cursor < minIdx) sm.cursor = minIdx;
+
   if (input === "UP") {
-    // Wrap around from top (0) to bottom (6) (home/start_menu.asm:18-34)
-    sm.cursor = (sm.cursor + 6) % 7;
+    // Wrap around from top (minIdx) to bottom (6) (home/start_menu.asm:18-34)
+    sm.cursor = sm.cursor <= minIdx ? 6 : sm.cursor - 1;
     audio.playSfx("blip");
     renderStartMenu();
   } else if (input === "DOWN") {
-    // Wrap around from bottom (6) to top (0) (home/start_menu.asm:35-51)
-    sm.cursor = (sm.cursor + 1) % 7;
+    // Wrap around from bottom (6) to top (minIdx) (home/start_menu.asm:35-51)
+    sm.cursor = sm.cursor >= 6 ? minIdx : sm.cursor + 1;
     audio.playSfx("blip");
     renderStartMenu();
   } else if (input === "B" || input === "START") {
@@ -4930,6 +5359,8 @@ export function handleStartMenuInput(input) {
       sm.partyActionOpen = false;
       sm.partyStatsOpen = false;
       sm.partySwitchIdx = null;
+      sm.saveYesNoCursor = 0;
+      sm.saveCompleted = false;
       renderStartMenu();
     }
   }
@@ -4945,14 +5376,22 @@ export function renderStartMenu() {
   }
   overlay.classList.remove("hidden");
 
+  const hasDex = isPokedexUnlockedInStartMenu();
   const menuBox = document.getElementById("start-menu-box");
-  menuBox.querySelectorAll("[data-smenu-item]").forEach((btn) => {
-    const idx = Number(btn.dataset.smenuItem);
-    const curEl = btn.querySelector(".bcursor");
-    if (curEl) {
-      curEl.textContent = idx === sm.cursor ? (sm.subView ? "▷" : "▶") : " ";
-    }
-  });
+  if (menuBox) {
+    // Shorter 6-item box when player doesn't have the Pokédex (engine/menus/draw_start_menu.asm:10-12)
+    menuBox.style.height = hasDex ? "88%" : "76%";
+    menuBox.querySelectorAll("[data-smenu-item]").forEach((btn) => {
+      const idx = Number(btn.dataset.smenuItem);
+      if (idx === 0) {
+        btn.classList.toggle("hidden", !hasDex);
+      }
+      const curEl = btn.querySelector(".bcursor");
+      if (curEl) {
+        curEl.textContent = idx === sm.cursor ? (sm.subView ? "▷" : "▶") : " ";
+      }
+    });
+  }
 
   const subPanel = document.getElementById("start-sub-panel");
   const subTitle = document.getElementById("start-sub-title");
@@ -5439,22 +5878,60 @@ export function renderStartMenu() {
     });
   } else if (sm.subView === "SAVE") {
     if (subTitle) subTitle.textContent = `SAVE GAME (sMainData)`;
-    saveProgress();
-    const saveWrap = document.createElement("div");
-    saveWrap.style.padding = "8px 10px";
-    saveWrap.style.display = "flex";
-    saveWrap.style.flexDirection = "column";
-    saveWrap.style.gap = "4px";
-    saveWrap.innerHTML = `
-      <div><strong>PLAYER:</strong> RED</div>
-      <div><strong>BADGES:</strong> ${getEarnedBadges().length}</div>
-      <div><strong>POKéDEX:</strong> ${state.caughtPokemon.size}</div>
-      <div class="gb-poke-box" style="margin-top:8px;padding:6px 8px">
-        Saving... Don't turn off the power!<br/>
-        <strong>RED saved the game!</strong>
+    // Authentic SaveSAV screen (engine/menus/save.asm):
+    // Top-right SaveScreenInfoBox + YES/NO box + bottom message box
+    const elapsedMinTotal = Math.max(
+      1,
+      Math.floor((Date.now() - (state.playTimeStartMs || Date.now())) / 60000) +
+        state.visitedZones.size
+    );
+    const timeStr = `${Math.floor(elapsedMinTotal / 60)}:${String(
+      elapsedMinTotal % 60
+    ).padStart(2, "0")}`;
+
+    const saveScreen = document.createElement("div");
+    saveScreen.className = "gb-save-screen";
+    saveScreen.innerHTML = `
+      <div class="gb-poke-box gb-save-info-box">
+        <div class="gb-trainer-info-row"><span>PLAYER</span><span>RED</span></div>
+        <div class="gb-trainer-info-row"><span>BADGES</span><span>${getEarnedBadges().length}</span></div>
+        <div class="gb-trainer-info-row"><span>POKéDEX</span><span>${state.caughtPokemon.size}</span></div>
+        <div class="gb-trainer-info-row"><span>TIME</span><span>${timeStr}</span></div>
+      </div>
+      ${
+        !sm.saveCompleted
+          ? `
+        <div class="gb-poke-box gb-save-yesno-box">
+          <button type="button" class="smenu-item" data-save-yn="0"><span class="bcursor">${
+            sm.saveYesNoCursor === 0 ? "▶" : " "
+          }</span>YES</button>
+          <button type="button" class="smenu-item" data-save-yn="1"><span class="bcursor">${
+            sm.saveYesNoCursor === 1 ? "▶" : " "
+          }</span>NO</button>
+        </div>
+      `
+          : ""
+      }
+      <div class="gb-textbox gb-poke-box" style="height:33.33%;width:100%">
+        <p class="gb-dialogue-text">${
+          sm.saveCompleted
+            ? "RED saved the game!"
+            : "Would you like to\nSAVE the game?"
+        }</p>
+        ${sm.saveCompleted ? '<span class="gb-prompt-arrow">▼</span>' : ""}
       </div>
     `;
-    subBody.appendChild(saveWrap);
+    saveScreen.querySelectorAll("[data-save-yn]").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        sm.saveYesNoCursor = Number(btn.dataset.saveYn);
+        handleStartMenuInput("A");
+      };
+    });
+    if (sm.saveCompleted) {
+      saveScreen.onclick = () => handleStartMenuInput("A");
+    }
+    subBody.appendChild(saveScreen);
   } else if (sm.subView === "TOWN_MAP") {
     // Authentic In-Game Kanto Town Map (DisplayTownMap in engine/items/town_map.asm)
     const cur = state.currentZone;
@@ -5504,39 +5981,19 @@ export function renderStartMenu() {
     }
   } else if (sm.subView === "OPTION") {
     if (subTitle) subTitle.textContent = `OPTION`;
-    const optWrap = document.createElement("div");
-    optWrap.style.padding = "8px 10px";
-    optWrap.style.display = "flex";
-    optWrap.style.flexDirection = "column";
-    optWrap.style.gap = "5px";
-    const palRow = document.createElement("button");
-    palRow.type = "button";
-    palRow.className = "sub-list-row";
-    palRow.innerHTML = `<span><span class="bcursor">${sm.subCursor === 0 ? "▶" : " "}</span>PALETTE MODE</span><span>${engine.paletteMode.toUpperCase()}</span>`;
-    palRow.onclick = () => {
-      sm.subCursor = 0;
-      handleStartMenuInput("A");
-    };
-    const bgmRow = document.createElement("button");
-    bgmRow.type = "button";
-    bgmRow.className = "sub-list-row";
-    bgmRow.innerHTML = `<span><span class="bcursor">${sm.subCursor === 1 ? "▶" : " "}</span>SOUND / BGM</span><span>${audio.enabled ? "ON" : "OFF"}</span>`;
-    bgmRow.onclick = () => {
-      sm.subCursor = 1;
-      handleStartMenuInput("A");
-    };
-    const wildRow = document.createElement("button");
-    wildRow.type = "button";
-    wildRow.className = "sub-list-row";
-    wildRow.innerHTML = `<span><span class="bcursor">${sm.subCursor === 2 ? "▶" : " "}</span>WILD ENCOUNTERS</span><span>${state.wildEncountersEnabled ? "ON" : "OFF"}</span>`;
-    wildRow.onclick = () => {
-      sm.subCursor = 2;
-      handleStartMenuInput("A");
-    };
-    optWrap.appendChild(palRow);
-    optWrap.appendChild(bgmRow);
-    optWrap.appendChild(wildRow);
-    subBody.appendChild(optWrap);
+    const optEl = buildOptionsMenuDOM(
+      sm.subCursor,
+      (r) => {
+        sm.subCursor = r;
+        renderStartMenu();
+      },
+      () => {
+        audio.playSfx("blip");
+        sm.subView = null;
+        renderStartMenu();
+      }
+    );
+    subBody.appendChild(optEl);
   }
 }
 
@@ -5668,6 +6125,20 @@ function gameLoop(now) {
     if (now - lastAnimTick > 280) {
       lastAnimTick = now;
       engine.animCounter = (engine.animCounter + 1) & 7;
+      if (state.titleMenu?.open && state.titleMenu.screen === "TITLE") {
+        const pikaCanvas = document.getElementById("title-pika-canvas");
+        if (pikaCanvas) {
+          const frameKey =
+            (engine.animCounter & 1) === 0
+              ? "pikachu_happy_1"
+              : "pikachu_excited_1";
+          engine.render2BitGraphicToCanvas(
+            pikaCanvas,
+            engine.pikachuFaces[frameKey] || engine.pokemonSprites.PIKACHU,
+            "PAL_PIKACHU_PORTRAIT"
+          );
+        }
+      }
       if (state.dialogue && state.dialogue.pikachuMood) {
         const faceCanvas = document.getElementById("dialogue-pika-canvas");
         const frames = state.dialogue.pikachuMood.frames;
@@ -5877,6 +6348,22 @@ function setupControlsAndEvents() {
     ) {
       return;
     }
+    if (state.titleMenu?.open) {
+      if (keyToDir[e.code]) {
+        e.preventDefault();
+        handleTitleMenuInput(keyToDir[e.code]);
+      } else if (e.code === "Space" || e.code === "KeyZ") {
+        e.preventDefault();
+        handleTitleMenuInput("A");
+      } else if (e.code === "Enter" || e.code === "KeyM") {
+        e.preventDefault();
+        handleTitleMenuInput("START");
+      } else if (e.code === "KeyX" || e.code === "Backspace" || e.code === "Escape") {
+        e.preventDefault();
+        handleTitleMenuInput("B");
+      }
+      return;
+    }
     if (state.battle) {
       if (keyToDir[e.code]) {
         e.preventDefault();
@@ -5968,6 +6455,10 @@ function setupControlsAndEvents() {
     const dir = btn.dataset.dpad;
     const startHold = (e) => {
       e.preventDefault();
+      if (state.titleMenu?.open) {
+        handleTitleMenuInput(dir);
+        return;
+      }
       if (state.battle) {
         handleBattleInput(dir);
         return;
@@ -5989,7 +6480,9 @@ function setupControlsAndEvents() {
   });
 
   document.getElementById("btn-gb-a")?.addEventListener("click", () => {
-    if (state.battle) {
+    if (state.titleMenu?.open) {
+      handleTitleMenuInput("A");
+    } else if (state.battle) {
       handleBattleInput("A");
     } else if (state.startMenu.open) {
       handleStartMenuInput("A");
@@ -5998,7 +6491,9 @@ function setupControlsAndEvents() {
     }
   });
   document.getElementById("btn-gb-b")?.addEventListener("click", () => {
-    if (state.dialogue) {
+    if (state.titleMenu?.open) {
+      handleTitleMenuInput("B");
+    } else if (state.dialogue) {
       state.dialogue = null;
       renderDialogueModal();
     } else if (state.battle) {
@@ -6018,7 +6513,9 @@ function setupControlsAndEvents() {
     }
   });
   document.getElementById("btn-gb-start")?.addEventListener("click", () => {
-    if (state.startMenu.open) {
+    if (state.titleMenu?.open) {
+      handleTitleMenuInput("START");
+    } else if (state.startMenu.open) {
       handleStartMenuInput("START");
     } else {
       toggleStartMenu();
@@ -6379,6 +6876,9 @@ window.POKEYELLOW = {
   triggerViridianOldManTutorial,
   startScriptedCatchScene,
   awardStarterPikachuInLab,
+  openTitleScreen,
+  handleTitleMenuInput,
+  renderTitleScreen,
 };
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -6387,6 +6887,7 @@ window.addEventListener("DOMContentLoaded", () => {
   if (state.viewMode !== "gb") {
     renderZoneList();
   }
-  loadZone("PALLET_TOWN");
+  loadZone("PALLET_TOWN", { keepTitleOpen: true });
+  renderTitleScreen();
   requestAnimationFrame(gameLoop);
 });

@@ -1459,6 +1459,200 @@ button {
   display: block;
 }
 
+/* Authentic Pokémon Yellow Title Screen & Main Menu (engine/movie/title_yellow.asm & engine/menus/main_menu.asm) */
+.title-screen-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  background: #fcfaff;
+  color: #111827;
+  font-family: var(--font-mono);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.gb-title-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 8px 8px;
+  background: #fcfaff;
+  cursor: pointer;
+}
+
+.gb-title-logo-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.gb-title-main {
+  font-size: 23px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #111827;
+  text-shadow: 2px 2px 0 #facc15;
+  line-height: 1;
+}
+
+.gb-title-sub {
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: #111827;
+  color: #facc15;
+  padding: 2px 8px;
+  margin-top: 2px;
+}
+
+.gb-title-pika-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 3px double #111827;
+  background: #ffffff;
+}
+
+#title-pika-canvas {
+  width: 84px;
+  height: 84px;
+  display: block;
+}
+
+.gb-title-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 8.5px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.gb-title-press-start {
+  font-size: 10px;
+  font-weight: 900;
+  color: #111827;
+  animation: gbPromptBlink 0.75s steps(2, start) infinite;
+}
+
+/* MainMenu (CONTINUE / NEW GAME / OPTION) + DisplayContinueGameInfo */
+.gb-main-menu-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fcfaff;
+  padding: 6px;
+}
+
+.gb-main-menu-box {
+  width: 66%;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gb-continue-info-box {
+  position: absolute;
+  right: 6px;
+  bottom: 8px;
+  width: 72%;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 900;
+}
+
+/* Authentic Gen I Option Screen (DisplayOptionMenu in engine/menus/options.asm) */
+.gb-options-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 4px 6px;
+  background: #fcfaff;
+  font-family: var(--font-mono);
+}
+
+.gb-opt-box {
+  border: 3px double #111827;
+  box-shadow: inset 0 0 0 1px #111827;
+  padding: 3px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9.5px;
+  font-weight: 900;
+}
+
+.gb-opt-choices {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 2px;
+}
+
+.gb-opt-choice-btn {
+  background: transparent;
+  border: none;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 2px;
+  cursor: pointer;
+}
+
+/* Authentic Gen I Save Screen (SaveSAV in engine/menus/save.asm) */
+.gb-save-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fcfaff;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.gb-save-info-box {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 72%;
+  padding: 5px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 900;
+}
+
+.gb-save-yesno-box {
+  position: absolute;
+  left: 4px;
+  bottom: 35%;
+  width: 34%;
+  padding: 5px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
 .sub-list-row {
   background: transparent;
   border: 1px solid transparent;
