@@ -1076,15 +1076,25 @@ function resolveWarpDestination(zone, warp) {
     }
   }
 
-  if (destConst === "LAST_MAP" || !engine.zonesByConst[destConst]) {
+  if (destConst === "LAST_MAP") {
     if (
       state.lastOutdoorMap &&
       engine.zonesByConst[state.lastOutdoorMap.mapConst]
     ) {
       destConst = state.lastOutdoorMap.mapConst;
-      if (state.lastOutdoorMap.warpIndex !== undefined) {
-        destWarpIdx = state.lastOutdoorMap.warpIndex;
-      }
+    } else if (zone.defaultParent && engine.zonesByConst[zone.defaultParent.mapConst]) {
+      destConst = zone.defaultParent.mapConst;
+    } else {
+      destConst = "PALLET_TOWN";
+    }
+    // Preserve warp.destWarpIndex (which specifies the exact outdoor door index in pret/pokeyellow!)
+  } else if (!engine.zonesByConst[destConst]) {
+    if (
+      state.lastOutdoorMap &&
+      engine.zonesByConst[state.lastOutdoorMap.mapConst]
+    ) {
+      destConst = state.lastOutdoorMap.mapConst;
+      destWarpIdx = state.lastOutdoorMap.warpIndex ?? 0;
     } else if (zone.defaultParent && engine.zonesByConst[zone.defaultParent.mapConst]) {
       destConst = zone.defaultParent.mapConst;
       destWarpIdx = zone.defaultParent.warpIndex ?? 0;
@@ -1321,7 +1331,7 @@ export function useFieldMove(moveId, options = {}) {
 }
 
 function attemptStep(dir) {
-  if (state.dialogue || state.battle || state.startMenu.open) return;
+  if (state.dialogue || state.battle || state.startMenu.open || state.cutsceneActive) return;
   if (state.player.moveAnim) return;
 
   const zone = state.currentZone;
@@ -2319,8 +2329,6 @@ export function startScriptedCatchScene(mode = "OAK_PIKACHU") {
         `Wild PIKACHU\nappeared!`,
         `PROF. OAK used\nPOKé BALL!`,
         `All right! PIKACHU\nwas caught!`,
-        `OAK: Whew... That\nwas close!`,
-        `Wild POKéMON live in\ntall grass! Come with\nme to my POKéMON LAB!`,
       ]
     : [
         `Wild RATTATA\nappeared!`,
@@ -2359,19 +2367,29 @@ export function startScriptedCatchScene(mode = "OAK_PIKACHU") {
     partySubCursor: 0,
     forcedSwitch: false,
     showTrainerSprite: false,
-      log: messages[0],
-      messageQueue: messages.slice(1),
-      finished: true,
-      onComplete: isOak
+    log: messages[0],
+    messageQueue: messages.slice(1),
+    finished: true,
+    onComplete: isOak
       ? () => {
-          state.events.oakRescuedInGrass = true;
-          loadZone("OAKS_LAB", { x: 5, y: 3, dir: "UP" });
+          // PalletTownScript4 (scripts/PalletTown.asm:116-184):
+          // Oak explains in Pallet Town after catching Pikachu, then escorts Red to Oak's Lab!
           openDialogue(
-            "PROF. OAK'S LAB — INTRO EVENT",
-            "BLUE: Gramps! I'm fed up with waiting!\n\nOAK: Let me think... Oh, that's right, I told you to come! Just wait!\n\nOAK: Here, RED! There is 1 POKéMON left inside this POKé BALL on the table. Go ahead, it's yours!\n\nBLUE: No fair! Gramps, I want this one! BLUE pushed RED aside and snatched the POKé BALL! BLUE received an EEVEE!\n\nOAK: BLUE! What are you doing?! ...RED, this is the wild POKéMON I caught earlier in the tall grass. You can have it!\n\nRED received a PIKACHU (:L5)!",
+            "PROF. OAK",
+            "OAK: Whew... That\nwas close!\n\nWild POKéMON live in\ntall grass! You need\nyour own POKéMON for\nyour protection.\n\nI know! Here, come\nwith me!",
             {
               onComplete: () => {
-                awardStarterPikachuInLab();
+                state.events.oakRescuedInGrass = true;
+                loadZone("OAKS_LAB", { x: 5, y: 3, dir: "UP" });
+                openDialogue(
+                  "PROF. OAK'S LAB — INTRO EVENT",
+                  "BLUE: Gramps! I'm fed up with waiting!\n\nOAK: Let me think... Oh, that's right, I told you to come! Just wait!\n\nOAK: Here, RED! There is 1 POKéMON left inside this POKé BALL on the table. Go ahead, it's yours!\n\nBLUE: No fair! Gramps, I want this one! BLUE pushed RED aside and snatched the POKé BALL! BLUE received an EEVEE!\n\nOAK: BLUE! What are you doing?! ...RED, this is the wild POKéMON I caught earlier in the tall grass. You can have it!\n\nRED received a PIKACHU (:L5)!",
+                  {
+                    onComplete: () => {
+                      awardStarterPikachuInLab();
+                    },
+                  }
+                );
               },
             }
           );
@@ -2385,34 +2403,80 @@ export function startScriptedCatchScene(mode = "OAK_PIKACHU") {
           );
         },
   };
-  audio.playSfx("thunder");
+  audio.playPokemonCry(foeMon.species);
   renderBattleModal();
 }
 
 export function triggerOakIntroGrassEvent() {
   const zone = state.currentZone;
   if (!zone || zone.constName !== "PALLET_TOWN") return;
+  if (state.cutsceneActive) return;
+
+  // Phase 1 (PalletTownScript1): Oak calls out from off-screen BEFORE spawning!
   const oakObj = state.npcs.find((n) => n.name === "PALLETTOWN_OAK");
   if (oakObj) {
-    oakObj.defaultVisible = true;
-    oakObj.x = state.player.x;
-    oakObj.y = Math.min(zone.height * 2 - 1, state.player.y + 1);
-    oakObj.renderX = oakObj.x;
-    oakObj.renderY = oakObj.y;
-    oakObj.facing = "UP";
+    oakObj.defaultVisible = false;
   }
   state.player.dir = "DOWN";
   renderAllCanvases(true);
   audio.playSfx("blip");
-  openDialogue(
-    "PROF. OAK",
-    "OAK: Hey! Wait! Don't go out!\n\nOAK: It's unsafe! Wild POKéMON live in tall grass!",
-    {
-      onComplete: () => {
+  openDialogue("PROF. OAK", "OAK: Hey! Wait!\nDon't go out!", {
+    onComplete: () => {
+      // Phase 2 (PalletTownScript2): Oak spawns down at (10, 5) and walks step-by-step up to Red!
+      if (!oakObj) {
         startScriptedCatchScene("OAK_PIKACHU");
-      },
-    }
-  );
+        return;
+      }
+      state.cutsceneActive = true;
+      const targetX = state.player.x;
+      const targetY = Math.min(zone.height * 2 - 1, state.player.y + 1);
+      const startY = Math.min(zone.height * 2 - 1, Math.max(targetY + 3, 5));
+      oakObj.defaultVisible = true;
+      oakObj.x = targetX;
+      oakObj.y = startY;
+      oakObj.renderX = targetX;
+      oakObj.renderY = startY;
+      oakObj.facing = "UP";
+      renderAllCanvases(true);
+
+      const walkNextStep = () => {
+        if (!state.cutsceneActive || state.currentZone?.constName !== "PALLET_TOWN") {
+          state.cutsceneActive = false;
+          return;
+        }
+        if (oakObj.y <= targetY) {
+          oakObj.x = targetX;
+          oakObj.y = targetY;
+          oakObj.renderX = targetX;
+          oakObj.renderY = targetY;
+          oakObj.isWalking = false;
+          oakObj.moveAnim = null;
+          state.cutsceneActive = false;
+          renderAllCanvases(true);
+          // Phase 3 (PalletTownScript3): Wild Pikachu ambushes from tall grass!
+          startScriptedCatchScene("OAK_PIKACHU");
+          return;
+        }
+        const fromY = oakObj.y;
+        const nextY = fromY - 1;
+        oakObj.y = nextY;
+        oakObj.facing = "UP";
+        oakObj.stepParity = !oakObj.stepParity;
+        oakObj.isWalking = true;
+        oakObj.moveAnim = {
+          fromX: targetX,
+          fromY,
+          toX: targetX,
+          toY: nextY,
+          startTime: performance.now(),
+          duration: 280,
+        };
+        setTimeout(walkNextStep, 290);
+      };
+
+      setTimeout(walkNextStep, 180);
+    },
+  });
 }
 
 export function triggerRivalLabBattle() {
