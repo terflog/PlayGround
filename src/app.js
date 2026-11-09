@@ -1301,21 +1301,14 @@ function attemptStep(dir) {
   const targetX = state.player.x + dx;
   const targetY = state.player.y + dy;
 
-  // 1. Check if standing on a warp tile at the edge of an indoor room and pressing outward
+  // 1. Check if standing on a warp tile at the outer edge of a room and pressing outward
   const standingWarp = checkWarpAtStep(zone, state.player.x, state.player.y);
   if (standingWarp) {
-    const ts = engine.tilesetsByConst[zone.tileset];
-    const curTile = engine.getCollisionTileAtStep(
-      zone,
-      state.player.x,
-      state.player.y
-    );
     const pushingOut =
       (dir === "DOWN" && state.player.y === zone.height * 2 - 1) ||
       (dir === "UP" && state.player.y === 0) ||
       (dir === "LEFT" && state.player.x === 0) ||
-      (dir === "RIGHT" && state.player.x === zone.width * 2 - 1) ||
-      (zone.romId >= 0x25 && dir === "DOWN" && ts.warpSet.has(curTile));
+      (dir === "RIGHT" && state.player.x === zone.width * 2 - 1);
     if (pushingOut) {
       const { destConst, destWarpIdx } = resolveWarpDestination(
         zone,
@@ -2206,7 +2199,11 @@ export function triggerNpcDialogue(npc, zone = state.currentZone) {
     }
     if (npc.name === "BLUESHOUSE_TOWN_MAP") {
       audio.playSfx("blip");
-      openDialogue("TOWN MAP", "It's a big map! This is useful!");
+      openDialogue("TOWN MAP", "It's a big map! This is useful!", {
+        onComplete: () => {
+          openTownMapScreen(false);
+        },
+      });
       return;
     }
   }
@@ -4526,6 +4523,19 @@ const START_MENU_SECTIONS = [
   "EXIT",
 ];
 
+export function openTownMapScreen(fromMenu = false) {
+  const tmOrder = engine.getTownMapOrder();
+  const cur = state.currentZone;
+  const matchIdx = tmOrder.findIndex(
+    (loc) => loc.x === cur.townMapX && loc.y === cur.townMapY
+  );
+  state.startMenu.open = true;
+  state.startMenu.subView = "TOWN_MAP";
+  state.startMenu.townMapCursor = matchIdx !== -1 ? matchIdx : 0;
+  state.startMenu.townMapFromItem = fromMenu;
+  renderStartMenu();
+}
+
 export function toggleStartMenu() {
   if (state.battle || state.dialogue) return;
   if (state.titleMenu?.open) {
@@ -5127,8 +5137,7 @@ function useBagItemInStartMenu(itemIndex) {
   }
   if (item.kind === "map") {
     audio.playSfx("blip");
-    sm.subView = "TOWN_MAP";
-    renderStartMenu();
+    openTownMapScreen(true);
     return;
   }
   if (item.kind === "flute") {
@@ -5490,6 +5499,30 @@ export function handleStartMenuInput(input) {
     return;
   }
 
+  if (sm.subView === "TOWN_MAP") {
+    const tmOrder = engine.getTownMapOrder();
+    const count = tmOrder.length;
+    if (input === "UP" || input === "RIGHT") {
+      sm.townMapCursor = ((sm.townMapCursor || 0) + 1) % count;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "DOWN" || input === "LEFT") {
+      sm.townMapCursor = ((sm.townMapCursor || 0) - 1 + count) % count;
+      audio.playSfx("blip");
+      renderStartMenu();
+    } else if (input === "A" || input === "B" || input === "START") {
+      audio.playSfx("blip");
+      if (sm.townMapFromItem) {
+        sm.subView = "ITEM";
+      } else {
+        sm.subView = null;
+        sm.open = false;
+      }
+      renderStartMenu();
+    }
+    return;
+  }
+
   if (sm.subView) {
     if (input === "B" || input === "START" || input === "A") {
       audio.playSfx("blip");
@@ -5593,33 +5626,20 @@ export function renderStartMenu() {
       const nestCoords = new Set(
         nestZones.map((z) => `${z.townMapX},${z.townMapY}`)
       );
-      const regionNames = Array.from(
-        new Set(nestZones.map((z) => z.displayName))
-      );
 
       const wrap = document.createElement("div");
       wrap.className = "gb-pokedex-data";
       wrap.innerHTML = `
-        <div style="display:flex;justify-content:space-between;padding:4px 8px;border-bottom:2px solid #111827;font-size:10px;font-weight:900">
+        <div style="display:flex;justify-content:space-between;padding:2px 6px;background:#fcfaff;border-bottom:2px solid #111827;font-size:10px;font-weight:900">
           <span>${cleanName}'s NEST</span>
-          <span>KANTO</span>
         </div>
-        <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#162436;overflow:hidden">
-          <canvas id="start-dex-area-canvas" width="160" height="104" style="width:100%;height:100%;display:block"></canvas>
+        <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#fcfaff;overflow:hidden">
+          <canvas id="start-dex-area-canvas" width="160" height="128" style="width:100%;height:100%;display:block"></canvas>
           ${
             nestZones.length === 0
               ? `<div class="gb-poke-box" style="position:absolute;padding:4px 10px;font-size:10px;font-weight:900">AREA UNKNOWN</div>`
               : ""
           }
-        </div>
-        <div class="gb-poke-box" style="padding:4px 8px;font-size:9px;font-weight:900;min-height:36px;display:flex;align-items:center;justify-content:space-between">
-          <span>${
-            regionNames.length > 0
-              ? regionNames.slice(0, 4).join(", ") +
-                (regionNames.length > 4 ? ` (+${regionNames.length - 4} more)` : "")
-              : "Not found in the wild (Gift / Evolution / Special)."
-          }</span>
-          <span class="gb-prompt-arrow">▼</span>
         </div>
       `;
       wrap.onclick = () => {
@@ -5631,33 +5651,14 @@ export function renderStartMenu() {
       subBody.appendChild(wrap);
 
       const areaCanvas = document.getElementById("start-dex-area-canvas");
-      if (areaCanvas) {
-        const ctx = areaCanvas.getContext("2d");
-        const W = areaCanvas.width;
-        const H = areaCanvas.height;
-        const cellW = W / 16;
-        const cellH = H / 16;
-        ctx.fillStyle = "#fcfaff";
-        ctx.fillRect(0, 0, W, H);
-        // Draw Kanto map nodes
-        for (const z of engine.canonicalZones) {
-          const px = z.townMapX * cellW;
-          const py = z.townMapY * cellH;
-          ctx.fillStyle = z.category === "town" ? "#94a3b8" : "#cbd5e1";
-          ctx.fillRect(px + 2, py + 2, cellW - 4, cellH - 4);
-        }
-        // Highlight nest coordinates
-        for (const key of nestCoords) {
-          const [gx, gy] = key.split(",").map(Number);
-          const px = gx * cellW;
-          const py = gy * cellH;
-          ctx.fillStyle = "#111827";
-          ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
-          ctx.strokeStyle = "#facc15";
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(px + 1.5, py + 1.5, cellW - 3, cellH - 3);
-        }
-      }
+      engine.renderKantoTownMapScreen(areaCanvas, {
+        playerX: state.currentZone.townMapX,
+        playerY: state.currentZone.townMapY,
+        cursorX: null,
+        cursorY: null,
+        nestCoords,
+        showPlayer: true,
+      });
       return;
     }
 
@@ -6110,51 +6111,53 @@ export function renderStartMenu() {
     subBody.appendChild(saveScreen);
   } else if (sm.subView === "TOWN_MAP") {
     // Authentic In-Game Kanto Town Map (DisplayTownMap in engine/items/town_map.asm)
-    const cur = state.currentZone;
+    const tmOrder = engine.getTownMapOrder();
+    const curLoc =
+      tmOrder[sm.townMapCursor ?? 0] || {
+        x: state.currentZone.townMapX,
+        y: state.currentZone.townMapY,
+        name: state.currentZone.regionName || state.currentZone.displayName.toUpperCase(),
+      };
     const wrap = document.createElement("div");
     wrap.className = "gb-pokedex-data";
     wrap.innerHTML = `
-      <div style="display:flex;justify-content:space-between;padding:4px 8px;border-bottom:2px solid #111827;font-size:10px;font-weight:900">
-        <span>${cur.regionName || cur.displayName.toUpperCase()}</span>
-        <span>TOWN MAP</span>
+      <div id="town-map-top-label" style="display:flex;justify-content:space-between;padding:2px 6px;background:#fcfaff;border-bottom:2px solid #111827;font-size:10px;font-weight:900">
+        <span>${curLoc.name}</span>
       </div>
       <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#fcfaff;overflow:hidden">
-        <canvas id="start-town-map-canvas" width="160" height="104" style="width:100%;height:100%;display:block"></canvas>
-      </div>
-      <div class="gb-poke-box" style="padding:4px 8px;font-size:9px;font-weight:900;min-height:32px;display:flex;align-items:center;justify-content:space-between">
-        <span>RED's POSITION: ${cur.displayName}</span>
-        <span class="gb-prompt-arrow">▼</span>
+        <canvas id="start-town-map-canvas" width="160" height="128" style="width:100%;height:100%;display:block;cursor:crosshair"></canvas>
       </div>
     `;
-    wrap.onclick = () => {
-      audio.playSfx("blip");
-      sm.subView = "ITEM";
-      renderStartMenu();
-    };
     subBody.appendChild(wrap);
     const tmCanvas = document.getElementById("start-town-map-canvas");
-    if (tmCanvas) {
-      const ctx = tmCanvas.getContext("2d");
-      const W = tmCanvas.width;
-      const H = tmCanvas.height;
-      const cellW = W / 16;
-      const cellH = H / 16;
-      ctx.fillStyle = "#fcfaff";
-      ctx.fillRect(0, 0, W, H);
-      for (const z of engine.canonicalZones) {
-        const px = z.townMapX * cellW;
-        const py = z.townMapY * cellH;
-        ctx.fillStyle = z.category === "town" ? "#64748b" : "#cbd5e1";
-        ctx.fillRect(px + 2, py + 2, cellW - 4, cellH - 4);
-      }
-      const cx = cur.townMapX * cellW;
-      const cy = cur.townMapY * cellH;
-      ctx.fillStyle = "#111827";
-      ctx.fillRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(cx + 0.5, cy + 0.5, cellW - 1, cellH - 1);
-    }
+    engine.renderKantoTownMapScreen(tmCanvas, {
+      playerX: state.currentZone.townMapX,
+      playerY: state.currentZone.townMapY,
+      cursorX: curLoc.x,
+      cursorY: curLoc.y,
+      nestCoords: null,
+      showPlayer: true,
+    });
+    tmCanvas?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const rect = tmCanvas.getBoundingClientRect();
+      const px = ((e.clientX - rect.left) / rect.width) * 160;
+      const py = ((e.clientY - rect.top) / rect.height) * 128;
+      const gx = Math.round((px - 20) / 8);
+      const gy = Math.round((py - 4) / 8);
+      let bestIdx = sm.townMapCursor ?? 0;
+      let bestDist = 999;
+      tmOrder.forEach((loc, idx) => {
+        const d = Math.abs(loc.x - gx) + Math.abs(loc.y - gy);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = idx;
+        }
+      });
+      audio.playSfx("blip");
+      sm.townMapCursor = bestIdx;
+      renderStartMenu();
+    });
   } else if (sm.subView === "OPTION") {
     if (subTitle) subTitle.textContent = `OPTION`;
     const optEl = buildOptionsMenuDOM(
@@ -6314,6 +6317,13 @@ function gameLoop(now) {
             "PAL_PIKACHU_PORTRAIT"
           );
         }
+      }
+      if (
+        state.startMenu.open &&
+        (state.startMenu.subView === "TOWN_MAP" ||
+          state.startMenu.dexModalMode === "AREA")
+      ) {
+        renderStartMenu();
       }
       if (state.dialogue && state.dialogue.pikachuMood) {
         const faceCanvas = document.getElementById("dialogue-pika-canvas");
@@ -7055,6 +7065,7 @@ window.POKEYELLOW = {
   openTitleScreen,
   handleTitleMenuInput,
   renderTitleScreen,
+  openTownMapScreen,
 };
 
 window.addEventListener("DOMContentLoaded", () => {
